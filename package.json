@@ -1,0 +1,27 @@
+{
+  "name": "dispatchai-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Recruiter-focused, production-style agentic field-service dispatch platform",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@dispatchai/web",
+    "dev:domain": "node --env-file=.env ./node_modules/vite-node/vite-node.mjs packages/domain/src/bin/dispatch-server.ts",
+    "dev:agent": "node --env-file=.env ./node_modules/vite-node/vite-node.mjs packages/agent/src/bin/agent-server.ts",
+    "dev:cloudflare": "wrangler dev --port 8788",
+    "smoke:cloudflare": "node scripts/cloudflare-smoke.mjs",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "agents": "^0.24.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1",
+    "wrangler": "^4.136.3"
+  }
+}

@@ -1,0 +1,1694 @@
+{
+  "name": "DispatchAI - All Operations (Single Canvas)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "create-work-order",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "create-0-node-webhook",
+      "name": "Create: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        160,
+        304
+      ],
+      "webhookId": "create-work-order-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.item.json.headers || {};\nconst correlationId = headers['x-correlation-id'] || `corr_${Date.now()}`;\n\nconst body = $input.item.json.body || {};\nconst requiredFields = ['idempotencyKey', 'customerId', 'propertyId', 'serviceType', 'issueSummary', 'urgency', 'slotId', 'createdBy'];\n\nfor (const field of requiredFields) {\n  if (!body[field]) {\n    return [{\n      json: {\n        authenticated: true,\n        valid: false,\n        error: {\n          code: 'INVALID_INPUT',\n          message: `Field \"${field}\" is required`,\n          retryable: false\n        },\n        correlationId\n      }\n    }];\n  }\n}\n\nreturn [{\n  json: {\n    authenticated: true,\n    valid: true,\n    payload: body,\n    correlationId\n  }\n}];"
+      },
+      "id": "create-0-node-auth-validation",
+      "name": "Create: Auth & Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.authenticated }}",
+              "value2": true
+            },
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "create-0-node-if-valid",
+      "name": "Create: Is Authorized & Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        608,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3100/api/internal/create-work-order",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-correlation-id",
+              "value": "={{ $json.correlationId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "create-0-node-create-order-db",
+      "name": "Create: Create Work Order in DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        208
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ok }}",
+              "value2": true
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "create-0-node-if-created",
+      "name": "Create: Order Created Successfully?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/automation/work-order-created",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Create: Create Work Order in DB').item.json.data.workOrder) }}",
+        "options": {
+          "timeout": 5000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "create-0-node-trigger-automation",
+      "name": "Create: Trigger Showcase Automation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1280,
+        112
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Create: Create Work Order in DB').item.json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "create-0-node-respond-success",
+      "name": "Create: Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1504,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "create-0-node-respond-db-failure",
+      "name": "Create: Respond Booking Failure",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1280,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, correlationId: $json.correlationId }) }}",
+        "options": {
+          "responseCode": "={{ $json.authenticated === false ? 401 : 400 }}"
+        }
+      },
+      "id": "create-0-node-respond-error",
+      "name": "Create: Respond Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "check-availability",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "check-1-node-webhook",
+      "name": "Check: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        160,
+        832
+      ],
+      "webhookId": "check-availability-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.item.json.headers || {};\n\nconst body = $input.item.json.body || {};\nconst { serviceType, serviceZone, date, preferredWindow } = body;\n\nif (!serviceType || !['HVAC', 'PLUMBING'].includes(serviceType)) {\n  return [{\n    json: {\n      authenticated: true,\n      valid: false,\n      error: {\n        code: 'INVALID_INPUT',\n        message: 'serviceType must be either HVAC or PLUMBING',\n        retryable: false\n      },\n      correlationId: headers['x-correlation-id'] || `corr_${Date.now()}`\n    }\n  }];\n}\n\nif (!serviceZone || typeof serviceZone !== 'string') {\n  return [{\n    json: {\n      authenticated: true,\n      valid: false,\n      error: {\n        code: 'INVALID_INPUT',\n        message: 'serviceZone is required',\n        retryable: false\n      },\n      correlationId: headers['x-correlation-id'] || `corr_${Date.now()}`\n    }\n  }];\n}\n\nif (!date || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) {\n  return [{\n    json: {\n      authenticated: true,\n      valid: false,\n      error: {\n        code: 'INVALID_INPUT',\n        message: 'date must be in YYYY-MM-DD format',\n        retryable: false\n      },\n      correlationId: headers['x-correlation-id'] || `corr_${Date.now()}`\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    authenticated: true,\n    valid: true,\n    payload: { serviceType, serviceZone, date, preferredWindow },\n    correlationId: headers['x-correlation-id'] || `corr_${Date.now()}`\n  }\n}];"
+      },
+      "id": "check-1-node-auth-validation",
+      "name": "Check: Auth & Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.authenticated }}",
+              "value2": true
+            },
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "check-1-node-if-valid",
+      "name": "Check: Is Authorized & Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        608,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3100/api/internal/check-availability",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-correlation-id",
+              "value": "={{ $json.correlationId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "check-1-node-db-availability",
+      "name": "Check: Query Availability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        720
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "check-1-node-respond-success",
+      "name": "Check: Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, correlationId: $json.correlationId }) }}",
+        "options": {
+          "responseCode": "={{ $json.authenticated === false ? 401 : 400 }}"
+        }
+      },
+      "id": "check-1-node-respond-error",
+      "name": "Check: Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "customer-lookup",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "custlookup-2-node-webhook",
+      "name": "CustLookup: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        160,
+        1344
+      ],
+      "webhookId": "customer-lookup-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.item.json.headers || {};\n\nconst body = $input.item.json.body || {};\nconst phone = typeof body.phone === 'string' ? body.phone.trim() : '';\n\nif (!phone || phone.replace(/\\D/g, '').length < 7) {\n  return [{\n    json: {\n      authenticated: true,\n      valid: false,\n      error: {\n        code: 'INVALID_INPUT',\n        message: 'Field \"phone\" is required and must contain at least 7 digits',\n        retryable: false\n      },\n      correlationId: headers['x-correlation-id'] || `corr_${Date.now()}`\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    authenticated: true,\n    valid: true,\n    phone,\n    correlationId: headers['x-correlation-id'] || `corr_${Date.now()}`\n  }\n}];"
+      },
+      "id": "custlookup-2-node-auth-validation",
+      "name": "CustLookup: Auth & Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.authenticated }}",
+              "value2": true
+            },
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "custlookup-2-node-if-valid",
+      "name": "CustLookup: Is Authorized & Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        608,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3100/api/internal/find-customer",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-correlation-id",
+              "value": "={{ $json.correlationId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ phone: $json.phone }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "custlookup-2-node-db-lookup",
+      "name": "CustLookup: Database Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        1248
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "custlookup-2-node-respond-success",
+      "name": "CustLookup: Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, correlationId: $json.correlationId }) }}",
+        "options": {
+          "responseCode": "={{ $json.authenticated === false ? 401 : 400 }}"
+        }
+      },
+      "id": "custlookup-2-node-respond-error",
+      "name": "CustLookup: Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "get-work-order",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "getwo-3-node-webhook",
+      "name": "GetWO: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        160,
+        1872
+      ],
+      "webhookId": "get-work-order-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.item.json.headers || {};\nconst correlationId = headers['x-correlation-id'] || `corr_${Date.now()}`;\n\nconst body = $input.item.json.body || {};\nconst workOrderId = typeof body.workOrderId === 'string' ? body.workOrderId.trim() : '';\n\nif (!workOrderId) {\n  return [{\n    json: {\n      authenticated: true,\n      valid: false,\n      error: {\n        code: 'INVALID_INPUT',\n        message: 'Field \"workOrderId\" is required',\n        retryable: false\n      },\n      correlationId\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    authenticated: true,\n    valid: true,\n    workOrderId,\n    correlationId\n  }\n}];"
+      },
+      "id": "getwo-3-node-auth-validation",
+      "name": "GetWO: Auth & Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        1872
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.authenticated }}",
+              "value2": true
+            },
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "getwo-3-node-if-valid",
+      "name": "GetWO: Is Authorized & Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        608,
+        1872
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3100/api/internal/get-work-order",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-correlation-id",
+              "value": "={{ $json.correlationId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workOrderId: $json.workOrderId }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "getwo-3-node-db-lookup",
+      "name": "GetWO: Lookup Work Order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        1760
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "getwo-3-node-respond-success",
+      "name": "GetWO: Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, correlationId: $json.correlationId }) }}",
+        "options": {
+          "responseCode": "={{ $json.authenticated === false ? 401 : 400 }}"
+        }
+      },
+      "id": "getwo-3-node-respond-error",
+      "name": "GetWO: Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        1984
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reschedule-work-order",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "reschedule-4-node-webhook",
+      "name": "Reschedule: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        160,
+        2384
+      ],
+      "webhookId": "reschedule-work-order-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.item.json.headers || {};\nconst correlationId = headers['x-correlation-id'] || `corr_${Date.now()}`;\n\nconst body = $input.item.json.body || {};\nconst { idempotencyKey, workOrderId, newSlotId } = body;\n\nif (!idempotencyKey || !workOrderId || !newSlotId) {\n  return [{\n    json: {\n      authenticated: true,\n      valid: false,\n      error: {\n        code: 'INVALID_INPUT',\n        message: 'idempotencyKey, workOrderId, and newSlotId are all required',\n        retryable: false\n      },\n      correlationId\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    authenticated: true,\n    valid: true,\n    payload: { idempotencyKey, workOrderId, newSlotId },\n    correlationId\n  }\n}];"
+      },
+      "id": "reschedule-4-node-auth-validation",
+      "name": "Reschedule: Auth & Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        2384
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.authenticated }}",
+              "value2": true
+            },
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "reschedule-4-node-if-valid",
+      "name": "Reschedule: Is Authorized & Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        608,
+        2384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3100/api/internal/reschedule-work-order",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-correlation-id",
+              "value": "={{ $json.correlationId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "reschedule-4-node-reschedule-db",
+      "name": "Reschedule: Reschedule in DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        2288
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": "={{ $json.ok ? 200 : 400 }}"
+        }
+      },
+      "id": "reschedule-4-node-respond-result",
+      "name": "Reschedule: Respond Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        2288
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, correlationId: $json.correlationId }) }}",
+        "options": {
+          "responseCode": "={{ $json.authenticated === false ? 401 : 400 }}"
+        }
+      },
+      "id": "reschedule-4-node-respond-error",
+      "name": "Reschedule: Respond Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cancel-work-order",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "cancel-5-node-webhook",
+      "name": "Cancel: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        160,
+        2912
+      ],
+      "webhookId": "cancel-work-order-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.item.json.headers || {};\nconst correlationId = headers['x-correlation-id'] || `corr_${Date.now()}`;\n\nconst body = $input.item.json.body || {};\nconst { idempotencyKey, workOrderId, reason } = body;\n\nif (!idempotencyKey || !workOrderId) {\n  return [{\n    json: {\n      authenticated: true,\n      valid: false,\n      error: {\n        code: 'INVALID_INPUT',\n        message: 'idempotencyKey and workOrderId are required',\n        retryable: false\n      },\n      correlationId\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    authenticated: true,\n    valid: true,\n    payload: { idempotencyKey, workOrderId, reason },\n    correlationId\n  }\n}];"
+      },
+      "id": "cancel-5-node-auth-validation",
+      "name": "Cancel: Auth & Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        2912
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.authenticated }}",
+              "value2": true
+            },
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "cancel-5-node-if-valid",
+      "name": "Cancel: Is Authorized & Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        608,
+        2912
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3100/api/internal/cancel-work-order",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-correlation-id",
+              "value": "={{ $json.correlationId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "cancel-5-node-cancel-db",
+      "name": "Cancel: Cancel in DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        2800
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": "={{ $json.ok ? 200 : 400 }}"
+        }
+      },
+      "id": "cancel-5-node-respond-result",
+      "name": "Cancel: Respond Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        2800
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, correlationId: $json.correlationId }) }}",
+        "options": {
+          "responseCode": "={{ $json.authenticated === false ? 401 : 400 }}"
+        }
+      },
+      "id": "cancel-5-node-respond-error",
+      "name": "Cancel: Respond Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        3024
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "automation/work-order-created",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "showcase-6-node-webhook",
+      "name": "Showcase: Webhook: Work Order Created",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        160,
+        3424
+      ],
+      "webhookId": "work-order-created-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AuF5x8y5hgIIeD67",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.serviceType }}",
+                    "rightValue": "HVAC",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.serviceType }}",
+                    "rightValue": "PLUMBING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "showcase-6-node-switch-service",
+      "name": "Showcase: Switch Service",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        384,
+        3424
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const wo = $input.item.json.body || {};\nreturn [{\n  json: {\n    workOrderId: wo.id,\n    serviceCategory: 'HVAC',\n    technicianPrep: 'Prepare refrigerant manifold gauges, vacuum pump, and multi-meter. Verify seasonal capacitor stock.',\n    customerAdvice: 'Please ensure clear access to both indoor thermostat and outdoor condenser unit.',\n    workOrder: wo\n  }\n}];"
+      },
+      "id": "showcase-6-node-hvac-branch",
+      "name": "Showcase: HVAC Checklist & Equipment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        3328
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const wo = $input.item.json.body || {};\nreturn [{\n  json: {\n    workOrderId: wo.id,\n    serviceCategory: 'PLUMBING',\n    technicianPrep: 'Prepare pipe inspection camera, commercial snake, and replacement shutoff valve assortment.',\n    customerAdvice: 'Please locate main water shutoff valve in case isolation is required upon technician arrival.',\n    workOrder: wo\n  }\n}];"
+      },
+      "id": "showcase-6-node-plumbing-branch",
+      "name": "Showcase: Plumbing Checklist & Equipment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        3520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nconst wo = item.workOrder || {};\nreturn [{\n  json: {\n    confirmationId: `conf_${wo.id || Date.now()}`,\n    workOrderId: wo.id,\n    serviceCategory: item.serviceCategory,\n    customerNotice: {\n      recipientCustomerId: wo.customerId,\n      channel: 'SMS_MOCK',\n      text: `DispatchAI Confirmation: Your ${item.serviceCategory} appointment is booked for ${wo.scheduledStart}. ${item.customerAdvice}`\n    },\n    dispatchNotice: {\n      channel: 'INTERNAL_BROADCAST_MOCK',\n      priority: wo.urgency,\n      text: `Job #${wo.id} assigned. Tech prep: ${item.technicianPrep}`\n    },\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "showcase-6-node-create-confirmation",
+      "name": "Showcase: Create Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        3424
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.item.json.customerNotice;\n// Showcase Demo Integration: simulated external customer dispatch\nreturn [{\n  json: {\n    status: 'DISPATCHED_MOCK',\n    provider: 'Twilio_Mock',\n    notice: payload,\n    deliveredAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "showcase-6-node-customer-notice",
+      "name": "Showcase: Customer Notice (Demo Mock)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        3328
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $('Showcase: Create Confirmation').item.json.dispatchNotice;\n// Showcase Demo Integration: simulated internal dispatch board notice\nreturn [{\n  json: {\n    status: 'POSTED_MOCK',\n    channel: '#field-ops-austin',\n    notice: payload,\n    postedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "showcase-6-node-dispatch-notice",
+      "name": "Showcase: Dispatch Notice (Demo Mock)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        3520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const conf = $('Showcase: Create Confirmation').item.json;\nconst cust = $('Showcase: Customer Notice (Demo Mock)').item.json;\nconst disp = $('Showcase: Dispatch Notice (Demo Mock)').item.json;\n\nreturn [{\n  json: {\n    ok: true,\n    data: {\n      automation: 'work-order-created-showcase',\n      confirmationId: conf.confirmationId,\n      workOrderId: conf.workOrderId,\n      customerNoticeStatus: cust.status,\n      dispatchNoticeStatus: disp.status,\n      loggedAt: new Date().toISOString()\n    },\n    correlationId: `showcase_${Date.now()}`\n  }\n}];"
+      },
+      "id": "showcase-6-node-integration-log",
+      "name": "Showcase: Integration Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        3424
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "showcase-6-node-respond-success",
+      "name": "Showcase: Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1552,
+        3424
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 04 · Get work order\nPOST /webhook/get-work-order\n\nRead-only lookup by `workOrderId`; use its backend result for every status claim.\n\n**Local setup:** use the saved Header Auth credential on this webhook and its HTTP request nodes; relink the credential after importing into another n8n instance."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1760,
+        1968
+      ],
+      "typeVersion": 1,
+      "id": "1e9ae9c8-331d-4c8c-b0d7-ea3d7dfe078a",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## 01 · Create work order\nPOST /webhook/create-work-order\n\nOnly after explicit customer confirmation. Backend rechecks slot availability and idempotency before writing.\n\n**Local setup:** use the saved Header Auth credential on this webhook and its HTTP request nodes; relink the credential after importing into another n8n instance.",
+        "height": 464,
+        "width": 368
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1824,
+        64
+      ],
+      "typeVersion": 1,
+      "id": "0323bf85-25ba-4b7a-ba89-c950b763c89f",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## 02 · Availability\nPOST /webhook/check-availability\n\nReturns currently available technician slots for service type, zone, and date. Re-query when constraints change or a slot is stale.\n\n**Local setup:** use the saved Header Auth credential on this webhook and its HTTP request nodes; relink the credential after importing into another n8n instance."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1664,
+        928
+      ],
+      "typeVersion": 1,
+      "id": "15f26e9b-dc17-49d3-97c6-376e3dfb0cbd",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## 03 · Customer lookup\nPOST /webhook/customer-lookup\n\nInput: customer phone. Return only matching customer and properties from the database.\n\n**Local setup:** use the saved Header Auth credential on this webhook and its HTTP request nodes; relink the credential after importing into another n8n instance."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1664,
+        1392
+      ],
+      "typeVersion": 1,
+      "id": "08401360-3d1c-4e00-a6a0-ce6e363d5ee1",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## 05 · Reschedule\nPOST /webhook/reschedule-work-order\n\nRequires explicit confirmation, `idempotencyKey`, work-order ID, and a fresh available slot. Failed reservation must preserve the original booking.\n\n**Local setup:** use the saved Header Auth credential on this webhook and its HTTP request nodes; relink the credential after importing into another n8n instance."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1664,
+        2496
+      ],
+      "typeVersion": 1,
+      "id": "f2c1bc52-d286-494a-a701-5a5327d7aa80",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## 06 · Cancellation\nPOST /webhook/cancel-work-order\n\nRequires explicit confirmation and an `idempotencyKey`. Successful cancellation releases an eligible future slot; retries must not cancel twice.\n\n**Local setup:** use the saved Header Auth credential on this webhook and its HTTP request nodes; relink the credential after importing into another n8n instance."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1664,
+        2976
+      ],
+      "typeVersion": 1,
+      "id": "663a2879-6a81-4b12-b8aa-724650d79d53",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## 07 · Created automation\nPOST /webhook/automation/work-order-created\n\nTriggered only after successful create. HVAC / plumbing branches prepare a confirmation and demo notices.\n\n**Customer / Dispatch Notice nodes are demo mocks:** they do not send real messages. Replace with real providers only after you add credentials. Booking success must remain independent of notice delivery."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1664,
+        3376
+      ],
+      "typeVersion": 1,
+      "id": "e7697c9d-53f1-4933-935b-e32daa2a283f",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "##Create Work Order",
+        "height": 80,
+        "width": 208
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        16,
+        128
+      ],
+      "typeVersion": 1,
+      "id": "80be792d-5339-4c07-9d2c-e97ee22a4b2d",
+      "name": "Sticky Note7"
+    }
+  ],
+  "connections": {
+    "Create: Webhook": {
+      "main": [
+        [
+          {
+            "node": "Create: Auth & Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create: Auth & Validation": {
+      "main": [
+        [
+          {
+            "node": "Create: Is Authorized & Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create: Is Authorized & Valid?": {
+      "main": [
+        [
+          {
+            "node": "Create: Create Work Order in DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create: Respond Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create: Create Work Order in DB": {
+      "main": [
+        [
+          {
+            "node": "Create: Order Created Successfully?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create: Order Created Successfully?": {
+      "main": [
+        [
+          {
+            "node": "Create: Trigger Showcase Automation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create: Respond Booking Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check: Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check: Auth & Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check: Auth & Validation": {
+      "main": [
+        [
+          {
+            "node": "Check: Is Authorized & Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check: Is Authorized & Valid?": {
+      "main": [
+        [
+          {
+            "node": "Check: Query Availability",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check: Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check: Query Availability": {
+      "main": [
+        [
+          {
+            "node": "Check: Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CustLookup: Webhook": {
+      "main": [
+        [
+          {
+            "node": "CustLookup: Auth & Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CustLookup: Auth & Validation": {
+      "main": [
+        [
+          {
+            "node": "CustLookup: Is Authorized & Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CustLookup: Is Authorized & Valid?": {
+      "main": [
+        [
+          {
+            "node": "CustLookup: Database Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CustLookup: Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CustLookup: Database Lookup": {
+      "main": [
+        [
+          {
+            "node": "CustLookup: Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetWO: Webhook": {
+      "main": [
+        [
+          {
+            "node": "GetWO: Auth & Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetWO: Auth & Validation": {
+      "main": [
+        [
+          {
+            "node": "GetWO: Is Authorized & Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetWO: Is Authorized & Valid?": {
+      "main": [
+        [
+          {
+            "node": "GetWO: Lookup Work Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GetWO: Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetWO: Lookup Work Order": {
+      "main": [
+        [
+          {
+            "node": "GetWO: Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reschedule: Webhook": {
+      "main": [
+        [
+          {
+            "node": "Reschedule: Auth & Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reschedule: Auth & Validation": {
+      "main": [
+        [
+          {
+            "node": "Reschedule: Is Authorized & Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reschedule: Is Authorized & Valid?": {
+      "main": [
+        [
+          {
+            "node": "Reschedule: Reschedule in DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reschedule: Respond Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reschedule: Reschedule in DB": {
+      "main": [
+        [
+          {
+            "node": "Reschedule: Respond Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: Webhook": {
+      "main": [
+        [
+          {
+            "node": "Cancel: Auth & Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: Auth & Validation": {
+      "main": [
+        [
+          {
+            "node": "Cancel: Is Authorized & Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: Is Authorized & Valid?": {
+      "main": [
+        [
+          {
+            "node": "Cancel: Cancel in DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancel: Respond Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: Cancel in DB": {
+      "main": [
+        [
+          {
+            "node": "Cancel: Respond Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Showcase: Webhook: Work Order Created": {
+      "main": [
+        [
+          {
+            "node": "Showcase: Switch Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Showcase: Switch Service": {
+      "main": [
+        [
+          {
+            "node": "Showcase: HVAC Checklist & Equipment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Showcase: Plumbing Checklist & Equipment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Showcase: HVAC Checklist & Equipment": {
+      "main": [
+        [
+          {
+            "node": "Showcase: Create Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Showcase: Plumbing Checklist & Equipment": {
+      "main": [
+        [
+          {
+            "node": "Showcase: Create Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Showcase: Create Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Showcase: Customer Notice (Demo Mock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Showcase: Customer Notice (Demo Mock)": {
+      "main": [
+        [
+          {
+            "node": "Showcase: Dispatch Notice (Demo Mock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Showcase: Dispatch Notice (Demo Mock)": {
+      "main": [
+        [
+          {
+            "node": "Showcase: Integration Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Showcase: Integration Log": {
+      "main": [
+        [
+          {
+            "node": "Showcase: Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create: Trigger Showcase Automation": {
+      "main": [
+        [
+          {
+            "node": "Create: Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "active": false
+}

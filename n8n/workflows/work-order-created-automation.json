@@ -1,0 +1,221 @@
+{
+  "name": "Work Order Created Showcase Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "automation/work-order-created",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook: Work Order Created",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [100, 300],
+      "webhookId": "work-order-created-webhook"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.body.serviceType }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "HVAC",
+              "output": 0
+            },
+            {
+              "value2": "PLUMBING",
+              "output": 1
+            }
+          ]
+        }
+      },
+      "id": "node-switch-service",
+      "name": "Switch Service",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [320, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const wo = $input.item.json.body || {};\nreturn [{\n  json: {\n    workOrderId: wo.id,\n    serviceCategory: 'HVAC',\n    technicianPrep: 'Prepare refrigerant manifold gauges, vacuum pump, and multi-meter. Verify seasonal capacitor stock.',\n    customerAdvice: 'Please ensure clear access to both indoor thermostat and outdoor condenser unit.',\n    workOrder: wo\n  }\n}];"
+      },
+      "id": "node-hvac-branch",
+      "name": "HVAC Checklist & Equipment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [540, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const wo = $input.item.json.body || {};\nreturn [{\n  json: {\n    workOrderId: wo.id,\n    serviceCategory: 'PLUMBING',\n    technicianPrep: 'Prepare pipe inspection camera, commercial snake, and replacement shutoff valve assortment.',\n    customerAdvice: 'Please locate main water shutoff valve in case isolation is required upon technician arrival.',\n    workOrder: wo\n  }\n}];"
+      },
+      "id": "node-plumbing-branch",
+      "name": "Plumbing Checklist & Equipment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [540, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nconst wo = item.workOrder || {};\nreturn [{\n  json: {\n    confirmationId: `conf_${wo.id || Date.now()}`,\n    workOrderId: wo.id,\n    serviceCategory: item.serviceCategory,\n    customerNotice: {\n      recipientCustomerId: wo.customerId,\n      channel: 'SMS_MOCK',\n      text: `DispatchAI Confirmation: Your ${item.serviceCategory} appointment is booked for ${wo.scheduledStart}. ${item.customerAdvice}`\n    },\n    dispatchNotice: {\n      channel: 'INTERNAL_BROADCAST_MOCK',\n      priority: wo.urgency,\n      text: `Job #${wo.id} assigned. Tech prep: ${item.technicianPrep}`\n    },\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-create-confirmation",
+      "name": "Create Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.item.json.customerNotice;\n// Showcase Demo Integration: simulated external customer dispatch\nreturn [{\n  json: {\n    status: 'DISPATCHED_MOCK',\n    provider: 'Twilio_Mock',\n    notice: payload,\n    deliveredAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-customer-notice",
+      "name": "Customer Notice (Demo Mock)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.item.json.dispatchNotice;\n// Showcase Demo Integration: simulated internal dispatch board notice\nreturn [{\n  json: {\n    status: 'POSTED_MOCK',\n    channel: '#field-ops-austin',\n    notice: payload,\n    postedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-dispatch-notice",
+      "name": "Dispatch Notice (Demo Mock)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const conf = $('Create Confirmation').item.json;\nconst cust = $('Customer Notice (Demo Mock)').item.json;\nconst disp = $('Dispatch Notice (Demo Mock)').item.json;\n\nreturn [{\n  json: {\n    ok: true,\n    data: {\n      automation: 'work-order-created-showcase',\n      confirmationId: conf.confirmationId,\n      workOrderId: conf.workOrderId,\n      customerNoticeStatus: cust.status,\n      dispatchNoticeStatus: disp.status,\n      loggedAt: new Date().toISOString()\n    },\n    correlationId: `showcase_${Date.now()}`\n  }\n}];"
+      },
+      "id": "node-integration-log",
+      "name": "Integration Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1480, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: Work Order Created": {
+      "main": [
+        [
+          {
+            "node": "Switch Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Service": {
+      "main": [
+        [
+          {
+            "node": "HVAC Checklist & Equipment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Plumbing Checklist & Equipment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HVAC Checklist & Equipment": {
+      "main": [
+        [
+          {
+            "node": "Create Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plumbing Checklist & Equipment": {
+      "main": [
+        [
+          {
+            "node": "Create Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Customer Notice (Demo Mock)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Dispatch Notice (Demo Mock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Notice (Demo Mock)": {
+      "main": [
+        [
+          {
+            "node": "Integration Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Notice (Demo Mock)": {
+      "main": [
+        [
+          {
+            "node": "Integration Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Integration Log": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

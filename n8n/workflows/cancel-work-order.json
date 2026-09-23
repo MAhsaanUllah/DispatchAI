@@ -1,0 +1,162 @@
+{
+  "name": "Cancel Work Order",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cancel-work-order",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [100, 300],
+      "webhookId": "cancel-work-order-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.item.json.headers || {};\nconst authSecret = headers['x-dispatch-secret'] || (headers['authorization'] || '').replace(/^Bearer\\s+/, '');\nconst expectedSecret = $env.N8N_WEBHOOK_SECRET || 'dev_secret_dispatch_2026';\nconst correlationId = headers['x-correlation-id'] || `corr_${Date.now()}`;\n\nif (authSecret !== expectedSecret) {\n  return [{\n    json: {\n      authenticated: false,\n      error: {\n        code: 'UNAUTHORIZED',\n        message: 'Invalid or missing x-dispatch-secret authentication header',\n        retryable: false\n      },\n      correlationId\n    }\n  }];\n}\n\nconst body = $input.item.json.body || {};\nconst { idempotencyKey, workOrderId, reason } = body;\n\nif (!idempotencyKey || !workOrderId) {\n  return [{\n    json: {\n      authenticated: true,\n      valid: false,\n      error: {\n        code: 'INVALID_INPUT',\n        message: 'idempotencyKey and workOrderId are required',\n        retryable: false\n      },\n      correlationId\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    authenticated: true,\n    valid: true,\n    payload: { idempotencyKey, workOrderId, reason },\n    correlationId\n  }\n}];"
+      },
+      "id": "node-auth-validation",
+      "name": "Auth & Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [320, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.authenticated }}",
+              "value2": true
+            },
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "node-if-valid",
+      "name": "Is Authorized & Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [540, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DATABASE_SERVICE_URL || 'http://localhost:3000' }}/api/internal/cancel-work-order",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-correlation-id",
+              "value": "={{ $json.correlationId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {}
+      },
+      "id": "node-cancel-db",
+      "name": "Cancel in DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": "={{ $json.ok ? 200 : 400 }}"
+        }
+      },
+      "id": "node-respond-result",
+      "name": "Respond Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": false,\n  \"error\": {{ JSON.stringify($json.error) }},\n  \"correlationId\": \"{{ $json.correlationId }}\"\n}",
+        "options": {
+          "responseCode": "={{ $json.authenticated === false ? 401 : 400 }}"
+        }
+      },
+      "id": "node-respond-error",
+      "name": "Respond Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [780, 420]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth & Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth & Validation": {
+      "main": [
+        [
+          {
+            "node": "Is Authorized & Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Authorized & Valid?": {
+      "main": [
+        [
+          {
+            "node": "Cancel in DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel in DB": {
+      "main": [
+        [
+          {
+            "node": "Respond Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
