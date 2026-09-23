@@ -14,7 +14,7 @@ The application combines a React operations dashboard, an ElevenLabs conversatio
 
 ### Workflow orchestration
 
-![DispatchAI n8n workflow canvas](assets/screenshots/n8n-all-operations.png)
+![DispatchAI n8n workflow canvas](assets/screenshots/all-n8n-operations.png)
 
 The merged n8n canvas contains seven flows: create work order, check availability, find customer, get work order, reschedule, cancel, and booking-created automation. Open the image at full size to inspect the connections.
 
