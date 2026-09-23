@@ -1,0 +1,22 @@
+{
+  "name": "@dispatchai/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@dispatchai/shared": "*",
+    "@dispatchai/domain": "*",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250204.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
