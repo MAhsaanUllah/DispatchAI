@@ -102,11 +102,12 @@ export const api = {
     return this.sendMessage(text);
   },
 
-  subscribeEvents(callback: (event: AgentEvent) => void) {
+  subscribeEvents(callback: (event: AgentEvent) => void, onConnectionChange?: (connected: boolean) => void) {
     let lastEventId = state.events.at(-1)?.id;
     const timer = window.setInterval(async () => {
       try {
         const next = await refreshState();
+        onConnectionChange?.(true);
         const newEvents = lastEventId
           ? next.events.slice(next.events.findIndex((event) => event.id === lastEventId) + 1)
           : next.events;
@@ -114,6 +115,7 @@ export const api = {
         lastEventId = next.events.at(-1)?.id;
       } catch {
         // A later poll restores current state after a temporary disconnect.
+        onConnectionChange?.(false);
       }
     }, 1500);
     return () => window.clearInterval(timer);

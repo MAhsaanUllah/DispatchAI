@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Radio, RotateCcw, ChevronDown, CheckCircle2, Server, Database, Cpu, Mic } from "lucide-react";
+import { Radio, RotateCcw, Mic } from "lucide-react";
 
 interface NavbarProps {
   onReset: () => void;
@@ -8,9 +8,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal }) => {
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  const [isDisconnected, setIsDisconnected] = useState(false);
 
   const handleResetClick = () => {
     setIsResetting(true);
@@ -55,95 +53,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
           </div>
         </div>
 
-        {/* Quiet Connection State (Section 14 & 41) */}
-        <div style={{ position: "relative" }}>
-          <button
-            onClick={() => setShowDiagnostics(!showDiagnostics)}
-            aria-label="Toggle system diagnostics"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "3px 8px",
-              borderRadius: "var(--radius-sm)",
-              backgroundColor: isDisconnected ? "rgba(239, 68, 68, 0.15)" : "var(--surface-subtle)",
-              border: `1px solid ${isDisconnected ? "var(--error)" : "var(--border)"}`,
-              fontSize: "12px",
-              color: isDisconnected ? "var(--error)" : "var(--text-secondary)",
-              cursor: "pointer"
-            }}
-          >
-            <span className={isDisconnected ? "" : "live-status-dot"} style={isDisconnected ? { width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "var(--error)" } : {}} />
-            <span style={{ color: isDisconnected ? "var(--error)" : "var(--text-primary)", fontWeight: 500 }}>
-              {isDisconnected ? "Agent Disconnected" : "Agent connected"}
-            </span>
-            <ChevronDown size={12} color="var(--text-tertiary)" />
-          </button>
-
-          {/* Secondary Diagnostics Surface */}
-          {showDiagnostics && (
-            <div style={{
-              position: "absolute",
-              top: "calc(100% + 6px)",
-              left: 0,
-              width: "260px",
-              backgroundColor: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-md)",
-              boxShadow: "var(--shadow-drawer)",
-              padding: "10px 12px",
-              zIndex: 50,
-              fontSize: "11.5px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px"
-            }}>
-              <div style={{ fontSize: "10.5px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase" }}>
-                System Diagnostics & Resilience
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text-secondary)" }}>
-                  <Cpu size={12} /> Local DispatchAgent
-                </span>
-                <span style={{ color: isDisconnected ? "var(--error)" : "var(--success)", fontWeight: 500 }}>
-                  {isDisconnected ? "Offline" : "Active"}
-                </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text-secondary)" }}>
-                  <Server size={12} /> n8n Automation
-                </span>
-                <span style={{ color: isDisconnected ? "var(--error)" : "var(--success)", fontWeight: 500 }}>
-                  {isDisconnected ? "Reconnecting..." : "Connected"}
-                </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text-secondary)" }}>
-                  <Database size={12} /> Bounded Retries
-                </span>
-                <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>Max 3 Retries (5s)</span>
-              </div>
-
-              <button
-                onClick={() => setIsDisconnected(!isDisconnected)}
-                style={{
-                  marginTop: "4px",
-                  padding: "6px",
-                  borderRadius: "var(--radius-xs)",
-                  backgroundColor: isDisconnected ? "var(--accent)" : "var(--surface-subtle)",
-                  border: "1px solid var(--border)",
-                  color: isDisconnected ? "#ffffff" : "var(--text-primary)",
-                  fontWeight: 500,
-                  fontSize: "11px",
-                  cursor: "pointer",
-                  textAlign: "center"
-                }}
-              >
-                {isDisconnected ? "Restore Reconnect Stream" : "Simulate Outage Disconnect"}
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Right Controls: Clock & Essential Actions */}

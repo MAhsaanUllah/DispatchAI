@@ -23,5 +23,8 @@
     "typescript": "^5.9.3",
     "vitest": "^5.0.1",
     "wrangler": "^4.136.3"
+  },
+  "overrides": {
+    "react": "18.3.1"
   }
 }

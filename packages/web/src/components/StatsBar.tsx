@@ -5,11 +5,29 @@ interface StatsBarProps {
   jobs: WorkOrder[];
 }
 
+// The dashboard follows the app's Austin (America/Chicago) date convention.
+const austinDateKey = (value: Date | string | undefined): string | null => {
+  if (!value) return null;
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+};
+
 export const StatsBar: React.FC<StatsBarProps> = ({ jobs }) => {
-  const total = jobs.length;
-  const active = jobs.filter((j) => ["BOOKED", "DISPATCHED", "IN_PROGRESS"].includes(j.status)).length;
-  const urgent = jobs.filter((j) => j.urgency === "HIGH" && j.status !== "COMPLETED" && j.status !== "CANCELLED").length;
-  const completed = jobs.filter((j) => j.status === "COMPLETED").length;
+  const todayKey = austinDateKey(new Date());
+  const todayJobs = jobs.filter((job) => austinDateKey(job.scheduledStart) === todayKey);
+
+  const total = todayJobs.length;
+  const active = todayJobs.filter((j) => ["BOOKED", "DISPATCHED", "IN_PROGRESS"].includes(j.status)).length;
+  const urgent = todayJobs.filter((j) => j.urgency === "HIGH" && j.status !== "COMPLETED" && j.status !== "CANCELLED").length;
+  const completed = todayJobs.filter((j) => j.status === "COMPLETED").length;
 
   return (
     <div

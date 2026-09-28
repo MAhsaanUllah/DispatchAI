@@ -7,6 +7,7 @@ import { EventTimeline } from "./EventTimeline.js";
 interface AgentChatProps {
   state: AgentState;
   notifications: LocalNotification[];
+  connected?: boolean | null;
   onSendMessage: (text: string) => Promise<void>;
   onConfirm: () => Promise<void>;
   onReject: () => void | Promise<void>;
@@ -18,6 +19,7 @@ interface AgentChatProps {
 export const AgentChat: React.FC<AgentChatProps> = ({
   state,
   notifications,
+  connected = null,
   onSendMessage,
   onConfirm,
   onReject,
@@ -201,8 +203,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({
                 </div>
                 <div style={{
                   fontSize: "11px",
-                  color: "var(--success)",
-                  backgroundColor: "var(--success-soft)",
+                  color: connected === true ? "var(--success)" : connected === false ? "var(--danger)" : "var(--text-secondary)",
+                  backgroundColor: connected === true ? "var(--success-soft)" : connected === false ? "var(--danger-soft)" : "var(--surface-subtle)",
                   padding: "2px 8px",
                   borderRadius: "var(--radius-xs)",
                   display: "inline-flex",
@@ -210,8 +212,17 @@ export const AgentChat: React.FC<AgentChatProps> = ({
                   gap: "4px",
                   fontWeight: 500
                 }}>
-                  <span style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "var(--success)" }} />
-                  Austin Dispatch Engine Connected
+                  <span style={{
+                    width: "4px",
+                    height: "4px",
+                    borderRadius: "50%",
+                    backgroundColor: connected === true ? "var(--success)" : connected === false ? "var(--danger)" : "var(--text-secondary)"
+                  }} />
+                  {connected === true
+                    ? "Austin Dispatch Engine Connected"
+                    : connected === false
+                      ? "Dispatch Agent Unreachable"
+                      : "Checking dispatch agent..."}
                 </div>
                 <p style={{ fontSize: "11.5px", maxWidth: "290px", color: "var(--text-secondary)", lineHeight: 1.5, marginTop: "2px" }}>
                   Ask to lookup customer records, reassign active technicians, check schedule availability, or process urgent dispatch overrides.
