@@ -32,8 +32,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({
 
   const quickPrompts = [
     { label: "Find Customer", text: "Look up customer Alicia Ramirez and view service records" },
-    { label: "Check HVAC", text: "Check available HVAC technician slots in Austin-North for today" },
-    { label: "Interruption Test", text: "Wait, cancel that and tell me Carlos Mendoza's schedule instead" },
+    { label: "Check HVAC slots", text: "Check available HVAC technician slots in Austin-North for today" },
+    { label: "Change request", text: "Wait, cancel that and tell me Carlos Mendoza's schedule instead" },
     { label: "Lookup WO-1001", text: "What is the current status and technician for work order wo_1001?" }
   ];
 
@@ -62,103 +62,31 @@ export const AgentChat: React.FC<AgentChatProps> = ({
       overflow: "hidden",
       position: "relative"
     }}>
-      {/* Integrated Console Header with In-Card Tabs (Section 24) */}
-      <div style={{
-        padding: "12px 18px",
-        borderBottom: "1px solid var(--border)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        backgroundColor: "var(--surface)",
-        flexShrink: 0
-      }}>
-        {/* Left Segmented Tab Switcher */}
-        <div style={{
-          display: "flex",
-          gap: "2px",
-          backgroundColor: "var(--surface-subtle)",
-          padding: "3px",
-          borderRadius: "var(--radius-sm)",
-          border: "1px solid var(--border)"
-        }}>
-          <button
-            onClick={() => onTabChange("chat")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "5px 12px",
-              borderRadius: "var(--radius-xs)",
-              border: "none",
-              fontSize: "12px",
-              fontWeight: 500,
-              cursor: "pointer",
-              backgroundColor: activeTab === "chat" ? "var(--surface)" : "transparent",
-              color: activeTab === "chat" ? "var(--text-primary)" : "var(--text-secondary)",
-              boxShadow: activeTab === "chat" ? "0 1px 2px rgba(0,0,0,0.05)" : "none"
-            }}
-          >
-            <span className="live-status-dot" />
+      <div className="agent-console-header">
+        <div className="agent-console-heading">
+          <div>
+            <div className="agent-console-title">Dispatch Agent</div>
+            <div className="agent-console-subtitle">Operations assistant</div>
+          </div>
+          <div className="agent-caller" title={state.customer ? `${state.customer.firstName} ${state.customer.lastName}` : undefined}>
+            {state.customer ? `${state.customer.firstName} ${state.customer.lastName}` : "No active caller"}
+          </div>
+        </div>
+        <div className="agent-console-tabs" role="tablist" aria-label="Dispatch console">
+          <button type="button" role="tab" aria-selected={activeTab === "chat"} className={`agent-console-tab ${activeTab === "chat" ? "is-active" : ""}`} onClick={() => onTabChange("chat")}>
+            <span className={`live-status-dot ${connected === true ? "is-online" : "is-offline"}`} aria-hidden="true" />
             <span>Agent</span>
-            {state.pendingAction && (
-              <span style={{
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                backgroundColor: "var(--warning)"
-              }} />
-            )}
+            {state.pendingAction && <span className="agent-pending-dot" title="Confirmation pending" aria-hidden="true" />}
           </button>
-
-          <button
-            onClick={() => onTabChange("events")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-              padding: "5px 12px",
-              borderRadius: "var(--radius-xs)",
-              border: "none",
-              fontSize: "12px",
-              fontWeight: 500,
-              cursor: "pointer",
-              backgroundColor: activeTab === "events" ? "var(--surface)" : "transparent",
-              color: activeTab === "events" ? "var(--text-primary)" : "var(--text-secondary)",
-              boxShadow: activeTab === "events" ? "0 1px 2px rgba(0,0,0,0.05)" : "none"
-            }}
-          >
-            <Activity size={12} color="var(--text-tertiary)" />
-            <span>Activity ({state.events.length})</span>
+          <button type="button" role="tab" aria-selected={activeTab === "events"} className={`agent-console-tab ${activeTab === "events" ? "is-active" : ""}`} onClick={() => onTabChange("events")}>
+            <Activity size={14} aria-hidden="true" />
+            <span>Activity</span><span className="agent-tab-count">{state.events.length}</span>
           </button>
-          <button
-            onClick={() => onTabChange("outbox")}
-            style={{
-              display: "flex", alignItems: "center", gap: "5px", padding: "5px 12px",
-              borderRadius: "var(--radius-xs)", border: "none", fontSize: "12px", fontWeight: 500,
-              cursor: "pointer", backgroundColor: activeTab === "outbox" ? "var(--surface)" : "transparent",
-              color: activeTab === "outbox" ? "var(--text-primary)" : "var(--text-secondary)"
-            }}
-          >
-            <Bell size={12} />
-            <span>Outbox ({notifications.length})</span>
+          <button type="button" role="tab" aria-selected={activeTab === "outbox"} className={`agent-console-tab ${activeTab === "outbox" ? "is-active" : ""}`} onClick={() => onTabChange("outbox")}>
+            <Bell size={14} aria-hidden="true" />
+            <span>Outbox</span><span className="agent-tab-count">{notifications.length}</span>
           </button>
         </div>
-
-        {/* Right Active Customer Status */}
-        {state.customer ? (
-          <div style={{
-            fontSize: "11.5px",
-            padding: "3px 8px",
-            borderRadius: "var(--radius-xs)",
-            backgroundColor: "var(--accent-soft)",
-            color: "var(--accent)",
-            border: "1px solid #BFDBFE"
-          }}>
-            Caller: <strong>{state.customer.firstName} {state.customer.lastName}</strong>
-          </div>
-        ) : (
-          <span style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>No active caller</span>
-        )}
       </div>
 
       {/* Main Console Body: Chat vs Activity Stream */}
@@ -174,59 +102,25 @@ export const AgentChat: React.FC<AgentChatProps> = ({
             gap: "12px"
           }}>
             {state.history.length === 0 ? (
-              <div style={{
-                textAlign: "center",
-                padding: "28px 16px",
-                color: "var(--text-secondary)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                flex: 1,
-                gap: "8px"
-              }}>
-                <div style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "50%",
-                  backgroundColor: "var(--surface-subtle)",
-                  border: "1px solid var(--border)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "var(--accent)"
-                }}>
-                  <Bot size={18} />
+              <div className="agent-empty-state">
+                <div className="agent-empty-icon"><Bot size={22} aria-hidden="true" /></div>
+                <h2>Ready to help dispatch</h2>
+                <div className={`agent-connection-status ${connected === true ? "is-connected" : connected === false ? "is-disconnected" : ""}`} role="status">
+                  <span className="agent-connection-dot" aria-hidden="true" />
+                  {connected === true ? "Austin Dispatch Engine Connected" : connected === false ? "Dispatch Agent Unreachable" : "Checking dispatch agent…"}
                 </div>
-                <div style={{ fontSize: "13.5px", color: "var(--text-primary)", fontWeight: 600 }}>
-                  DispatchAgent Standing By
-                </div>
-                <div style={{
-                  fontSize: "11px",
-                  color: connected === true ? "var(--success)" : connected === false ? "var(--danger)" : "var(--text-secondary)",
-                  backgroundColor: connected === true ? "var(--success-soft)" : connected === false ? "var(--danger-soft)" : "var(--surface-subtle)",
-                  padding: "2px 8px",
-                  borderRadius: "var(--radius-xs)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  fontWeight: 500
-                }}>
-                  <span style={{
-                    width: "4px",
-                    height: "4px",
-                    borderRadius: "50%",
-                    backgroundColor: connected === true ? "var(--success)" : connected === false ? "var(--danger)" : "var(--text-secondary)"
-                  }} />
-                  {connected === true
-                    ? "Austin Dispatch Engine Connected"
-                    : connected === false
-                      ? "Dispatch Agent Unreachable"
-                      : "Checking dispatch agent..."}
-                </div>
-                <p style={{ fontSize: "11.5px", maxWidth: "290px", color: "var(--text-secondary)", lineHeight: 1.5, marginTop: "2px" }}>
-                  Ask to lookup customer records, reassign active technicians, check schedule availability, or process urgent dispatch overrides.
+                <p>
+                  {connected === false
+                    ? "Start the local agent service to use chat and load live work orders."
+                    : "Look up a customer, check availability, or ask about a work order."}
                 </p>
+                <div className="agent-suggestions" aria-label="Suggested requests">
+                  {quickPrompts.map((chip) => (
+                    <button key={chip.label} type="button" onClick={() => onSendMessage(chip.text)} disabled={isLoading} title={chip.text}>
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               state.history.map((msg) => {
@@ -360,95 +254,25 @@ export const AgentChat: React.FC<AgentChatProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggested Prompt Chips - Sleek Ghost Badges (Section 23) */}
-          <div style={{
-            padding: "7px 14px",
-            borderTop: "1px solid var(--border)",
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "5px",
-            backgroundColor: "var(--surface)",
-            flexShrink: 0
-          }}>
-            {quickPrompts.map((chip, i) => (
-              <button
-                key={i}
-                onClick={() => onSendMessage(chip.text)}
-                disabled={isLoading}
-                style={{
-                  textAlign: "center",
-                  fontSize: "11px",
-                  fontWeight: 500,
-                  backgroundColor: "var(--surface-subtle)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-secondary)",
-                  padding: "4px 8px",
-                  borderRadius: "var(--radius-xs)",
-                  cursor: "pointer",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  transition: "all 0.12s ease"
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.borderColor = "var(--border-strong)";
-                  e.currentTarget.style.color = "var(--text-primary)";
-                  e.currentTarget.style.backgroundColor = "var(--surface)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = "var(--border)";
-                  e.currentTarget.style.color = "var(--text-secondary)";
-                  e.currentTarget.style.backgroundColor = "var(--surface-subtle)";
-                }}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Input Composer (Section 23) */}
-          <form onSubmit={handleSubmit} style={{
-            padding: "10px 16px 12px 16px",
-            borderTop: "1px solid var(--border)",
-            display: "flex",
-            gap: "8px",
-            backgroundColor: "var(--surface)",
-            flexShrink: 0
-          }}>
+          <form onSubmit={handleSubmit} className="agent-composer">
+            <label className="sr-only" htmlFor="dispatch-agent-message">Message Dispatch Agent</label>
             <input
+              id="dispatch-agent-message"
+              name="dispatch-agent-message"
               type="text"
-              placeholder="Ask DispatchAgent (e.g. 'Reschedule WO-1001')..."
+              placeholder="Ask about a job or customer…"
+              autoComplete="off"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               disabled={isLoading}
-              style={{
-                flex: 1,
-                backgroundColor: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-sm)",
-                padding: "7px 12px",
-                color: "var(--text-primary)",
-                fontSize: "12.5px",
-                outline: "none"
-              }}
             />
             <button
               type="submit"
               disabled={isLoading || !inputText.trim()}
-              style={{
-                backgroundColor: "var(--text-primary)",
-                border: "none",
-                borderRadius: "var(--radius-sm)",
-                padding: "0 14px",
-                color: "#ffffff",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: isLoading || !inputText.trim() ? 0.4 : 1
-              }}
+              aria-label="Send message"
+              title="Send message"
             >
-              <Send size={13} />
+              <Send size={17} aria-hidden="true" />
             </button>
           </form>
         </>
