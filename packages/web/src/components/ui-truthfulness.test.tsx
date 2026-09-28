@@ -163,6 +163,7 @@ describe("AgentChat: the engine badge reflects measured polling state", () => {
     pendingAction: null,
     activeWorkOrder: null,
     lastCreatedWorkOrderId: null,
+    lastSuccessfulCreate: null,
     rescheduleContext: null,
     history: [],
     events: []

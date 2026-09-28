@@ -28,6 +28,16 @@ export interface RescheduleContext {
   serviceZone: string;
 }
 
+// Identity of the last booking this session actually executed, used to absorb immediate replays.
+export interface SuccessfulCreateRecord {
+  workOrder: WorkOrder;
+  customerId: string;
+  propertyId: string;
+  serviceType: ServiceType;
+  slotId: string;
+  completedAt: string;
+}
+
 export interface AgentState {
   sessionId: string;
   elevenLabsConversationId?: string;
@@ -42,6 +52,7 @@ export interface AgentState {
   pendingAction: PendingConfirmationAction | null;
   activeWorkOrder: WorkOrder | null;
   lastCreatedWorkOrderId: string | null;
+  lastSuccessfulCreate: SuccessfulCreateRecord | null;
   rescheduleContext: RescheduleContext | null;
   history: ConversationMessage[];
   events: AgentEvent[];
@@ -62,6 +73,7 @@ export function createInitialAgentState(sessionId: string): AgentState {
     pendingAction: null,
     activeWorkOrder: null,
     lastCreatedWorkOrderId: null,
+    lastSuccessfulCreate: null,
     rescheduleContext: null,
     history: [],
     events: []

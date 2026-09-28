@@ -10,7 +10,7 @@ import {
   WorkOrder
 } from "@dispatchai/shared";
 import { N8nClient } from "./client.js";
-import { AgentState, ConversationMessage, createInitialAgentState, PendingConfirmationAction } from "./state.js";
+import { AgentState, ConversationMessage, createInitialAgentState, PendingConfirmationAction, SuccessfulCreateRecord } from "./state.js";
 
 export type EventListener = (event: AgentEvent) => void;
 
@@ -38,6 +38,23 @@ export class DispatchAgent {
 
   public getState(): AgentState {
     return { ...this.state };
+  }
+
+  // A slot is consumed by a successful booking and released only by reschedule/cancel,
+  // so an identical create request in the same session context is that same booking.
+  public findBookingReplay(slotId?: string): SuccessfulCreateRecord | null {
+    const last = this.state.lastSuccessfulCreate;
+    if (!last || !slotId || last.slotId !== slotId) return null;
+    if (this.state.customer?.id !== last.customerId) return null;
+    if (this.state.selectedProperty?.id !== last.propertyId) return null;
+    if (this.state.serviceType !== last.serviceType) return null;
+    return last;
+  }
+
+  private clearSuccessfulCreate(workOrderId: string): void {
+    if (this.state.lastSuccessfulCreate?.workOrder.id === workOrderId) {
+      this.state.lastSuccessfulCreate = null;
+    }
   }
 
   public setElevenLabsConversationId(conversationId: string) {
@@ -261,6 +278,14 @@ export class DispatchAgent {
 
       this.state.activeWorkOrder = res.data.workOrder;
       this.state.lastCreatedWorkOrderId = res.data.workOrder.id;
+      this.state.lastSuccessfulCreate = {
+        workOrder: res.data.workOrder,
+        customerId: action.payload.customerId,
+        propertyId: action.payload.propertyId,
+        serviceType: action.payload.serviceType,
+        slotId: action.payload.slotId,
+        completedAt: new Date().toISOString()
+      };
       this.emit("TOOL_CALL_COMPLETED", correlationId, "create_work_order", res.data);
       this.emit("WORK_ORDER_CREATED", correlationId, undefined, res.data.workOrder, `Work order #${res.data.workOrder.id} successfully booked.`);
       this.emit("STATE_UPDATED", correlationId, undefined, { activeWorkOrder: this.state.activeWorkOrder });
@@ -277,6 +302,7 @@ export class DispatchAgent {
 
       this.state.activeWorkOrder = res.data.workOrder;
       this.state.rescheduleContext = null;
+      this.clearSuccessfulCreate(res.data.workOrder.id);
       this.emit("TOOL_CALL_COMPLETED", correlationId, "reschedule_work_order", res.data);
       this.emit("WORK_ORDER_RESCHEDULED", correlationId, undefined, res.data.workOrder, `Work order #${res.data.workOrder.id} rescheduled.`);
       this.emit("STATE_UPDATED", correlationId, undefined, { activeWorkOrder: this.state.activeWorkOrder });
@@ -292,6 +318,7 @@ export class DispatchAgent {
       }
 
       this.state.activeWorkOrder = res.data.workOrder;
+      this.clearSuccessfulCreate(res.data.workOrder.id);
       this.emit("TOOL_CALL_COMPLETED", correlationId, "cancel_work_order", res.data);
       this.emit("WORK_ORDER_CANCELLED", correlationId, undefined, res.data.workOrder, `Work order #${res.data.workOrder.id} cancelled.`);
       this.emit("STATE_UPDATED", correlationId, undefined, { activeWorkOrder: this.state.activeWorkOrder });

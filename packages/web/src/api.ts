@@ -17,6 +17,7 @@ let state: AgentState = {
   pendingAction: null,
   activeWorkOrder: null,
   lastCreatedWorkOrderId: null,
+  lastSuccessfulCreate: null,
   rescheduleContext: null,
   history: [],
   events: []
