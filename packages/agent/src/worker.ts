@@ -354,6 +354,14 @@ async function proxyDatabaseRequest(path: string, method: string, corsHeaders: R
 
 async function handleConfirmedMutation(agent: DispatchAgent, type: string, params: any, correlationId: string) {
   const pending = agent.getState().pendingAction;
+  // An immediate redundant replay of the last successful booking must not open a second
+  // confirmation cycle: return the original result idempotently instead of mutating again.
+  if (!pending && type === "CREATE_WORK_ORDER") {
+    const replay = agent.findBookingReplay(params?.slotId);
+    if (replay) {
+      return toolSuccess({ workOrder: replay.workOrder, idempotentReplay: true }, correlationId);
+    }
+  }
   if (!pending) {
     if (type === "CREATE_WORK_ORDER") agent.proposeBooking(params.slotId, params.issueSummary, params.urgency || "STANDARD", "VOICE_AGENT");
     if (type === "RESCHEDULE_WORK_ORDER") agent.proposeReschedule(params.workOrderId, params.newSlotId);
