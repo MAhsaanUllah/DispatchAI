@@ -19,6 +19,7 @@ export const App: React.FC = () => {
   const [mobileActiveView, setMobileActiveView] = useState<"jobs" | "agent">("jobs");
   const [isLoading, setIsLoading] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [agentConnected, setAgentConnected] = useState<boolean | null>(null);
   const [austinTime, setAustinTime] = useState("");
 
   // Update Austin Local Clock (CDT)
@@ -45,7 +46,8 @@ export const App: React.FC = () => {
       setAgentState({ ...nextState });
       setJobs(nextJobs);
       setNotifications(nextNotifications);
-    });
+      setAgentConnected(true);
+    }).catch(() => setAgentConnected(false));
 
     const unsubscribe = api.subscribeEvents((event) => {
       setAgentState({ ...api.getAgent().getState() });
@@ -58,7 +60,7 @@ export const App: React.FC = () => {
         void api.getJobs().then(setJobs);
         void api.getNotifications().then(setNotifications);
       }
-    });
+    }, (connected) => setAgentConnected(connected));
 
     return () => unsubscribe();
   }, []);
@@ -195,6 +197,7 @@ export const App: React.FC = () => {
             <AgentChat
               state={agentState}
               notifications={notifications}
+              connected={agentConnected}
               onSendMessage={handleSendMessage}
               onConfirm={handleConfirm}
               onReject={handleReject}
@@ -209,6 +212,7 @@ export const App: React.FC = () => {
       {/* Work-Order Slide-Over Drawer */}
       <WorkOrderDrawer
         job={selectedJob}
+        events={agentState.events}
         onClose={() => setSelectedJob(null)}
         onQuickAction={handleQuickAction}
       />

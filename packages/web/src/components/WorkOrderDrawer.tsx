@@ -1,9 +1,10 @@
 import React, { useEffect } from "react";
-import { X, Calendar, MapPin, User, Wrench, ArrowRightLeft, XCircle, CheckCircle2 } from "lucide-react";
-import { WorkOrder } from "@dispatchai/shared";
+import { X, Calendar, MapPin, User, Wrench, ArrowRightLeft, XCircle, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { AgentEvent, WorkOrder } from "@dispatchai/shared";
 
 interface WorkOrderDrawerProps {
   job: WorkOrder | null;
+  events: AgentEvent[];
   onClose: () => void;
   onQuickAction: (actionText: string) => void;
 }
@@ -34,7 +35,62 @@ const formatWorkOrderId = (id: string): string => {
   return id.replace(/^wo_?/i, "WO-").toUpperCase();
 };
 
-export const WorkOrderDrawer: React.FC<WorkOrderDrawerProps> = ({ job, onClose, onQuickAction }) => {
+const workOrderIdOf = (evt: AgentEvent): string | null => {
+  const payload = evt.payload ?? {};
+  if (typeof payload.workOrderId === "string") return payload.workOrderId;
+  if (typeof payload.id === "string" && payload.id.startsWith("wo_")) return payload.id;
+  const workOrder = payload.workOrder as { id?: unknown } | undefined;
+  if (workOrder && typeof workOrder.id === "string") return workOrder.id;
+  const pending = payload.payload as { workOrderId?: unknown } | undefined;
+  if (pending && typeof pending.workOrderId === "string") return pending.workOrderId;
+  return null;
+};
+
+const activityLabel = (evt: AgentEvent): string => {
+  switch (evt.type) {
+    case "WORK_ORDER_CREATED":
+      return "Work order created";
+    case "WORK_ORDER_RESCHEDULED":
+      return "Work order rescheduled";
+    case "WORK_ORDER_CANCELLED":
+      return "Work order cancelled";
+    case "TOOL_CALL_STARTED":
+      return `Executing ${evt.toolName ?? "tool"}`;
+    case "TOOL_CALL_COMPLETED":
+      return `${evt.toolName ?? "Tool"} executed`;
+    case "TOOL_CALL_FAILED":
+      return `${evt.toolName ?? "Tool"} failed`;
+    case "CONFIRMATION_REQUIRED":
+      return "Confirmation required";
+    case "RETRY_STARTED":
+      return "Retrying after transient failure";
+    case "ERROR":
+      return "Operation failed";
+    default:
+      return "State updated";
+  }
+};
+
+const activityIcon = (evt: AgentEvent): React.ReactNode => {
+  const base = { size: 13, style: { marginTop: "2px", flexShrink: 0 } };
+  switch (evt.type) {
+    case "WORK_ORDER_CANCELLED":
+      return <XCircle {...base} color="var(--danger)" />;
+    case "TOOL_CALL_FAILED":
+    case "ERROR":
+      return <AlertCircle {...base} color="var(--danger)" />;
+    case "WORK_ORDER_RESCHEDULED":
+      return <ArrowRightLeft {...base} color="var(--accent)" />;
+    case "TOOL_CALL_STARTED":
+      return <Wrench {...base} color="var(--text-secondary)" />;
+    case "CONFIRMATION_REQUIRED":
+      return <Clock {...base} color="var(--accent)" />;
+    default:
+      return <CheckCircle2 {...base} color="var(--success)" />;
+  }
+};
+
+export const WorkOrderDrawer: React.FC<WorkOrderDrawerProps> = ({ job, events, onClose, onQuickAction }) => {
   // ESC key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -49,8 +105,11 @@ export const WorkOrderDrawer: React.FC<WorkOrderDrawerProps> = ({ job, onClose, 
   if (!job) return null;
 
   const statusClass = `badge-${job.status.toLowerCase()}`;
-  const techName = TECH_NAMES[job.technicianId || ""] || "Unassigned";
-  const propertyInfo = PROPERTY_DETAILS[job.propertyId] || { address: `${job.propertyId}, Austin, TX`, zone: "Austin-Central" };
+  const techName = job.technicianId ? TECH_NAMES[job.technicianId] ?? job.technicianId : "Unassigned";
+  const propertyInfo = PROPERTY_DETAILS[job.propertyId] ?? null;
+  const propertyAddress = propertyInfo?.address ?? job.propertyId;
+  const propertyZone = propertyInfo?.zone ?? null;
+  const activity = events.filter((evt) => workOrderIdOf(evt) === job.id).reverse();
 
   return (
     <>
@@ -160,8 +219,12 @@ export const WorkOrderDrawer: React.FC<WorkOrderDrawerProps> = ({ job, onClose, 
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px", fontSize: "12px" }}>
               <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{job.serviceType}</span>
-              <span style={{ color: "var(--border-strong)" }}>•</span>
-              <span style={{ color: "var(--text-secondary)" }}>{propertyInfo.zone}</span>
+              {propertyZone && (
+                <>
+                  <span style={{ color: "var(--border-strong)" }}>•</span>
+                  <span style={{ color: "var(--text-secondary)" }}>{propertyZone}</span>
+                </>
+              )}
               {job.urgency === "HIGH" && (
                 <>
                   <span style={{ color: "var(--border-strong)" }}>•</span>
@@ -203,38 +266,35 @@ export const WorkOrderDrawer: React.FC<WorkOrderDrawerProps> = ({ job, onClose, 
             <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px" }}>
               <MapPin size={14} color="var(--text-secondary)" />
               <span style={{ color: "var(--text-secondary)" }}>Address:</span>
-              <span style={{ color: "var(--text-primary)" }}>{propertyInfo.address}</span>
+              <span style={{ color: "var(--text-primary)" }}>{propertyAddress}</span>
             </div>
           </div>
 
-          {/* Operational Activity Timeline (Section 30) */}
+          {/* Operational Activity Timeline (Section 30) — derived only from real agent events */}
           <div className="op-surface-subtle" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: "10px" }}>
             <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase" }}>
               Operational Activity
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                <CheckCircle2 size={13} color="var(--success)" style={{ marginTop: "2px", flexShrink: 0 }} />
-                <div>
-                  <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>Customer identified & zone mapped</div>
-                  <div style={{ color: "var(--text-secondary)", fontSize: "11.5px" }}>Zone verified as {propertyInfo.zone}</div>
-                </div>
+            {activity.length === 0 ? (
+              <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                No recorded activity for this work order.
               </div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                <CheckCircle2 size={13} color="var(--success)" style={{ marginTop: "2px", flexShrink: 0 }} />
-                <div>
-                  <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>Technician slot reserved</div>
-                  <div style={{ color: "var(--text-secondary)", fontSize: "11.5px" }}>Assigned to {techName} for {job.serviceType}</div>
-                </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px" }}>
+                {activity.map((evt) => (
+                  <div key={evt.id} style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                    {activityIcon(evt)}
+                    <div>
+                      <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>{activityLabel(evt)}</div>
+                      <div style={{ color: "var(--text-secondary)", fontSize: "11.5px" }}>
+                        {evt.timestamp.substring(11, 19)}
+                        {evt.message ? ` · ${evt.message}` : ""}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                <CheckCircle2 size={13} color="var(--success)" style={{ marginTop: "2px", flexShrink: 0 }} />
-                <div>
-                  <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>Work order {formatWorkOrderId(job.id)} confirmed</div>
-                  <div style={{ color: "var(--text-secondary)", fontSize: "11.5px" }}>Committed via n8n automation</div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Operational Actions (Section 22) */}

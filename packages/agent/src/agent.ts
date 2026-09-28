@@ -5,6 +5,7 @@ import {
   Customer,
   Property,
   ServiceType,
+  ToolFailure,
   Urgency,
   WorkOrder
 } from "@dispatchai/shared";
@@ -291,6 +292,34 @@ export class DispatchAgent {
     return { ok: true, message: "Pending action discarded." };
   }
 
+  // Distinguishes a failed lookup (backend/transport error) from a successful lookup with no match.
+  private backendFailureReply(error: ToolFailure["error"], correlationId: string): string {
+    const cause = error.retryable
+      ? "the dispatch automation service is temporarily unavailable"
+      : "the dispatch automation service returned an unexpected error";
+    const retryHint = error.retryable ? " Please try again in a moment." : "";
+    return `I'm sorry, but I could not complete that lookup because ${cause}.${retryHint} Reference: ${correlationId}.`;
+  }
+
+  // Never invent a service zone; availability can only be searched for a known property.
+  private missingPropertyReply(): string {
+    return "I can check new appointment times, but first I need to know which property this is for. Could you share the phone number or service address on the account?";
+  }
+
+  // Extracts a work order id without mistaking the year of a 4-digit date for the order number.
+  private extractWorkOrderId(text: string): string | null {
+    const explicit = text.match(/wo_\d+/i);
+    if (explicit) return explicit[0].toLowerCase();
+    const withoutDates = text.replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ");
+    const numbered = withoutDates.match(/\b(\d{4})\b/);
+    return numbered ? `wo_${numbered[1]}` : null;
+  }
+
+  private pushAgentReply(reply: string): string {
+    this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
+    return reply;
+  }
+
   // Conversational text interaction pipeline
   public async processMessage(text: string): Promise<string> {
     const correlationId = this.generateCorrelationId();
@@ -345,7 +374,10 @@ export class DispatchAgent {
       this.state.pendingAction = null;
 
       const serviceType = this.state.serviceType || (lower.includes("plumb") ? "PLUMBING" : "HVAC");
-      const serviceZone = this.state.selectedProperty?.serviceZone || "Austin-Central";
+      const serviceZone = this.state.selectedProperty?.serviceZone;
+      if (!serviceZone) {
+        return this.pushAgentReply(this.missingPropertyReply());
+      }
 
       const availResult = await this.checkAvailability(serviceType, serviceZone, targetDate, undefined, correlationId);
       if (availResult.ok && availResult.data.slots.length > 0) {
@@ -368,18 +400,22 @@ export class DispatchAgent {
     if (phoneMatch) {
       const rawDigits = `${phoneMatch[1]}${phoneMatch[2]}${phoneMatch[3]}`;
       const lookup = await this.findCustomer(rawDigits, correlationId);
-      if (lookup.ok && lookup.data.customer) {
+      if (!lookup.ok) {
+        const reply = this.backendFailureReply(lookup.error, correlationId);
+        this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
+        return reply;
+      }
+      if (lookup.data.customer) {
         const c = lookup.data.customer;
         const p = lookup.data.properties[0];
         const propAddress = p ? ` at ${p.addressLine1}` : "";
         const reply = `Hello ${c.firstName} ${c.lastName}! I have found your account${propAddress}. How can I assist with your HVAC or plumbing today?`;
         this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
         return reply;
-      } else {
-        const reply = `I could not find an existing customer account for phone number ${phoneMatch[0]}. Could you verify the number?`;
-        this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
-        return reply;
       }
+      const notFoundReply = `I could not find an existing customer account for phone number ${phoneMatch[0]}. Could you verify the number?`;
+      this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: notFoundReply, timestamp: new Date().toISOString() });
+      return notFoundReply;
     }
 
     // 4. Slot selection / Booking proposal (e.g. "Book the 10 AM slot", "Slot slot_303")
@@ -411,8 +447,11 @@ export class DispatchAgent {
       this.state.serviceType = serviceType;
       this.state.issueSummary = cleanText;
 
-      // Default to customer property zone or Austin-South
-      const serviceZone = this.state.selectedProperty?.serviceZone || "Austin-South";
+      // Zone is derived from the identified property; never assume one.
+      const serviceZone = this.state.selectedProperty?.serviceZone;
+      if (!serviceZone) {
+        return this.pushAgentReply(this.missingPropertyReply());
+      }
       const date = lower.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] ?? (lower.includes("tomorrow") ? serviceDate(1) : serviceDate());
 
       const availResult = await this.checkAvailability(serviceType, serviceZone, date, undefined, correlationId);
@@ -431,31 +470,56 @@ export class DispatchAgent {
       }
     }
 
-    // 6. Reschedule request intent (e.g. "Reschedule wo_1001 to slot_305" or "Reschedule work order 1001")
-    const reschedMatch = lower.match(/reschedule.*(wo_\d+|\d{4})/i);
-    if (reschedMatch) {
-      const woId = reschedMatch[1].startsWith("wo_") ? reschedMatch[1].toLowerCase() : `wo_${reschedMatch[1]}`;
-      const targetSlot = this.state.availableSlots.find((s) => lower.includes(s.slotId.toLowerCase()));
-
-      if (targetSlot) {
-        const action = this.proposeReschedule(woId, targetSlot.slotId);
-        const reply = `I can reschedule Work Order #${woId} to ${targetSlot.startAt.split("T")[1].substring(0, 5)} with technician ${targetSlot.technicianName}. Would you like me to confirm this reschedule?`;
-        this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
-        return reply;
-      } else {
-        // Fetch current work order and check new availability
-        const woResult = await this.getWorkOrder(woId, correlationId);
-        if (woResult.ok && woResult.data.workOrder) {
-          const wo = woResult.data.workOrder;
-          const avail = await this.checkAvailability(wo.serviceType, "Austin-South", "2026-09-19", undefined, correlationId);
-          if (avail.ok && avail.data.slots.length > 0) {
-            const slotsText = avail.data.slots.slice(0, 3).map((s) => `${s.slotId} (${s.technicianName} at ${s.startAt.split("T")[1].substring(0, 5)})`).join(", ");
-            const reply = `Work Order #${woId} is currently scheduled for ${wo.scheduledStart}. Available new slots for tomorrow include: ${slotsText}. Which slot would you prefer?`;
-            this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
-            return reply;
-          }
-        }
+    // 6. Reschedule request intent (e.g. "Reschedule wo_1001 to slot_305" or "reschedule 1001 to tomorrow")
+    if (/\breschedul/i.test(lower)) {
+      const woId = this.extractWorkOrderId(lower);
+      if (!woId) {
+        return this.pushAgentReply("I can help reschedule a work order, but I need the work order number. Could you share it (for example wo_1001)?");
       }
+
+      const targetSlot = this.state.availableSlots.find((s) => lower.includes(s.slotId.toLowerCase()));
+      if (targetSlot) {
+        this.proposeReschedule(woId, targetSlot.slotId);
+        const reply = `I can reschedule Work Order #${woId} to ${targetSlot.startAt.split("T")[1].substring(0, 5)} with technician ${targetSlot.technicianName}. Would you like me to confirm this reschedule?`;
+        return this.pushAgentReply(reply);
+      }
+
+      // No slot chosen yet: load the actual work order, then re-query from its own property and the stated date.
+      const woResult = await this.getWorkOrder(woId, correlationId);
+      if (!woResult.ok) {
+        return this.pushAgentReply(this.backendFailureReply(woResult.error, correlationId));
+      }
+      if (!woResult.data.workOrder) {
+        return this.pushAgentReply(`I could not find work order #${woId}. Please verify the order number.`);
+      }
+
+      const wo = woResult.data.workOrder;
+      const property = this.state.selectedProperty;
+      const serviceZone = property && property.id === wo.propertyId ? property.serviceZone : null;
+      if (!serviceZone) {
+        return this.pushAgentReply(this.missingPropertyReply());
+      }
+
+      const explicitDate = lower.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] ?? null;
+      const isToday = /\btoday\b/.test(lower);
+      const date = explicitDate ?? (isToday ? serviceDate() : serviceDate(1));
+      // Only name a relative day when that exact day is what gets queried.
+      const dateLabel = explicitDate ?? (isToday ? `today (${date})` : /\btomorrow\b/.test(lower) ? `tomorrow (${date})` : date);
+
+      const avail = await this.checkAvailability(wo.serviceType, serviceZone, date, undefined, correlationId);
+      if (!avail.ok) {
+        return this.pushAgentReply(this.backendFailureReply(avail.error, correlationId));
+      }
+
+      const scheduleNote = `Work Order #${woId} is currently scheduled for ${wo.scheduledStart}.`;
+      if (avail.data.slots.length > 0) {
+        const slotsText = avail.data.slots
+          .slice(0, 3)
+          .map((s) => `${s.slotId} (${s.technicianName} at ${s.startAt.split("T")[1].substring(0, 5)})`)
+          .join(", ");
+        return this.pushAgentReply(`${scheduleNote} I checked availability for ${dateLabel} in ${serviceZone}: ${slotsText}. Which slot would you prefer?`);
+      }
+      return this.pushAgentReply(`${scheduleNote} I checked availability for ${dateLabel} in ${serviceZone}, but no new slots are open then. Would you like me to check another date?`);
     }
 
     // 7. Cancellation request intent (e.g. "Cancel wo_1001", "Cancel work order 1001")
@@ -473,16 +537,20 @@ export class DispatchAgent {
     if (woMatch) {
       const woId = woMatch[0].startsWith("wo_") ? woMatch[0].toLowerCase() : `wo_${woMatch[1]}`;
       const woResult = await this.getWorkOrder(woId, correlationId);
-      if (woResult.ok && woResult.data.workOrder) {
+      if (!woResult.ok) {
+        const reply = this.backendFailureReply(woResult.error, correlationId);
+        this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
+        return reply;
+      }
+      if (woResult.data.workOrder) {
         const wo = woResult.data.workOrder;
         const reply = `Work Order #${wo.id} is currently ${wo.status}. Service: ${wo.serviceType} ("${wo.issueSummary}"), scheduled for ${wo.scheduledStart}.`;
         this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
         return reply;
-      } else {
-        const reply = `I could not find work order #${woId}. Please verify the order number.`;
-        this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
-        return reply;
       }
+      const notFoundReply = `I could not find work order #${woId}. Please verify the order number.`;
+      this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: notFoundReply, timestamp: new Date().toISOString() });
+      return notFoundReply;
     }
 
     // Default conversational reply
