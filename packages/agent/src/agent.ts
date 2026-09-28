@@ -93,13 +93,18 @@ export class DispatchAgent {
       return result;
     }
 
-    this.state.customer = result.data.customer;
-    if (result.data.properties.length > 0) {
-      this.state.selectedProperty = result.data.properties[0];
+    // A successful lookup with no match must not wipe previously-valid session context.
+    if (result.data.customer) {
+      this.state.customer = result.data.customer;
+      if (result.data.properties.length > 0) {
+        this.state.selectedProperty = result.data.properties[0];
+      }
+      this.emit("TOOL_CALL_COMPLETED", correlationId, "find_customer", result.data);
+      this.emit("STATE_UPDATED", correlationId, undefined, { customer: this.state.customer, property: this.state.selectedProperty });
+      return result;
     }
 
     this.emit("TOOL_CALL_COMPLETED", correlationId, "find_customer", result.data);
-    this.emit("STATE_UPDATED", correlationId, undefined, { customer: this.state.customer, property: this.state.selectedProperty });
     return result;
   }
 
@@ -143,9 +148,15 @@ export class DispatchAgent {
       return result;
     }
 
-    this.state.activeWorkOrder = result.data.workOrder;
+    // A missing work order must not erase the work order already loaded in this session.
+    if (result.data.workOrder) {
+      this.state.activeWorkOrder = result.data.workOrder;
+      this.emit("TOOL_CALL_COMPLETED", correlationId, "get_work_order", result.data);
+      this.emit("STATE_UPDATED", correlationId, undefined, { activeWorkOrder: this.state.activeWorkOrder });
+      return result;
+    }
+
     this.emit("TOOL_CALL_COMPLETED", correlationId, "get_work_order", result.data);
-    this.emit("STATE_UPDATED", correlationId, undefined, { activeWorkOrder: this.state.activeWorkOrder });
     return result;
   }
 
@@ -163,6 +174,7 @@ export class DispatchAgent {
     this.state.selectedSlot = slot;
     if (issueSummary) this.state.issueSummary = issueSummary;
     this.state.urgency = urgency;
+    this.state.rescheduleContext = null;
 
     const action: PendingConfirmationAction = {
       type: "CREATE_WORK_ORDER",
@@ -224,6 +236,7 @@ export class DispatchAgent {
     };
 
     this.state.pendingAction = action;
+    this.state.rescheduleContext = null;
     const correlationId = this.generateCorrelationId();
     this.emit("CONFIRMATION_REQUIRED", correlationId, "cancel_work_order", action, action.description);
     return action;
@@ -247,6 +260,7 @@ export class DispatchAgent {
       }
 
       this.state.activeWorkOrder = res.data.workOrder;
+      this.state.lastCreatedWorkOrderId = res.data.workOrder.id;
       this.emit("TOOL_CALL_COMPLETED", correlationId, "create_work_order", res.data);
       this.emit("WORK_ORDER_CREATED", correlationId, undefined, res.data.workOrder, `Work order #${res.data.workOrder.id} successfully booked.`);
       this.emit("STATE_UPDATED", correlationId, undefined, { activeWorkOrder: this.state.activeWorkOrder });
@@ -262,6 +276,7 @@ export class DispatchAgent {
       }
 
       this.state.activeWorkOrder = res.data.workOrder;
+      this.state.rescheduleContext = null;
       this.emit("TOOL_CALL_COMPLETED", correlationId, "reschedule_work_order", res.data);
       this.emit("WORK_ORDER_RESCHEDULED", correlationId, undefined, res.data.workOrder, `Work order #${res.data.workOrder.id} rescheduled.`);
       this.emit("STATE_UPDATED", correlationId, undefined, { activeWorkOrder: this.state.activeWorkOrder });
@@ -315,6 +330,38 @@ export class DispatchAgent {
     return numbered ? `wo_${numbered[1]}` : null;
   }
 
+  private hasWorkOrderAnaphor(text: string): boolean {
+    return /\b(?:this|that|the)\s+work\s*order\b/i.test(text) ||
+      /\bwork\s*order\s+(?:we|i)\s+(?:just\s+)?(?:created|booked|made|scheduled|rescheduled)\b/i.test(text) ||
+      /\bit\b/i.test(text);
+  }
+
+  // Deliberately narrow coreference: resolves only when session context leaves one candidate.
+  private resolveWorkOrderReference(text: string): string | null {
+    if (/\bwork\s*order\s+(?:we|i)\s+(?:just\s+)?(?:created|booked|made|scheduled|rescheduled)\b/i.test(text)) {
+      return this.state.lastCreatedWorkOrderId;
+    }
+    const candidates = new Set<string>();
+    if (this.state.activeWorkOrder) candidates.add(this.state.activeWorkOrder.id);
+    if (this.state.lastCreatedWorkOrderId) candidates.add(this.state.lastCreatedWorkOrderId);
+    return candidates.size === 1 ? [...candidates][0] : null;
+  }
+
+  private workOrderNumberRequest(action: string): string {
+    return `I can help ${action} a work order, but I need the work order number. Could you share it (for example wo_1001)?`;
+  }
+
+  private confirmationSuccessReply(actionType: PendingConfirmationAction["type"], workOrder: WorkOrder): string {
+    const note = "The demo confirmation was logged; no real message was sent.";
+    if (actionType === "RESCHEDULE_WORK_ORDER") {
+      return `I have confirmed the reschedule: Work order #${workOrder.id} has been rescheduled to ${workOrder.scheduledStart} with technician ${workOrder.technicianId}. ${note}`;
+    }
+    if (actionType === "CANCEL_WORK_ORDER") {
+      return `I have confirmed the cancellation: Work order #${workOrder.id} has been cancelled. ${note}`;
+    }
+    return `I have confirmed your appointment! Work order #${workOrder.id} is booked with technician ${workOrder.technicianId} for ${workOrder.scheduledStart}. ${note}`;
+  }
+
   private pushAgentReply(reply: string): string {
     this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
     return reply;
@@ -340,15 +387,16 @@ export class DispatchAgent {
     // 1. Pending confirmation handling
     if (this.state.pendingAction) {
       if (!dateChangeMatch && lower.match(/^(yes|confirm|book it|go ahead|proceed|sure|please do|ok|yep)(?:\b|$)/i)) {
+        const pendingType = this.state.pendingAction.type;
         const result: any = await this.confirmPendingAction(correlationId);
         if (result.ok) {
           const wo = result.data?.workOrder;
-          const reply = `I have confirmed your appointment! Work order #${wo.id} is booked with technician ${wo.technicianId} for ${wo.scheduledStart}. The demo confirmation was logged; no real message was sent.`;
+          const reply = this.confirmationSuccessReply(pendingType, wo);
           this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
           return reply;
         } else {
           const errorMsg = result.error?.message || "Operation failed.";
-          const reply = `I could not complete the appointment confirmation: ${errorMsg}`;
+          const reply = `I could not complete that action: ${errorMsg}`;
           this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
           return reply;
         }
@@ -373,30 +421,44 @@ export class DispatchAgent {
       this.state.selectedSlot = null;
       this.state.pendingAction = null;
 
-      const serviceType = this.state.serviceType || (lower.includes("plumb") ? "PLUMBING" : "HVAC");
-      const serviceZone = this.state.selectedProperty?.serviceZone;
+      const rescheduleContext = this.state.rescheduleContext;
+      const serviceType = rescheduleContext?.serviceType || this.state.serviceType || (lower.includes("plumb") ? "PLUMBING" : "HVAC");
+      const serviceZone = rescheduleContext?.serviceZone || this.state.selectedProperty?.serviceZone;
       if (!serviceZone) {
         return this.pushAgentReply(this.missingPropertyReply());
       }
 
       const availResult = await this.checkAvailability(serviceType, serviceZone, targetDate, undefined, correlationId);
       if (availResult.ok && availResult.data.slots.length > 0) {
-        const slotDescriptions = availResult.data.slots
-          .slice(0, 3)
-          .map((s) => `${s.technicianName} (${s.startAt.split("T")[1].substring(0, 5)})`)
-          .join(", ");
-        const reply = `I have updated your request to ${targetDate}. Available slots include: ${slotDescriptions}. Would you like to book one of these?`;
+        let reply: string;
+        if (rescheduleContext) {
+          const slotDescriptions = availResult.data.slots
+            .slice(0, 3)
+            .map((s) => `${s.slotId} (${s.technicianName} at ${s.startAt.split("T")[1].substring(0, 5)})`)
+            .join(", ");
+          reply = `I have updated the reschedule of Work Order #${rescheduleContext.workOrderId} to ${targetDate}. Available slots include: ${slotDescriptions}. Which slot would you prefer?`;
+        } else {
+          const slotDescriptions = availResult.data.slots
+            .slice(0, 3)
+            .map((s) => `${s.technicianName} (${s.startAt.split("T")[1].substring(0, 5)})`)
+            .join(", ");
+          reply = `I have updated your request to ${targetDate}. Available slots include: ${slotDescriptions}. Would you like to book one of these?`;
+        }
         this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
         return reply;
       } else {
-        const reply = `I checked availability for ${targetDate}, but unfortunately no technicians are available in ${serviceZone}.`;
+        const reply = rescheduleContext
+          ? `I checked availability for ${targetDate}, but no new slots are open for Work Order #${rescheduleContext.workOrderId} in ${serviceZone}. Would you like me to check another date?`
+          : `I checked availability for ${targetDate}, but unfortunately no technicians are available in ${serviceZone}.`;
         this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
         return reply;
       }
     }
 
-    // 3. Customer Identification (Phone number detection)
-    const phoneMatch = cleanText.match(/\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/);
+    // 3. Customer Identification (Phone number detection; explicit wo_ ids never count as phone numbers)
+    const phoneMatch = /wo_\d+/i.test(cleanText)
+      ? null
+      : cleanText.match(/\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/);
     if (phoneMatch) {
       const rawDigits = `${phoneMatch[1]}${phoneMatch[2]}${phoneMatch[3]}`;
       const lookup = await this.findCustomer(rawDigits, correlationId);
@@ -433,6 +495,12 @@ export class DispatchAgent {
       }
 
       if (matchedSlot) {
+        if (this.state.rescheduleContext) {
+          const ctx = this.state.rescheduleContext;
+          this.proposeReschedule(ctx.workOrderId, matchedSlot.slotId);
+          const reply = `I can reschedule Work Order #${ctx.workOrderId} to ${matchedSlot.startAt.split("T")[1].substring(0, 5)} with technician ${matchedSlot.technicianName}. Would you like me to confirm this reschedule?`;
+          return this.pushAgentReply(reply);
+        }
         const action = this.proposeBooking(matchedSlot.slotId, cleanText);
         const reply = `I can book ${matchedSlot.technicianName} for ${matchedSlot.startAt.slice(0, 10)} (${matchedSlot.startAt.split("T")[1].substring(0, 5)}) at ${this.state.selectedProperty?.addressLine1}. Would you like me to confirm that appointment?`;
         this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
@@ -446,6 +514,7 @@ export class DispatchAgent {
       const serviceType: ServiceType = isPlumbing ? "PLUMBING" : "HVAC";
       this.state.serviceType = serviceType;
       this.state.issueSummary = cleanText;
+      this.state.rescheduleContext = null;
 
       // Zone is derived from the identified property; never assume one.
       const serviceZone = this.state.selectedProperty?.serviceZone;
@@ -470,15 +539,19 @@ export class DispatchAgent {
       }
     }
 
-    // 6. Reschedule request intent (e.g. "Reschedule wo_1001 to slot_305" or "reschedule 1001 to tomorrow")
+    // 6. Reschedule request intent (e.g. "Reschedule wo_1001 to slot_305" or "reschedule this work order to tomorrow")
     if (/\breschedul/i.test(lower)) {
-      const woId = this.extractWorkOrderId(lower);
+      let woId = this.extractWorkOrderId(lower);
+      if (!woId && this.hasWorkOrderAnaphor(lower)) {
+        woId = this.resolveWorkOrderReference(lower);
+      }
       if (!woId) {
-        return this.pushAgentReply("I can help reschedule a work order, but I need the work order number. Could you share it (for example wo_1001)?");
+        return this.pushAgentReply(this.workOrderNumberRequest("reschedule"));
       }
 
       const targetSlot = this.state.availableSlots.find((s) => lower.includes(s.slotId.toLowerCase()));
       if (targetSlot) {
+        this.state.rescheduleContext = null;
         this.proposeReschedule(woId, targetSlot.slotId);
         const reply = `I can reschedule Work Order #${woId} to ${targetSlot.startAt.split("T")[1].substring(0, 5)} with technician ${targetSlot.technicianName}. Would you like me to confirm this reschedule?`;
         return this.pushAgentReply(reply);
@@ -499,6 +572,7 @@ export class DispatchAgent {
       if (!serviceZone) {
         return this.pushAgentReply(this.missingPropertyReply());
       }
+      this.state.rescheduleContext = { workOrderId: woId, serviceType: wo.serviceType, serviceZone };
 
       const explicitDate = lower.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] ?? null;
       const isToday = /\btoday\b/.test(lower);
@@ -522,20 +596,35 @@ export class DispatchAgent {
       return this.pushAgentReply(`${scheduleNote} I checked availability for ${dateLabel} in ${serviceZone}, but no new slots are open then. Would you like me to check another date?`);
     }
 
-    // 7. Cancellation request intent (e.g. "Cancel wo_1001", "Cancel work order 1001")
+    // 7. Cancellation request intent (e.g. "Cancel wo_1001", "Cancel that work order")
+    const cancelIntent = /\bcancel\b/i.test(lower);
     const cancelMatch = lower.match(/cancel.*(wo_\d+|\d{4})/i);
-    if (cancelMatch) {
-      const woId = cancelMatch[1].startsWith("wo_") ? cancelMatch[1].toLowerCase() : `wo_${cancelMatch[1]}`;
+    if (cancelIntent && (cancelMatch || this.hasWorkOrderAnaphor(lower))) {
+      const referencedId = cancelMatch
+        ? (cancelMatch[1].startsWith("wo_") ? cancelMatch[1].toLowerCase() : `wo_${cancelMatch[1]}`)
+        : null;
+      const woId = referencedId ?? this.resolveWorkOrderReference(lower);
+      if (!woId) {
+        return this.pushAgentReply(this.workOrderNumberRequest("cancel"));
+      }
       const action = this.proposeCancellation(woId, cleanText);
       const reply = `Are you sure you want to cancel Work Order #${woId}? Please reply 'yes' or 'confirm' to execute the cancellation.`;
       this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
       return reply;
     }
 
-    // 8. Work order retrieval (e.g. "Show work order wo_1001", "get work order 1001")
+    // 8. Work order retrieval (e.g. "Show work order wo_1001", "Show me the work order we just created")
     const woMatch = cleanText.match(/wo_\d+/i) || cleanText.match(/(?:work\s*order|job)\s*#?\s*(\d{4})/i);
-    if (woMatch) {
-      const woId = woMatch[0].startsWith("wo_") ? woMatch[0].toLowerCase() : `wo_${woMatch[1]}`;
+    let woId: string | null = woMatch
+      ? (woMatch[0].startsWith("wo_") ? woMatch[0].toLowerCase() : `wo_${woMatch[1]}`)
+      : null;
+    if (!woId && this.hasWorkOrderAnaphor(lower) && /\b(?:show|get|see|check|status|details?|find|look)\b/i.test(lower)) {
+      woId = this.resolveWorkOrderReference(lower);
+      if (!woId) {
+        return this.pushAgentReply(this.workOrderNumberRequest("look up"));
+      }
+    }
+    if (woId) {
       const woResult = await this.getWorkOrder(woId, correlationId);
       if (!woResult.ok) {
         const reply = this.backendFailureReply(woResult.error, correlationId);

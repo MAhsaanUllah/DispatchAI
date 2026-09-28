@@ -16,6 +16,8 @@ let state: AgentState = {
   selectedSlot: null,
   pendingAction: null,
   activeWorkOrder: null,
+  lastCreatedWorkOrderId: null,
+  rescheduleContext: null,
   history: [],
   events: []
 };
