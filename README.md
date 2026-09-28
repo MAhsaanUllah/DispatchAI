@@ -38,12 +38,14 @@ The dashboard and voice interface use the local DispatchAgent API. Read tools re
 ## Engineering highlights
 
 - **Grounded operations:** Customer and schedule answers come from tool results rather than generated records.
-- **Booking safeguards:** Confirmation before mutations, idempotency keys for repeated requests, and slot-conflict checks.
+- **Booking safeguards:** Confirmation before mutations, idempotency keys for repeated requests, slot-conflict checks, and protection against duplicate voice-tool booking replays.
+- **Multi-turn work-order handling:** Create, look up, reschedule, and cancel a work order across turns while retaining the correct job context; ambiguous references prompt for clarification instead of guessing.
+- **Truthful UI and failures:** Dashboard counts, activity, technician details, and connection status reflect available data. Backend outages are reported differently from genuine not-found results.
 - **Persistent local state:** SQLite retains work orders and outbox entries across domain-service restarts.
 - **Voice integration:** ElevenLabs browser sessions use a server-issued signed URL; the API key remains server-side.
 - **Workflow security:** Shared-secret authentication between the agent and n8n, plus signature verification for incoming ElevenLabs webhooks.
 - **Cloudflare integration:** A deployed Agents SDK Worker stores session state in a Durable Object and has been smoke-tested over a private Tunnel/VPC connection to local n8n. Its public route is disabled.
-- **Automated checks:** Vitest covers contracts, domain rules, workflow topology, agent tools, voice bridge, and failure paths.
+- **Automated checks:** 114 passing tests across 17 files cover contracts, domain rules, workflow topology, agent tools, multi-turn routing, voice-tool replay, UI states, and failure paths. Agent, domain, and web typechecks pass.
 
 ## Stack
 
