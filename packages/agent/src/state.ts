@@ -22,6 +22,12 @@ export interface ConversationMessage {
   timestamp: string;
 }
 
+export interface RescheduleContext {
+  workOrderId: string;
+  serviceType: ServiceType;
+  serviceZone: string;
+}
+
 export interface AgentState {
   sessionId: string;
   elevenLabsConversationId?: string;
@@ -35,6 +41,8 @@ export interface AgentState {
   selectedSlot: AvailableSlot | null;
   pendingAction: PendingConfirmationAction | null;
   activeWorkOrder: WorkOrder | null;
+  lastCreatedWorkOrderId: string | null;
+  rescheduleContext: RescheduleContext | null;
   history: ConversationMessage[];
   events: AgentEvent[];
 }
@@ -53,6 +61,8 @@ export function createInitialAgentState(sessionId: string): AgentState {
     selectedSlot: null,
     pendingAction: null,
     activeWorkOrder: null,
+    lastCreatedWorkOrderId: null,
+    rescheduleContext: null,
     history: [],
     events: []
   };
