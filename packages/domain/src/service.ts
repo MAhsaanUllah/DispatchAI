@@ -57,13 +57,18 @@ export class DispatchService {
       ["TECHNICIAN", workOrder.technicianId]
     ] as const) {
       if (!recipientId) continue;
+      const customer = audience === "CUSTOMER" ? this.store.customers.get(recipientId) : undefined;
+      const isEmail = audience === "CUSTOMER" && !!customer?.email;
       this.store.notifications.push({
         id: `notice_${randomUUID()}`,
         workOrderId: workOrder.id,
         audience,
         recipientId,
         eventType,
-        message: `Work order ${workOrder.id} ${eventType.toLowerCase()} for ${workOrder.scheduledStart ?? "an unscheduled time"}.`,
+        message: `Your ${workOrder.serviceType.toLowerCase()} appointment ${workOrder.id} is ${eventType.toLowerCase()} for ${workOrder.scheduledStart ?? "an unscheduled time"}. Address and arrival window should be confirmed with dispatch.`,
+        channel: isEmail ? "EMAIL" : "INTERNAL",
+        recipientAddress: isEmail ? customer?.email : undefined,
+        subject: `${eventType === "BOOKED" ? "Booking confirmation" : eventType === "RESCHEDULED" ? "Appointment updated" : "Appointment cancelled"} · ${workOrder.id}`,
         status: "PENDING_LOCAL",
         createdAt: now
       });

@@ -1,6 +1,12 @@
 import type { AgentState } from "@dispatchai/agent";
 import type { AgentEvent, LocalNotification, WorkOrder } from "@dispatchai/shared";
 
+export type Directory = {
+  company: { name: string; market: string; timeZone: string; serviceZones: string[]; note: string };
+  services: { id: string; name: string; description: string; priceNote: string }[];
+  technicians: { id: string; name: string; skills: string[]; serviceZones: string[]; status: string; upcomingSlots: { id: string; startAt: string; endAt: string; status: string }[] }[];
+};
+
 const baseUrl = (((import.meta as any).env?.VITE_AGENT_API_URL) || "").replace(/\/$/, "");
 const sessionId = "austin_dispatch_web_session";
 
@@ -59,6 +65,11 @@ export const api = {
     return response.data.notifications;
   },
 
+  async getDirectory(): Promise<Directory> {
+    const response = await request<{ ok: true; data: Directory }>("/api/directory");
+    return response.data;
+  },
+
   async sendMessage(text: string): Promise<{ reply: string; events: AgentEvent[] }> {
     const response = await request<{ reply: string; state: AgentState; events: AgentEvent[] }>("/api/chat", {
       method: "POST",
@@ -89,14 +100,15 @@ export const api = {
   async createVoiceSession(requestedSessionId: string): Promise<any> {
     return request("/api/voice/session", {
       method: "POST",
+      headers: { "x-session-id": requestedSessionId },
       body: JSON.stringify({ sessionId: requestedSessionId })
     });
   },
 
-  async executeVoiceTool(toolName: string, parameters: any, voiceToolToken: string, convId?: string): Promise<any> {
+  async executeVoiceTool(toolName: string, parameters: any, voiceToolToken: string, convId?: string, requestedSessionId = sessionId): Promise<any> {
     return request(`/api/voice/tools/${toolName}`, {
       method: "POST",
-      headers: { "x-voice-session-token": voiceToolToken },
+      headers: { "x-voice-session-token": voiceToolToken, "x-session-id": requestedSessionId },
       body: JSON.stringify({ tool_name: toolName, parameters, conversation_id: convId })
     });
   },

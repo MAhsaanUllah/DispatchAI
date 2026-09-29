@@ -4,6 +4,8 @@ import {
   toolSuccess
 } from "@dispatchai/shared";
 import { DispatchService } from "./service.js";
+import { getDirectory } from "./directory.js";
+import { deliverBookingEmails } from "./email.js";
 
 export interface ServerOptions {
   service?: DispatchService;
@@ -51,6 +53,10 @@ export function createDispatchServer(options: ServerOptions = {}) {
 
     if (method === "GET" && pathname === "/api/jobs") {
       return sendJson(200, toolSuccess({ jobs: Array.from(service.getStore().workOrders.values()) }, correlationId));
+    }
+
+    if (method === "GET" && pathname === "/api/directory") {
+      return sendJson(200, toolSuccess(getDirectory(service.getStore()), correlationId));
     }
 
     if (method === "GET" && pathname === "/api/notifications") {
@@ -101,6 +107,7 @@ export function createDispatchServer(options: ServerOptions = {}) {
       case "/webhook/create-work-order":
       case "/api/internal/create-work-order": {
         const result = service.createWorkOrder(body, correlationId);
+        if (result.ok) await deliverBookingEmails(service.getStore(), result.data.workOrder.id);
         return sendJson(result.ok ? 200 : 400, result);
       }
 
@@ -113,12 +120,14 @@ export function createDispatchServer(options: ServerOptions = {}) {
       case "/webhook/reschedule-work-order":
       case "/api/internal/reschedule-work-order": {
         const result = service.rescheduleWorkOrder(body, correlationId);
+        if (result.ok) await deliverBookingEmails(service.getStore(), result.data.workOrder.id);
         return sendJson(result.ok ? 200 : 400, result);
       }
 
       case "/webhook/cancel-work-order":
       case "/api/internal/cancel-work-order": {
         const result = service.cancelWorkOrder(body, correlationId);
+        if (result.ok) await deliverBookingEmails(service.getStore(), result.data.workOrder.id);
         return sendJson(result.ok ? 200 : 400, result);
       }
 
