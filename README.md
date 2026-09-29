@@ -6,7 +6,9 @@
 
 The application combines a React operations dashboard, an ElevenLabs conversational voice interface, authenticated n8n workflows, and a TypeScript domain service backed by SQLite. A Cloudflare Agents SDK runtime demonstrates persistent agent state and a private path from a Worker to local n8n.
 
-**[View the Cloudflare-hosted product preview](https://dispatchai-web.itsahsaanmughal.workers.dev)** · The public site showcases the experience. Voice calls and staff operations remain available in the local demo, not on the public preview.
+**[Explore the Cloudflare-hosted preview](https://dispatchai-web.itsahsaanmughal.workers.dev/)** · [View the read-only dashboard](https://dispatchai-web.itsahsaanmughal.workers.dev/app) · [Request a guided live demo](mailto:dev.ahsaan@gmail.com?subject=DispatchAI%20live%20demo%20request)
+
+The public site and dashboard preview use synthetic sample data. A guided session can demonstrate the real ElevenLabs voice call, local dashboard, n8n workflows, and booking flow together. The public preview does not initiate paid calls or expose operational write actions.
 
 ## Product preview
 
@@ -32,7 +34,7 @@ ElevenLabs voice call ─┘                              │
                                                       ▼
                                        Work orders + local outbox
 
-Cloudflare web Worker ─→ public landing preview (static assets)
+Cloudflare web Worker ─→ public landing + read-only dashboard preview
 Cloudflare Agents SDK Worker ─→ private Tunnel/VPC path ─→ local n8n
 ```
 
@@ -48,7 +50,7 @@ The dashboard and voice interface use the local DispatchAgent API. Read tools re
 - **Voice integration:** ElevenLabs browser sessions use a server-issued signed URL; the API key remains server-side. A pre-call form captures a name and confirmation email for the local demo.
 - **Company directory and notifications:** Read-only company, technician, and service views accompany the work-order dashboard. Confirmed bookings enter a persistent notification outbox; optional email delivery requires a configured sender and real recipient.
 - **Workflow security:** Shared-secret authentication between the agent and n8n, plus signature verification for incoming ElevenLabs webhooks.
-- **Cloudflare integration:** A deployed Agents SDK Worker stores session state in a Durable Object and has been smoke-tested over a private Tunnel/VPC connection to local n8n. Its public route is disabled. A separate Worker hosts the public frontend preview without exposing local APIs.
+- **Cloudflare integration:** A deployed Agents SDK Worker stores session state in a Durable Object and has been smoke-tested over a private Tunnel/VPC connection to local n8n. Its public route is disabled. A separate Worker hosts the public landing page and read-only dashboard preview without exposing local APIs.
 - **Automated checks:** 130 passing tests across 21 files cover contracts, domain rules, workflow topology, agent tools, multi-turn routing, voice-tool replay, pre-call intake, UI states, and failure paths. All four package typechecks pass.
 
 ## Stack
@@ -61,7 +63,7 @@ The dashboard and voice interface use the local DispatchAgent API. Read tools re
 | Orchestration | n8n |
 | Domain and persistence | TypeScript, Zod, SQLite |
 | Cloud agent runtime | Cloudflare Agents SDK, Durable Objects, Tunnel/VPC Service |
-| Public preview | Cloudflare Workers Static Assets |
+| Public preview | Cloudflare Workers Static Assets, React sample dashboard |
 | Tests | Vitest |
 
 ## Run locally
@@ -96,7 +98,7 @@ With the local services and the configured private tunnel running, start `npm ru
 
 ### Public frontend preview
 
-`npm run build:cloudflare --workspace=@dispatchai/web` builds a preview-safe frontend; `npm run deploy:cloudflare --workspace=@dispatchai/web` deploys it as the separate `dispatchai-web` Worker. On this public build, voice controls are disabled, `/app` explains the guided local demo, and `/api/*` returns an explicit unavailable response. The existing `dispatchai-agent` Worker is unchanged.
+`npm run build:cloudflare --workspace=@dispatchai/web` builds a preview-safe frontend; `npm run deploy:cloudflare --workspace=@dispatchai/web` deploys it as the separate `dispatchai-web` Worker. On this public build, `/app` is an interactive but read-only view of synthetic seed records; it does not call the local API or change bookings. The voice-demo button opens a contact prompt, and `/api/*` returns an explicit unavailable response. The existing `dispatchai-agent` Worker is unchanged.
 
 ## Project scope and next steps
 
