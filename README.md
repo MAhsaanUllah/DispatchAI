@@ -6,6 +6,8 @@
 
 The application combines a React operations dashboard, an ElevenLabs conversational voice interface, authenticated n8n workflows, and a TypeScript domain service backed by SQLite. A Cloudflare Agents SDK runtime demonstrates persistent agent state and a private path from a Worker to local n8n.
 
+**[View the Cloudflare-hosted product preview](https://dispatchai-web.itsahsaanmughal.workers.dev)** · The public site showcases the experience. Voice calls and staff operations remain available in the local demo, not on the public preview.
+
 ## Product preview
 
 ### Operations dashboard
@@ -30,6 +32,7 @@ ElevenLabs voice call ─┘                              │
                                                       ▼
                                        Work orders + local outbox
 
+Cloudflare web Worker ─→ public landing preview (static assets)
 Cloudflare Agents SDK Worker ─→ private Tunnel/VPC path ─→ local n8n
 ```
 
@@ -42,10 +45,11 @@ The dashboard and voice interface use the local DispatchAgent API. Read tools re
 - **Multi-turn work-order handling:** Create, look up, reschedule, and cancel a work order across turns while retaining the correct job context; ambiguous references prompt for clarification instead of guessing.
 - **Truthful UI and failures:** Dashboard counts, activity, technician details, and connection status reflect available data. Backend outages are reported differently from genuine not-found results.
 - **Persistent local state:** SQLite retains work orders and outbox entries across domain-service restarts.
-- **Voice integration:** ElevenLabs browser sessions use a server-issued signed URL; the API key remains server-side.
+- **Voice integration:** ElevenLabs browser sessions use a server-issued signed URL; the API key remains server-side. A pre-call form captures a name and confirmation email for the local demo.
+- **Company directory and notifications:** Read-only company, technician, and service views accompany the work-order dashboard. Confirmed bookings enter a persistent notification outbox; optional email delivery requires a configured sender and real recipient.
 - **Workflow security:** Shared-secret authentication between the agent and n8n, plus signature verification for incoming ElevenLabs webhooks.
-- **Cloudflare integration:** A deployed Agents SDK Worker stores session state in a Durable Object and has been smoke-tested over a private Tunnel/VPC connection to local n8n. Its public route is disabled.
-- **Automated checks:** 114 passing tests across 17 files cover contracts, domain rules, workflow topology, agent tools, multi-turn routing, voice-tool replay, UI states, and failure paths. Agent, domain, and web typechecks pass.
+- **Cloudflare integration:** A deployed Agents SDK Worker stores session state in a Durable Object and has been smoke-tested over a private Tunnel/VPC connection to local n8n. Its public route is disabled. A separate Worker hosts the public frontend preview without exposing local APIs.
+- **Automated checks:** 130 passing tests across 21 files cover contracts, domain rules, workflow topology, agent tools, multi-turn routing, voice-tool replay, pre-call intake, UI states, and failure paths. All four package typechecks pass.
 
 ## Stack
 
@@ -57,6 +61,7 @@ The dashboard and voice interface use the local DispatchAgent API. Read tools re
 | Orchestration | n8n |
 | Domain and persistence | TypeScript, Zod, SQLite |
 | Cloud agent runtime | Cloudflare Agents SDK, Durable Objects, Tunnel/VPC Service |
+| Public preview | Cloudflare Workers Static Assets |
 | Tests | Vitest |
 
 ## Run locally
@@ -83,14 +88,18 @@ npm run dev:agent
 npm run dev
 ```
 
-Open the dashboard at [http://localhost:5173](http://localhost:5173). The agent API runs on port `8787`, the domain service on `3100`, and n8n on `5678`. Use `npm test` and `npm run typecheck` to verify the codebase.
+Open the local landing page at [http://localhost:5173](http://localhost:5173) and the staff dashboard at `/app`. The agent API runs on port `8787`, the domain service on `3100`, and n8n on `5678`. Use `npm test` and `npm run typecheck` to verify the codebase.
 
 ### Cloudflare agent path
 
 With the local services and the configured private tunnel running, start `npm run dev:cloudflare` and run `npm run smoke:cloudflare`. This exercises the Agents SDK runtime on local port `8788`, its Durable Object state, and the private route to n8n. The deployed Worker has no public route; this path is an integration demonstration, not an always-on hosted dashboard.
 
+### Public frontend preview
+
+`npm run build:cloudflare --workspace=@dispatchai/web` builds a preview-safe frontend; `npm run deploy:cloudflare --workspace=@dispatchai/web` deploys it as the separate `dispatchai-web` Worker. On this public build, voice controls are disabled, `/app` explains the guided local demo, and `/api/*` returns an explicit unavailable response. The existing `dispatchai-agent` Worker is unchanged.
+
 ## Project scope and next steps
 
-The local dashboard, operational workflows, database, and agent tool routes form the working demo. The notification outbox records intended messages locally; it does not send SMS or email. Before presenting a live voice demo, rehearse a human-spoken booking and verify its dashboard result. A hosted release would additionally need authenticated public access, always-on n8n and database hosting, backups, and a dashboard cutover to the cloud API.
+The local dashboard, operational workflows, database, and agent tool routes form the working demo. Email delivery is optional; without a configured provider, messages remain in the local outbox. A human-spoken booking and its dashboard result still need a final live rehearsal. A fully hosted operational release would additionally need authenticated staff access, always-on n8n and database hosting, backups, and a dashboard cutover to a cloud API with the complete voice and operations routes.
 
 All names, contact details, technicians, and addresses shown in sample data or screenshots are fictional.

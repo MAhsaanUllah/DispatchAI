@@ -104,7 +104,8 @@ export const CreateWorkOrderInputSchema = z.object({
   issueSummary: z.string().min(1, "issueSummary is required"),
   urgency: UrgencySchema,
   slotId: z.string().min(1, "slotId is required"),
-  createdBy: CreatedBySchema
+  createdBy: CreatedBySchema,
+  confirmationEmail: z.string().email("confirmationEmail must be a valid email address").optional()
 });
 export type CreateWorkOrderInput = z.infer<typeof CreateWorkOrderInputSchema>;
 

@@ -3,7 +3,7 @@ import { DispatchService } from "@dispatchai/domain";
 import { AgentEvent } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
-import { handleRequest } from "./worker.js";
+import { getOrCreateAgent, handleRequest } from "./worker.js";
 
 describe("Phase 5: ElevenLabs Voice Integration & Tool Bridge", () => {
   let domainService: DispatchService;
@@ -164,6 +164,52 @@ describe("Phase 5: ElevenLabs Voice Integration & Tool Bridge", () => {
       expect(otherSession.status).toBe(401);
     } finally {
       vi.unstubAllGlobals();
+      if (oldKey === undefined) delete process.env.ELEVENLABS_API_KEY; else process.env.ELEVENLABS_API_KEY = oldKey;
+      if (oldId === undefined) delete process.env.ELEVENLABS_AGENT_ID; else process.env.ELEVENLABS_AGENT_ID = oldId;
+    }
+  });
+
+  it("captures visitor details from the session request so the booking email reaches the visitor", async () => {
+    const oldKey = process.env.ELEVENLABS_API_KEY;
+    const oldId = process.env.ELEVENLABS_AGENT_ID;
+    process.env.ELEVENLABS_API_KEY = "test_api_key";
+    process.env.ELEVENLABS_AGENT_ID = "test_agent_id";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ signed_url: "wss://example.test/voice" }), { status: 200 })));
+    try {
+      const session = await handleRequest(new Request("http://localhost/api/voice/session", {
+        method: "POST",
+        headers: { "x-session-id": "visitor_capture_session", "Content-Type": "application/json" },
+        body: JSON.stringify({ visitorName: "Ayesha Khan", visitorEmail: "AYESHA.Personal@Mail.Test" })
+      }));
+      expect(session.status).toBe(200);
+      const sessionBody: any = await session.json();
+      expect(sessionBody.data.visitorEmail).toBe("ayesha.personal@mail.test");
+      const sessionAgent = getOrCreateAgent("visitor_capture_session");
+      expect(sessionAgent.getState().visitorName).toBe("Ayesha Khan");
+      expect(sessionAgent.getState().visitorEmail).toBe("ayesha.personal@mail.test");
+    } finally {
+      vi.unstubAllGlobals();
+      if (oldKey === undefined) delete process.env.ELEVENLABS_API_KEY; else process.env.ELEVENLABS_API_KEY = oldKey;
+      if (oldId === undefined) delete process.env.ELEVENLABS_AGENT_ID; else process.env.ELEVENLABS_AGENT_ID = oldId;
+    }
+  });
+
+  it("rejects a voice session with a malformed visitor email", async () => {
+    const oldKey = process.env.ELEVENLABS_API_KEY;
+    const oldId = process.env.ELEVENLABS_AGENT_ID;
+    process.env.ELEVENLABS_API_KEY = "test_api_key";
+    process.env.ELEVENLABS_AGENT_ID = "test_agent_id";
+    try {
+      const session = await handleRequest(new Request("http://localhost/api/voice/session", {
+        method: "POST",
+        headers: { "x-session-id": "invalid_visitor_session", "Content-Type": "application/json" },
+        body: JSON.stringify({ visitorName: "Bad Input", visitorEmail: "not-an-email" })
+      }));
+      expect(session.status).toBe(400);
+      const body: any = await session.json();
+      expect(body.ok).toBe(false);
+      expect(body.error.code).toBe("INVALID_INPUT");
+    } finally {
       if (oldKey === undefined) delete process.env.ELEVENLABS_API_KEY; else process.env.ELEVENLABS_API_KEY = oldKey;
       if (oldId === undefined) delete process.env.ELEVENLABS_AGENT_ID; else process.env.ELEVENLABS_AGENT_ID = oldId;
     }

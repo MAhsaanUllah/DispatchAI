@@ -63,6 +63,13 @@ export class DispatchAgent {
     this.emit("STATE_UPDATED", correlationId, undefined, { elevenLabsConversationId: conversationId });
   }
 
+  public setVisitorDetails(visitorName: string, visitorEmail: string) {
+    this.state.visitorName = visitorName.trim();
+    this.state.visitorEmail = visitorEmail.trim().toLowerCase();
+    const correlationId = this.generateCorrelationId();
+    this.emit("STATE_UPDATED", correlationId, undefined, { visitorName: this.state.visitorName, visitorEmail: this.state.visitorEmail });
+  }
+
   public subscribe(listener: EventListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -204,7 +211,8 @@ export class DispatchAgent {
         issueSummary: this.state.issueSummary || "Scheduled field-service maintenance",
         urgency: this.state.urgency,
         slotId: slot.slotId,
-        createdBy
+        createdBy,
+        ...(this.state.visitorEmail ? { confirmationEmail: this.state.visitorEmail } : {})
       },
       createdAt: new Date().toISOString()
     };

@@ -41,6 +41,8 @@ export interface SuccessfulCreateRecord {
 export interface AgentState {
   sessionId: string;
   elevenLabsConversationId?: string;
+  visitorName?: string;
+  visitorEmail?: string;
   customer: Customer | null;
   selectedProperty: Property | null;
   serviceType: ServiceType | null;
@@ -62,6 +64,8 @@ export function createInitialAgentState(sessionId: string): AgentState {
   return {
     sessionId,
     elevenLabsConversationId: undefined,
+    visitorName: undefined,
+    visitorEmail: undefined,
     customer: null,
     selectedProperty: null,
     serviceType: null,

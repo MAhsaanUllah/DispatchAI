@@ -231,6 +231,14 @@ export async function handleRequest(req: Request): Promise<Response> {
           });
         }
         const body: any = await req.json().catch(() => ({}));
+        const visitorName = typeof body.visitorName === "string" ? body.visitorName.trim().slice(0, 80) : "";
+        const visitorEmail = typeof body.visitorEmail === "string" ? body.visitorEmail.trim().toLowerCase() : "";
+        if (visitorEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(visitorEmail)) {
+          return new Response(
+            JSON.stringify(toolFailure("INVALID_INPUT", "visitorEmail must be a valid email address", false, `voice_${Date.now()}`)),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         const response = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(agentId)}`, {
           headers: { "xi-api-key": apiKey }
         });
@@ -241,6 +249,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         voiceTokens.set(voiceToolToken, { sessionId, expiresAt: Date.now() + 60 * 60 * 1000 });
         const convId = body.conversationId || null;
         if (convId) agent.setElevenLabsConversationId(convId);
+        if (visitorEmail) agent.setVisitorDetails(visitorName || "Website visitor", visitorEmail);
         return new Response(
           JSON.stringify({
             ok: true,
@@ -249,7 +258,8 @@ export async function handleRequest(req: Request): Promise<Response> {
               elevenLabsConversationId: convId,
               status: "READY",
               signedUrl: signed.signed_url,
-              voiceToolToken
+              voiceToolToken,
+              ...(visitorEmail ? { visitorName: visitorName || "Website visitor", visitorEmail } : {})
             }
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

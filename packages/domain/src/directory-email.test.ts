@@ -24,6 +24,30 @@ describe("company directory and booking email", () => {
     expect(directory.company.serviceZones).toContain("Austin-South");
   });
 
+  it("routes the booking email to the visitor address when one is supplied", () => {
+    const store = new DispatchStore();
+    const service = new DispatchService(store);
+    const available = service.checkAvailability({ serviceType: "HVAC", serviceZone: "Austin-South", date: new Date().toISOString().slice(0, 10) });
+    expect(available.ok).toBe(true);
+    if (!available.ok) return;
+    const booked = service.createWorkOrder({
+      idempotencyKey: "visitor-email-override-test",
+      customerId: "cust_101",
+      propertyId: "prop_201",
+      serviceType: "HVAC",
+      issueSummary: "AC blowing warm air",
+      urgency: "STANDARD",
+      slotId: available.data.slots[0].slotId,
+      createdBy: "VOICE_AGENT",
+      confirmationEmail: "visitor.personal@mail.test"
+    });
+    expect(booked.ok).toBe(true);
+    if (!booked.ok) return;
+    const notice = store.notifications.find((item) => item.workOrderId === booked.data.workOrder.id && item.audience === "CUSTOMER");
+    expect(notice).toMatchObject({ channel: "EMAIL", status: "PENDING_LOCAL", recipientAddress: "visitor.personal@mail.test" });
+    expect(notice?.recipientAddress).not.toBe("alicia.ramirez@example.com");
+  });
+
   it("queues an email preview after booking and never sends synthetic addresses", async () => {
     const store = new DispatchStore();
     const service = new DispatchService(store);

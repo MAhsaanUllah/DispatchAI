@@ -103,6 +103,7 @@ body {
 .landing-brand { display: inline-flex; align-items: center; gap: 11px; font-size: 21px; font-weight: 780; letter-spacing: -.05em; }
 .landing-brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: #173b2d; color: #fff; }
 .landing-brand-mark img { width: 36px; height: 36px; display: block; }
+.landing-primary-cta:disabled { opacity: .58; cursor: not-allowed; box-shadow: none; }
 .landing-brand-accent { color: #2d8562; }
 .landing-nav-right { display: flex; align-items: center; gap: 28px; }
 .landing-location { display: inline-flex; align-items: center; gap: 5px; color: #66766d; font-size: 12px; font-weight: 600; }
@@ -244,6 +245,28 @@ body {
   .voice-hero-title { font-size: 17px; }
   .voice-footer { flex-direction: column; align-items: stretch; }
   .voice-button { width: 100%; }
+}
+
+.precall-panel { width: min(100%, 470px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2); }
+.precall-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.precall-eyebrow { color: var(--text-tertiary); font-size: 10px; font-weight: 800; letter-spacing: .13em; }
+.precall-intro { display: flex; align-items: center; gap: 16px; padding: 20px 18px 4px; }
+.precall-intro img { width: 56px; height: 56px; flex: none; border-radius: 15px; border: 1px solid #cbdafa; background: #e6edfc; object-fit: cover; object-position: center 18%; }
+.precall-intro strong { display: block; font-size: 16.5px; letter-spacing: -.02em; }
+.precall-intro p { margin: 4px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.precall-form { display: flex; flex-direction: column; padding: 16px 18px 18px; }
+.precall-label { margin: 11px 0 5px; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.precall-label:first-child { margin-top: 0; }
+.precall-field { display: flex; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: var(--text-tertiary); }
+.precall-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.precall-field input { flex: 1; min-height: 42px; border: none; outline: none; background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; }
+.precall-error { margin: 10px 0 0; color: var(--danger); font-size: 12px; }
+.precall-cta { width: 100%; margin-top: 16px; min-height: 49px; }
+.precall-footnote { margin: 0; padding: 12px 18px 16px; border-top: 1px solid var(--border); color: var(--text-tertiary); font-size: 10.5px; }
+@media (max-width: 540px) {
+  .precall-intro { padding: 18px 16px 2px; }
+  .precall-form { padding: 14px 16px 16px; }
+  .precall-footnote { padding: 11px 16px 14px; }
 }
 
 /* System architecture page — animated connection canvas */

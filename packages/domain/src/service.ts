@@ -51,14 +51,15 @@ export class DispatchService {
     return undefined;
   }
 
-  private queueNotifications(workOrder: WorkOrder, eventType: LocalNotification["eventType"], now: string): void {
+  private queueNotifications(workOrder: WorkOrder, eventType: LocalNotification["eventType"], now: string, recipientEmailOverride?: string): void {
     for (const [audience, recipientId] of [
       ["CUSTOMER", workOrder.customerId],
       ["TECHNICIAN", workOrder.technicianId]
     ] as const) {
       if (!recipientId) continue;
       const customer = audience === "CUSTOMER" ? this.store.customers.get(recipientId) : undefined;
-      const isEmail = audience === "CUSTOMER" && !!customer?.email;
+      const recipientEmail = recipientEmailOverride || customer?.email;
+      const isEmail = audience === "CUSTOMER" && !!recipientEmail;
       this.store.notifications.push({
         id: `notice_${randomUUID()}`,
         workOrderId: workOrder.id,
@@ -67,7 +68,7 @@ export class DispatchService {
         eventType,
         message: `Your ${workOrder.serviceType.toLowerCase()} appointment ${workOrder.id} is ${eventType.toLowerCase()} for ${workOrder.scheduledStart ?? "an unscheduled time"}. Address and arrival window should be confirmed with dispatch.`,
         channel: isEmail ? "EMAIL" : "INTERNAL",
-        recipientAddress: isEmail ? customer?.email : undefined,
+        recipientAddress: isEmail ? recipientEmail : undefined,
         subject: `${eventType === "BOOKED" ? "Booking confirmation" : eventType === "RESCHEDULED" ? "Appointment updated" : "Appointment cancelled"} · ${workOrder.id}`,
         status: "PENDING_LOCAL",
         createdAt: now
@@ -278,7 +279,7 @@ export class DispatchService {
 
     const resultData: CreateWorkOrderOutputData = { workOrder };
     this.idempotencyRecord("create", input.idempotencyKey, input, resultData);
-    this.queueNotifications(workOrder, "BOOKED", now);
+    this.queueNotifications(workOrder, "BOOKED", now, input.confirmationEmail);
 
     this.store.recordEvent({
       id: `evt_${Date.now()}`,

@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { ArrowRight, CalendarDays, CheckCircle2, Clock3, Headphones, MapPin, Mic2, ShieldCheck } from "lucide-react";
 import { VoiceAgentControl } from "./components/VoiceAgentControl.js";
+import { PreCallForm, type VisitorDetails } from "./components/PreCallForm.js";
 
 export function LandingPage() {
+  const publicPreview = import.meta.env.MODE === "cloudflare";
+  const [preCallOpen, setPreCallOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [visitor, setVisitor] = useState<VisitorDetails | null>(null);
   const [voiceSessionId] = useState(() => `public_demo_${crypto.randomUUID()}`);
   return <div className="landing-shell">
     <a className="landing-skip" href="#main">Skip to content</a>
@@ -17,13 +21,13 @@ export function LandingPage() {
         <div className="landing-hero-copy">
           <div className="landing-kicker"><span className="landing-kicker-dot" /> HVAC & PLUMBING DISPATCH · AUSTIN, TX</div>
           <h1 id="landing-title">The first step to getting it <em>fixed.</em></h1>
-          <p className="landing-lede">“Hi, my AC stopped cooling last night.” That’s all it takes. Our dispatcher checks live technician availability across Austin and books a confirmed window — no hold music, no callbacks.</p>
-          <div className="landing-hero-actions"><button type="button" className="landing-primary-cta" onClick={() => setVoiceOpen(true)}><Mic2 size={18} aria-hidden="true" /> Start a browser call <ArrowRight size={17} aria-hidden="true" /></button><span>Voice demo · microphone required</span></div>
+          <p className="landing-lede">“Hi, my AC stopped cooling last night.” The dispatcher can check sample Austin technician availability and guide a confirmed demo booking.</p>
+          <div className="landing-hero-actions"><button type="button" className="landing-primary-cta" onClick={() => setPreCallOpen(true)} disabled={publicPreview}><Mic2 size={18} aria-hidden="true" /> {publicPreview ? "Voice demo by request" : "Start a browser call"} <ArrowRight size={17} aria-hidden="true" /></button><span>{publicPreview ? "Online preview · live services run locally" : "Voice demo · microphone required"}</span></div>
           <div className="landing-trust-line"><ShieldCheck size={16} aria-hidden="true" /><span>Nothing is booked, moved or cancelled until you say “yes, confirm it.”</span></div>
-          <div className="landing-signal-row" aria-label="Live dispatcher activity">
-            <span className="landing-signal"><span className="landing-live-badge"><span /> ON CALL NOW</span> Dispatching for 78704 · Zilker</span>
-            <span className="landing-signal"><Clock3 size={13} aria-hidden="true" /> Next HVAC window · Today 3:30 PM</span>
-            <span className="landing-signal"><CheckCircle2 size={13} aria-hidden="true" /> 42 calls handled this week</span>
+          <div className="landing-signal-row" aria-label="DispatchAI demo capabilities">
+            <span className="landing-signal"><span className="landing-live-badge"><span /> DEMO SCENARIO</span> Austin · 78704</span>
+            <span className="landing-signal"><Clock3 size={13} aria-hidden="true" /> Sample appointment windows</span>
+            <span className="landing-signal"><CheckCircle2 size={13} aria-hidden="true" /> Human-confirmed booking</span>
           </div>
         </div>
         <div className="landing-call-card" aria-label="Voice assistant preview">
@@ -47,10 +51,11 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="landing-bottom-cta" aria-labelledby="bottom-title"><div><span className="landing-card-eyebrow">READY WHEN YOU ARE</span><h2 id="bottom-title">Start with a conversation.</h2><p>Try the DispatchAI browser voice demo with a sample Austin customer record.</p></div><button type="button" className="landing-primary-cta" onClick={() => setVoiceOpen(true)}>Try the voice assistant <ArrowRight size={17} aria-hidden="true" /></button></section>
+      <section className="landing-bottom-cta" aria-labelledby="bottom-title"><div><span className="landing-card-eyebrow">READY WHEN YOU ARE</span><h2 id="bottom-title">Start with a conversation.</h2><p>{publicPreview ? "This public preview showcases the product; a live voice walkthrough requires the local operations stack." : "Try the DispatchAI browser voice demo with a sample Austin customer record."}</p></div><button type="button" className="landing-primary-cta" onClick={() => setPreCallOpen(true)} disabled={publicPreview}>{publicPreview ? "Live walkthrough by request" : "Try the voice assistant"} <ArrowRight size={17} aria-hidden="true" /></button></section>
       <p className="landing-disclaimer"><CheckCircle2 size={14} aria-hidden="true" /> Portfolio demonstration with synthetic customers and schedules. No real emergency service or live email delivery is promised. For immediate danger, contact local emergency services.</p>
     </main>
     <footer className="landing-footer"><span>© 2026 DispatchAI · Austin field-service demo</span><a href="/app">Open staff dashboard</a></footer>
-    <VoiceAgentControl isOpen={voiceOpen} onClose={() => setVoiceOpen(false)} sessionId={voiceSessionId} />
+    <PreCallForm isOpen={preCallOpen} onCancel={() => setPreCallOpen(false)} onStart={(details) => { setVisitor(details); setPreCallOpen(false); setVoiceOpen(true); }} />
+    <VoiceAgentControl isOpen={voiceOpen} onClose={() => setVoiceOpen(false)} sessionId={voiceSessionId} visitor={visitor ?? undefined} autoStart={!!visitor} />
   </div>;
 }

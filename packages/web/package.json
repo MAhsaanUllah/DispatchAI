@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:cloudflare": "tsc && vite build --mode cloudflare",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy --config wrangler.jsonc",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
