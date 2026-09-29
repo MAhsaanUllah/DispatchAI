@@ -135,3 +135,70 @@ describe("Phase 3: Cloudflare DispatchAgent & Text Interaction Path", () => {
     expect(emittedEvents.some((e) => e.type === "WORK_ORDER_CREATED")).toBe(false);
   });
 });
+
+describe("Visitor email routing from a public voice call", () => {
+  let domainService: DispatchService;
+  let n8nClient: N8nClient;
+  let agent: DispatchAgent;
+
+  beforeEach(() => {
+    domainService = new DispatchService();
+    n8nClient = new N8nClient({
+      baseUrl: "http://localhost:5678",
+      secret: "test_secret",
+      directService: domainService
+    });
+    agent = new DispatchAgent("visitor_email_session", n8nClient);
+  });
+
+  it("attaches the session visitor email to a proposed booking", async () => {
+    agent.setVisitorDetails("Ravi Kumar", "ravi.personal@mail.test");
+    expect(agent.getState().visitorName).toBe("Ravi Kumar");
+    expect(agent.getState().visitorEmail).toBe("ravi.personal@mail.test");
+
+    await agent.processMessage("5125550101");
+    await agent.processMessage("My AC unit stopped working today");
+    const targetSlot = agent.getState().availableSlots[0];
+    expect(targetSlot).toBeDefined();
+
+    agent.proposeBooking(targetSlot.slotId, "AC not cooling", "STANDARD", "VOICE_AGENT");
+    const pending = agent.getState().pendingAction;
+    expect(pending?.type).toBe("CREATE_WORK_ORDER");
+    expect(pending?.payload.confirmationEmail).toBe("ravi.personal@mail.test");
+  });
+
+  it("routes the booking notification to the visitor email after confirmation", async () => {
+    agent.setVisitorDetails("Ravi Kumar", "ravi.personal@mail.test");
+    await agent.processMessage("5125550101");
+    await agent.processMessage("My AC unit stopped working today");
+    const targetSlot = agent.getState().availableSlots[0];
+
+    agent.proposeBooking(targetSlot.slotId, "AC not cooling", "STANDARD", "VOICE_AGENT");
+    const confirmed = await agent.confirmPendingAction();
+    expect(confirmed.ok).toBe(true);
+    if (!confirmed.ok || !("data" in confirmed)) return;
+
+    const notice = domainService.getStore().notifications.find(
+      (item) => item.workOrderId === confirmed.data.workOrder.id && item.audience === "CUSTOMER"
+    );
+    expect(notice).toMatchObject({ channel: "EMAIL", status: "PENDING_LOCAL", recipientAddress: "ravi.personal@mail.test" });
+  });
+
+  it("keeps the seeded customer email when no visitor email was collected", async () => {
+    await agent.processMessage("5125550101");
+    await agent.processMessage("My AC unit stopped working today");
+    const targetSlot = agent.getState().availableSlots[0];
+
+    agent.proposeBooking(targetSlot.slotId, "AC not cooling", "STANDARD", "VOICE_AGENT");
+    expect(agent.getState().pendingAction?.payload.confirmationEmail).toBeUndefined();
+
+    const confirmed = await agent.confirmPendingAction();
+    expect(confirmed.ok).toBe(true);
+    if (!confirmed.ok || !("data" in confirmed)) return;
+
+    const notice = domainService.getStore().notifications.find(
+      (item) => item.workOrderId === confirmed.data.workOrder.id && item.audience === "CUSTOMER"
+    );
+    expect(notice?.recipientAddress).toBe("alicia.ramirez@example.com");
+  });
+});

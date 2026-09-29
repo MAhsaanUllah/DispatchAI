@@ -49,6 +49,7 @@ Thumbs.db
 
 # TypeScript cache
 *.tsbuildinfo
+packages/web/worker-configuration.d.ts
 
 # AI Agent & Internal Caches & Docs
 .hermes/

@@ -97,11 +97,14 @@ export const api = {
     return this.getJobs();
   },
 
-  async createVoiceSession(requestedSessionId: string): Promise<any> {
+  async createVoiceSession(requestedSessionId: string, visitor?: { name: string; email: string }): Promise<any> {
     return request("/api/voice/session", {
       method: "POST",
       headers: { "x-session-id": requestedSessionId },
-      body: JSON.stringify({ sessionId: requestedSessionId })
+      body: JSON.stringify({
+        sessionId: requestedSessionId,
+        ...(visitor ? { visitorName: visitor.name, visitorEmail: visitor.email } : {})
+      })
     });
   },
 

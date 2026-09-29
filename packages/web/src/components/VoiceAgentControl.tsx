@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { Mic, PhoneOff, X } from "lucide-react";
 import { api } from "../api";
@@ -8,9 +8,11 @@ interface VoiceAgentControlProps {
   onClose: () => void;
   onEventEmitted?: () => void;
   sessionId: string;
+  visitor?: { name: string; email: string };
+  autoStart?: boolean;
 }
 
-function VoiceCall({ onClose, sessionId, onEventEmitted }: VoiceAgentControlProps) {
+function VoiceCall({ onClose, sessionId, onEventEmitted, visitor, autoStart }: VoiceAgentControlProps) {
   const [error, setError] = useState("");
   const [conversationId, setConversationId] = useState("");
   const [messages, setMessages] = useState<Array<{ role: "user" | "agent"; text: string }>>([]);
@@ -47,7 +49,7 @@ function VoiceCall({ onClose, sessionId, onEventEmitted }: VoiceAgentControlProp
     try {
       const permission = await navigator.mediaDevices.getUserMedia({ audio: true });
       permission.getTracks().forEach((track) => track.stop());
-      const response = await api.createVoiceSession(sessionId);
+      const response = await api.createVoiceSession(sessionId, visitor);
       if (!response?.data?.signedUrl) throw new Error("ElevenLabs did not return a signed URL");
       voiceToolToken.current = response.data.voiceToolToken;
       conversation.startSession({ signedUrl: response.data.signedUrl, connectionType: "websocket" });
@@ -55,6 +57,14 @@ function VoiceCall({ onClose, sessionId, onEventEmitted }: VoiceAgentControlProp
       setError(failure instanceof Error ? failure.message : "Voice connection failed");
     }
   };
+
+  const didAutoStart = useRef(false);
+  useEffect(() => {
+    if (autoStart && !didAutoStart.current) {
+      didAutoStart.current = true;
+      void start();
+    }
+  }, [autoStart]);
 
   const close = () => {
     conversation.endSession();
@@ -119,7 +129,7 @@ function VoiceCall({ onClose, sessionId, onEventEmitted }: VoiceAgentControlProp
   );
 }
 
-export const VoiceAgentControl: React.FC<VoiceAgentControlProps> = ({ isOpen, onClose, sessionId, onEventEmitted }) => {
+export const VoiceAgentControl: React.FC<VoiceAgentControlProps> = ({ isOpen, onClose, sessionId, onEventEmitted, visitor, autoStart }) => {
   if (!isOpen) return null;
-  return <ConversationProvider><VoiceCall isOpen={isOpen} onClose={onClose} sessionId={sessionId} onEventEmitted={onEventEmitted} /></ConversationProvider>;
+  return <ConversationProvider><VoiceCall isOpen={isOpen} onClose={onClose} sessionId={sessionId} onEventEmitted={onEventEmitted} visitor={visitor} autoStart={autoStart} /></ConversationProvider>;
 };
