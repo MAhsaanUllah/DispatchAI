@@ -128,7 +128,11 @@ export const LocalNotificationSchema = z.object({
   recipientId: z.string(),
   eventType: z.enum(["BOOKED", "RESCHEDULED", "CANCELLED"]),
   message: z.string(),
-  status: z.literal("PENDING_LOCAL"),
+  channel: z.enum(["EMAIL", "INTERNAL"]).optional(),
+  recipientAddress: z.string().optional(),
+  subject: z.string().optional(),
+  status: z.enum(["PENDING_LOCAL", "SENT", "FAILED"]),
+  providerId: z.string().optional(),
   createdAt: z.string()
 });
 export type LocalNotification = z.infer<typeof LocalNotificationSchema>;

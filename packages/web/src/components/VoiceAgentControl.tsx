@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
-import { Mic, PhoneOff, Radio, X } from "lucide-react";
+import { Mic, PhoneOff, X } from "lucide-react";
 import { api } from "../api";
 
 interface VoiceAgentControlProps {
@@ -19,7 +19,7 @@ function VoiceCall({ onClose, sessionId, onEventEmitted }: VoiceAgentControlProp
   const invoke = async (name: string, parameters: Record<string, unknown>) => {
     if (!voiceToolToken.current) return JSON.stringify({ ok: false, error: "Voice session expired. Start a new call." });
     try {
-      const result = await api.executeVoiceTool(name, parameters, voiceToolToken.current, conversationIdRef.current);
+      const result = await api.executeVoiceTool(name, parameters, voiceToolToken.current, conversationIdRef.current, sessionId);
       onEventEmitted?.();
       return JSON.stringify(result.envelope);
     } catch (failure) {
@@ -72,7 +72,7 @@ function VoiceCall({ onClose, sessionId, onEventEmitted }: VoiceAgentControlProp
       <div className="voice-panel">
         <div className="voice-header">
           <div className="voice-brand">
-            <span className="voice-brand-mark"><Radio size={15} /></span>
+            <span className="voice-brand-mark"><img src="/favicon.svg" alt="" width="28" height="28" /></span>
             <span>DispatchAI <span className="voice-brand-divider">/</span> Voice assistant</span>
           </div>
           <button className="voice-close" onClick={close} aria-label="Close voice call"><X size={18} /></button>

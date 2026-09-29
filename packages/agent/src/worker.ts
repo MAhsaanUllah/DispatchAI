@@ -1,4 +1,4 @@
-import { DispatchService } from "@dispatchai/domain";
+import { DispatchService, getDirectory } from "@dispatchai/domain";
 import { toolFailure, toolSuccess, verifyWebhookSignature } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
@@ -184,6 +184,15 @@ export async function handleRequest(req: Request): Promise<Response> {
       });
     }
     return proxyDatabaseRequest("/api/jobs", "GET", corsHeaders);
+  }
+
+  if (method === "GET" && pathname === "/api/directory") {
+    if (isTestRuntime) {
+      return new Response(JSON.stringify({ ok: true, data: getDirectory(domainService.getStore()) }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+    return proxyDatabaseRequest("/api/directory", "GET", corsHeaders);
   }
 
   if (method === "GET" && pathname === "/api/notifications") {

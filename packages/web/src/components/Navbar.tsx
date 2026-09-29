@@ -1,13 +1,15 @@
 import React, { useState } from "react";
-import { Radio, RotateCcw, Mic } from "lucide-react";
+import { RotateCcw, Mic } from "lucide-react";
 
 interface NavbarProps {
   onReset: () => void;
   austinTime: string;
   onOpenVoiceModal?: () => void;
+  activeView?: "dispatch" | "team" | "services" | "company" | "system";
+  onViewChange?: (view: "dispatch" | "team" | "services" | "company" | "system") => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange }) => {
   const [isResetting, setIsResetting] = useState(false);
 
   const handleResetClick = () => {
@@ -17,7 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
   };
 
   return (
-    <header style={{
+    <header className="app-navbar" style={{
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
@@ -41,7 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
             justifyContent: "center",
             color: "#ffffff"
           }}>
-            <Radio size={15} />
+            <img src="/favicon.svg" alt="" width="28" height="28" />
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
             <span style={{ fontSize: "15px", fontWeight: 600, letterSpacing: "-0.01em", color: "var(--text-primary)" }}>
@@ -55,6 +57,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
 
       </div>
 
+      <nav className="app-nav-links" aria-label="Main navigation">
+        {([ ["dispatch", "Dispatch"], ["team", "Team"], ["services", "Services"], ["company", "Company"], ["system", "System"] ] as const).map(([view, label]) =>
+          <button type="button" key={view} className={activeView === view ? "app-nav-link active" : "app-nav-link"} aria-current={activeView === view ? "page" : undefined} onClick={() => onViewChange?.(view)}>{label}</button>
+        )}
+      </nav>
       {/* Right Controls: Clock & Essential Actions */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
         {/* Voice Dispatcher Trigger Button */}

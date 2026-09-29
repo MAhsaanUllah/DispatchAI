@@ -281,15 +281,17 @@ export const AgentChat: React.FC<AgentChatProps> = ({
       ) : (
         <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
           <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-            Local pending notices only — no SMS or email has been sent.
+            Booking notices are drafted locally. Email is sent only when a real address and provider are configured; check each notice's status.
           </div>
           {notifications.length === 0 ? (
             <div style={{ color: "var(--text-secondary)", fontSize: "12px" }}>No notices queued yet.</div>
           ) : notifications.map((notice) => (
             <div key={notice.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "10px", background: "var(--surface)" }}>
               <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-primary)" }}>
-                {notice.eventType} · {notice.audience} · {notice.status}
+                {notice.eventType} · {notice.audience} · {notice.channel || "INTERNAL"} · {notice.status}
               </div>
+              {notice.recipientAddress ? <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>To: {notice.recipientAddress}</div> : null}
+              {notice.subject ? <div style={{ fontSize: "11px", fontWeight: 600, marginTop: "4px" }}>{notice.subject}</div> : null}
               <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>{notice.message}</div>
               <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "4px" }}>{notice.createdAt}</div>
             </div>

@@ -6,12 +6,17 @@ import { WorkOrderDrawer } from "./components/WorkOrderDrawer.js";
 import { AgentChat } from "./components/AgentChat.js";
 import { EventTimeline } from "./components/EventTimeline.js";
 import { VoiceAgentControl } from "./components/VoiceAgentControl.js";
-import { api } from "./api.js";
+import { api, type Directory } from "./api.js";
+import { DirectoryPanel } from "./components/DirectoryPanel.js";
+import { SystemPanel } from "./components/SystemPanel.js";
 import { LocalNotification, WorkOrder } from "@dispatchai/shared";
 import { MessageSquare, Activity, Briefcase } from "lucide-react";
 
 export const App: React.FC = () => {
   const [jobs, setJobs] = useState<WorkOrder[]>([]);
+  const [directory, setDirectory] = useState<Directory | null>(null);
+  const [directoryLoading, setDirectoryLoading] = useState(true);
+  const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system">("dispatch");
   const [notifications, setNotifications] = useState<LocalNotification[]>([]);
   const [selectedJob, setSelectedJob] = useState<WorkOrder | null>(null);
   const [agentState, setAgentState] = useState(api.getAgent().getState());
@@ -42,6 +47,7 @@ export const App: React.FC = () => {
 
   // Initialize jobs and subscribe to agent events
   useEffect(() => {
+    void api.getDirectory().then(setDirectory).catch(() => setDirectory(null)).finally(() => setDirectoryLoading(false));
     void Promise.all([api.refreshState(), api.getJobs(), api.getNotifications()]).then(([nextState, nextJobs, nextNotifications]) => {
       setAgentState({ ...nextState });
       setJobs(nextJobs);
@@ -112,9 +118,10 @@ export const App: React.FC = () => {
   return (
     <div style={{ height: "100vh", maxHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--background)", overflow: "hidden" }}>
       {/* Shell Header */}
-      <Navbar onReset={handleResetData} austinTime={austinTime} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} />
+      <Navbar onReset={handleResetData} austinTime={austinTime} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
 
-      <main style={{ padding: "14px 24px 16px", maxWidth: "1680px", margin: "0 auto", width: "100%", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <main style={{ padding: "14px 24px 16px", maxWidth: "1680px", margin: "0 auto", width: "100%", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: activeView === "dispatch" ? "hidden" : "auto" }}>
+        {activeView === "system" ? <SystemPanel /> : activeView !== "dispatch" ? <DirectoryPanel view={activeView} directory={directory} loading={directoryLoading} /> : <>
         {/* Compact Operational Summary (Section 15) */}
         <StatsBar jobs={jobs} />
 
@@ -207,6 +214,7 @@ export const App: React.FC = () => {
             />
           </div>
         </div>
+        </>}
       </main>
 
       {/* Work-Order Slide-Over Drawer */}
