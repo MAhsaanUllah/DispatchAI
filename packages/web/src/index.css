@@ -117,7 +117,53 @@ body {
 .landing-lede { max-width: 560px; margin: 0; color: #607169; font-size: 17px; line-height: 1.65; text-wrap: pretty; }
 .landing-hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 15px; margin-top: 31px; }
 .landing-primary-cta { display: inline-flex; align-items: center; justify-content: center; gap: 11px; min-height: 49px; padding: 11px 20px; border: 1px solid #1c5940; border-radius: 8px; background: #1c5940; color: #fff; font-size: 13px; font-weight: 730; cursor: pointer; transition: background-color .18s ease, transform .18s ease; }
+.landing-shell a.landing-primary-cta, .public-dashboard a.landing-primary-cta { color: #fff; }
 .landing-primary-cta:hover:not(:disabled) { background: #123e2e; transform: translateY(-1px); }
+.landing-demo-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgb(12 25 19 / 58%); }
+.landing-demo-dialog { width: min(100%, 460px); padding: 32px; border: 1px solid #dce7df; border-radius: 16px; background: #fff; box-shadow: 0 24px 80px rgb(0 0 0 / 18%); }
+.landing-demo-dialog h2 { margin: 12px 0; font-size: 25px; line-height: 1.2; color: #17291f; }
+.landing-demo-dialog p { margin: 0 0 24px; color: #526258; line-height: 1.6; }
+.landing-demo-dismiss { margin-left: 12px; padding: 10px; border: 0; background: transparent; color: #526258; cursor: pointer; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.public-dashboard { min-height: 100%; overflow-y: auto; background: #f8faf8; color: #17251d; }
+.public-dashboard a { color: inherit; text-decoration: none; }
+.public-dashboard a:focus-visible, .public-dashboard :is(input, select):focus-visible { outline: 3px solid #26805c; outline-offset: 2px; }
+.public-dashboard-nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px max(24px, calc((100vw - 1184px) / 2)); border-bottom: 1px solid #e1e9e2; background: #fff; }
+.public-dashboard-brand { display: inline-flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 750; letter-spacing: -.045em; }
+.public-dashboard-brand span { margin-left: -8px; color: #2d8562; }
+.public-dashboard-back { display: inline-flex; align-items: center; gap: 6px; color: #46715a !important; font-weight: 650; }
+.public-dashboard-main { max-width: 1184px; margin: 0 auto; padding: 48px 24px 72px; }
+.public-dashboard-intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.public-dashboard-intro h1 { margin: 9px 0; font-size: clamp(32px, 4vw, 49px); line-height: 1.05; letter-spacing: -.055em; }
+.public-dashboard-intro p { max-width: 660px; margin: 0; color: #65756a; line-height: 1.6; }
+.public-dashboard-intro .landing-primary-cta { flex: none; }
+.public-dashboard-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
+.public-dashboard-stats > div { padding: 19px 22px; border: 1px solid #e0e8e1; border-radius: 11px; background: #fff; }
+.public-dashboard-stats span { display: block; margin-bottom: 10px; color: #718176; font-size: 10px; font-weight: 750; letter-spacing: .09em; }
+.public-dashboard-stats strong { font-size: 27px; line-height: 1; letter-spacing: -.05em; }
+.public-dashboard-panel { overflow: hidden; border: 1px solid #e0e8e1; border-radius: 12px; background: #fff; }
+.public-dashboard-panel-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding: 23px 24px 13px; }
+.public-dashboard-panel-head h2 { margin: 0 0 4px; font-size: 21px; letter-spacing: -.035em; }
+.public-dashboard-panel-head p { margin: 0; color: #728078; }
+.public-dashboard-readonly { padding: 6px 9px; border-radius: 5px; background: #eaf4ec; color: #287653; font-size: 10px; font-weight: 800; letter-spacing: .06em; white-space: nowrap; }
+.public-dashboard-filters { display: flex; flex-wrap: wrap; gap: 9px; padding: 14px 24px 20px; }
+.public-dashboard-filters input, .public-dashboard-filters select { min-height: 40px; padding: 9px 11px; border: 1px solid #dce5dd; border-radius: 7px; background: #fff; color: #25382c; font: inherit; }
+.public-dashboard-search { position: relative; flex: 1 1 280px; }
+.public-dashboard-search svg { position: absolute; top: 12px; left: 11px; color: #829087; }
+.public-dashboard-search input { width: 100%; padding-left: 35px; }
+.public-dashboard-table-wrap { overflow-x: auto; }
+.public-dashboard-table-wrap table { width: 100%; border-collapse: collapse; text-align: left; }
+.public-dashboard-table-wrap th { padding: 12px 15px; background: #f4f6f3; color: #68776c; font-size: 10px; letter-spacing: .06em; white-space: nowrap; }
+.public-dashboard-table-wrap td { max-width: 350px; padding: 14px 15px; border-top: 1px solid #edf0ec; color: #46544a; vertical-align: middle; }
+.public-dashboard-table-wrap td:nth-child(5) { min-width: 230px; color: #1d2c22; }
+.public-dashboard-job { color: #1d2c22 !important; font-weight: 750; white-space: nowrap; }
+.public-dashboard-status { display: inline-block; padding: 5px 7px; border-radius: 4px; background: #edf2ed; color: #486350; font-size: 10px; font-weight: 750; white-space: nowrap; }
+.public-dashboard-status.status-in_progress, .public-dashboard-status.status-dispatched { background: #e9f1ff; color: #295b9b; }
+.public-dashboard-status.status-completed { background: #e8f5eb; color: #287247; }
+.public-dashboard-empty, .public-dashboard-panel-foot { margin: 0; padding: 16px 24px; color: #718176; }
+.public-dashboard-panel-foot { border-top: 1px solid #edf0ec; font-size: 11px; }
+.public-dashboard-note { max-width: 640px; margin: 20px 0 0; color: #78877c; line-height: 1.6; }
+@media (max-width: 700px) { .public-dashboard-main { padding: 34px 16px 54px; } .public-dashboard-intro { align-items: start; flex-direction: column; } .public-dashboard-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .public-dashboard-panel-head { flex-direction: column; } .public-dashboard-table-wrap table { min-width: 850px; } }
 .landing-hero-actions > span { color: #849289; font-size: 12px; }
 .landing-trust-line { display: flex; align-items: center; gap: 7px; margin-top: 24px; color: #5c7164; font-size: 12px; }
 .landing-call-card { width: 100%; max-width: 410px; justify-self: end; padding: 24px 26px 27px; border: 1px solid #dce5dc; border-radius: 17px; background: #fff; box-shadow: 0 24px 70px rgba(29, 61, 43, .1); }
