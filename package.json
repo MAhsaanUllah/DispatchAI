@@ -11,7 +11,7 @@
     "dev:domain": "node --env-file=.env ./node_modules/vite-node/vite-node.mjs packages/domain/src/bin/dispatch-server.ts",
     "dev:agent": "node --env-file=.env ./node_modules/vite-node/vite-node.mjs packages/agent/src/bin/agent-server.ts",
     "dev:cloudflare": "wrangler dev --port 8788",
-    "smoke:cloudflare": "node scripts/cloudflare-smoke.mjs",
+    "smoke:cloudflare": "node --env-file=.env scripts/cloudflare-smoke.mjs",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",

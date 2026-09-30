@@ -24,7 +24,6 @@ import {
   WorkOrder,
   LocalNotification
 } from "@dispatchai/shared";
-import { randomUUID } from "node:crypto";
 import { DispatchStore } from "./store.js";
 
 export class DispatchService {
@@ -61,7 +60,7 @@ export class DispatchService {
       const recipientEmail = recipientEmailOverride || customer?.email;
       const isEmail = audience === "CUSTOMER" && !!recipientEmail;
       this.store.notifications.push({
-        id: `notice_${randomUUID()}`,
+        id: `notice_${crypto.randomUUID()}`,
         workOrderId: workOrder.id,
         audience,
         recipientId,

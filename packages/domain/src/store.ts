@@ -7,12 +7,9 @@ import {
   IntegrationEvent,
   LocalNotification
 } from "@dispatchai/shared";
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { generateSeedData } from "./seed.js";
 
-type Snapshot = {
+export type Snapshot = {
   version: 1;
   customers: Customer[];
   properties: Property[];
@@ -33,22 +30,13 @@ export class DispatchStore {
   public idempotencyRecords: Map<string, any> = new Map();
   public integrationEvents: IntegrationEvent[] = [];
   public notifications: LocalNotification[] = [];
-  private database?: DatabaseSync;
+  private save?: (snapshot: Snapshot) => void;
 
-  constructor(databasePath?: string) {
-    if (databasePath) {
-      const path = resolve(databasePath.replace(/^file:/, ""));
-      mkdirSync(dirname(path), { recursive: true });
-      this.database = new DatabaseSync(path);
-      this.database.exec("CREATE TABLE IF NOT EXISTS dispatch_state (id INTEGER PRIMARY KEY CHECK (id = 1), snapshot TEXT NOT NULL)");
-      const row = this.database.prepare("SELECT snapshot FROM dispatch_state WHERE id = 1").get() as { snapshot: string } | undefined;
-      if (row) {
-        this.restore(JSON.parse(row.snapshot) as Snapshot);
-        this.addUpcomingSlots();
-        return;
-      }
-    }
-    this.reset();
+  constructor(snapshot?: Snapshot, save?: (snapshot: Snapshot) => void) {
+    this.save = save;
+    if (snapshot) this.restore(snapshot);
+    else this.reset();
+    this.addUpcomingSlots();
   }
 
   private restore(snapshot: Snapshot): void {
@@ -76,9 +64,11 @@ export class DispatchStore {
   }
 
   public persist(): void {
-    if (!this.database) return;
-    // ponytail: one SQLite snapshot fits a single local server; use normalized tables if multi-process writes are needed.
-    const snapshot: Snapshot = {
+    this.save?.(this.snapshot());
+  }
+
+  public snapshot(): Snapshot {
+    return {
       version: 1,
       customers: [...this.customers.values()],
       properties: [...this.properties.values()],
@@ -89,11 +79,6 @@ export class DispatchStore {
       integrationEvents: this.integrationEvents,
       notifications: this.notifications
     };
-    this.database.prepare("INSERT INTO dispatch_state (id, snapshot) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET snapshot = excluded.snapshot").run(JSON.stringify(snapshot));
-  }
-
-  public close(): void {
-    this.database?.close();
   }
 
   public reset(): void {

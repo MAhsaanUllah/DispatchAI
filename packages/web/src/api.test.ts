@@ -43,3 +43,32 @@ describe("createVoiceSession forwards visitor details to the worker", () => {
     expect(body).toEqual({ sessionId: "legacy_session" });
   });
 });
+
+describe("worker error messages", () => {
+  it("surfaces the worker's string error on a limited demo call", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: "Demo call limit reached: each Google account gets 2 calls." }), {
+          status: 429,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+
+    await expect(api.createVoiceSession("s1")).rejects.toThrow("Demo call limit reached: each Google account gets 2 calls.");
+  });
+
+  it("releases the voice session with a keepalive request so unloads can end the call", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await api.endVoiceSession("voice_tok_1");
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain("/api/voice/end");
+    expect(init.keepalive).toBe(true);
+  });
+});

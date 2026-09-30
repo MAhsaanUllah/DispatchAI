@@ -39,7 +39,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
   });
   const body = await response.json();
-  if (!response.ok) throw new Error(body?.error?.message || body?.envelope?.error?.message || `Request failed (${response.status})`);
+  if (!response.ok) throw new Error((typeof body?.error === "string" ? body.error : body?.error?.message) || body?.envelope?.error?.message || `Request failed (${response.status})`);
   return body as T;
 }
 
@@ -97,14 +97,10 @@ export const api = {
     return this.getJobs();
   },
 
-  async createVoiceSession(requestedSessionId: string, visitor?: { name: string; email: string }): Promise<any> {
+  async createVoiceSession(requestedSessionId: string, visitor?: { name: string; email?: string; persona?: string }): Promise<any> {
     return request("/api/voice/session", {
       method: "POST",
-      headers: { "x-session-id": requestedSessionId },
-      body: JSON.stringify({
-        sessionId: requestedSessionId,
-        ...(visitor ? { visitorName: visitor.name, visitorEmail: visitor.email } : {})
-      })
+      body: JSON.stringify(import.meta.env.MODE === "cloudflare" ? {} : { sessionId: requestedSessionId, visitorName: visitor?.name, visitorEmail: visitor?.email })
     });
   },
 
@@ -114,6 +110,10 @@ export const api = {
       headers: { "x-voice-session-token": voiceToolToken, "x-session-id": requestedSessionId },
       body: JSON.stringify({ tool_name: toolName, parameters, conversation_id: convId })
     });
+  },
+
+  async endVoiceSession(voiceToolToken: string) {
+    return request("/api/voice/end", { method: "POST", headers: { "x-voice-session-token": voiceToolToken }, body: "{}", keepalive: true });
   },
 
   async sendChatMessage(text: string, _sessionId?: string): Promise<{ reply: string; events: AgentEvent[] }> {

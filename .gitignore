@@ -7,6 +7,7 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.dev.vars*
 *.pem
 *.key
 *.cert
@@ -61,4 +62,7 @@ AGENTS.md
 !/README.md
 dispatchai-docs/
 docs/
+# Private resume notes and voice-persona working copy (also covered by docs/ and *.md).
+docs/DEMO_HANDOFF.md
+docs/VOICE_PERSONA.md
 

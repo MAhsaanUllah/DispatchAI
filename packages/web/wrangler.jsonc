@@ -4,6 +4,11 @@
   "compatibility_date": "2026-09-29",
   "workers_dev": true,
   "main": "./cloudflare.js",
+  "services": [{ "binding": "AGENT", "service": "dispatchai-agent" }],
+  "durable_objects": {
+    "bindings": [{ "name": "DEMO_ACCESS", "class_name": "DemoAccess" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DemoAccess"] }],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

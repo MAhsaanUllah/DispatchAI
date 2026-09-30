@@ -8,7 +8,7 @@ interface VoiceAgentControlProps {
   onClose: () => void;
   onEventEmitted?: () => void;
   sessionId: string;
-  visitor?: { name: string; email: string };
+  visitor?: { name: string; email?: string; persona?: string };
   autoStart?: boolean;
 }
 
@@ -18,10 +18,16 @@ function VoiceCall({ onClose, sessionId, onEventEmitted, visitor, autoStart }: V
   const [messages, setMessages] = useState<Array<{ role: "user" | "agent"; text: string }>>([]);
   const voiceToolToken = useRef("");
   const conversationIdRef = useRef("");
+  const bookedId = useRef("");
   const invoke = async (name: string, parameters: Record<string, unknown>) => {
     if (!voiceToolToken.current) return JSON.stringify({ ok: false, error: "Voice session expired. Start a new call." });
     try {
       const result = await api.executeVoiceTool(name, parameters, voiceToolToken.current, conversationIdRef.current, sessionId);
+      const workOrderId = result?.envelope?.ok && name === "create_work_order" ? result.envelope.data?.workOrder?.id : "";
+      if (workOrderId) {
+        bookedId.current = workOrderId;
+        sessionStorage.setItem("dispatch_demo_work_order", workOrderId);
+      }
       onEventEmitted?.();
       return JSON.stringify(result.envelope);
     } catch (failure) {
@@ -31,7 +37,12 @@ function VoiceCall({ onClose, sessionId, onEventEmitted, visitor, autoStart }: V
   };
   const conversation = useConversation({
     onConnect: ({ conversationId: id }) => { conversationIdRef.current = id; setConversationId(id); },
-    onDisconnect: () => { conversationIdRef.current = ""; voiceToolToken.current = ""; setConversationId(""); },
+    onDisconnect: () => {
+      conversationIdRef.current = "";
+      setConversationId("");
+      if (voiceToolToken.current) void api.endVoiceSession(voiceToolToken.current).catch(() => {});
+      if (bookedId.current) window.location.assign("/app");
+    },
     onError: (message) => setError(message),
     onMessage: ({ role, message }) => setMessages((previous) => [...previous, { role, text: message }]),
     clientTools: {
@@ -52,7 +63,20 @@ function VoiceCall({ onClose, sessionId, onEventEmitted, visitor, autoStart }: V
       const response = await api.createVoiceSession(sessionId, visitor);
       if (!response?.data?.signedUrl) throw new Error("ElevenLabs did not return a signed URL");
       voiceToolToken.current = response.data.voiceToolToken;
-      conversation.startSession({ signedUrl: response.data.signedUrl, connectionType: "websocket" });
+      const dynamicVariables = response.data.address ? {
+        visitor_name: response.data.name,
+        demo_address: response.data.address,
+        demo_phone: response.data.phone,
+        demo_service_type: response.data.serviceType,
+        demo_zone: response.data.zone,
+        demo_today: response.data.today,
+        demo_tomorrow: response.data.tomorrow
+      } : undefined;
+      conversation.startSession({
+        signedUrl: response.data.signedUrl,
+        connectionType: "websocket",
+        dynamicVariables
+      });
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Voice connection failed");
     }
@@ -66,9 +90,20 @@ function VoiceCall({ onClose, sessionId, onEventEmitted, visitor, autoStart }: V
     }
   }, [autoStart]);
 
+  useEffect(() => {
+    const release = () => {
+      const token = voiceToolToken.current;
+      voiceToolToken.current = "";
+      if (token) void api.endVoiceSession(token).catch(() => {});
+    };
+    window.addEventListener("pagehide", release);
+    return () => window.removeEventListener("pagehide", release);
+  }, []);
+
   const close = () => {
     conversation.endSession();
-    voiceToolToken.current = "";
+    if (voiceToolToken.current) void api.endVoiceSession(voiceToolToken.current);
+    if (bookedId.current) { window.location.assign("/app"); return; }
     onClose();
   };
 
@@ -121,9 +156,9 @@ function VoiceCall({ onClose, sessionId, onEventEmitted, visitor, autoStart }: V
             <span>Powered by ElevenLabs · connected to dispatch tools</span>
             {conversationId && <span className="voice-conversation-id">{conversationId}</span>}
           </div>
-          {active ? <button className="voice-button voice-end" onClick={() => conversation.endSession()}><PhoneOff size={16} /> End call</button> : <button className="voice-button voice-start" onClick={start} disabled={connecting}><Mic size={16} /> {connecting ? "Connecting" : "Start voice call"}</button>}
+          {active ? <button className="voice-button voice-end" onClick={close}><PhoneOff size={16} /> End call</button> : <button className="voice-button voice-start" onClick={start} disabled={connecting}><Mic size={16} /> {connecting ? "Connecting" : "Start voice call"}</button>}
         </div>
-        <p className="voice-footnote">Calls use ElevenLabs minutes. Booking changes require your explicit confirmation.</p>
+        <p className="voice-footnote">Calls use ElevenLabs minutes. Each Google account gets 2 demo calls. Booking changes require your explicit confirmation.</p>
       </div>
     </div>
   );

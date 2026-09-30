@@ -163,6 +163,11 @@ body {
 .public-dashboard-empty, .public-dashboard-panel-foot { margin: 0; padding: 16px 24px; color: #718176; }
 .public-dashboard-panel-foot { border-top: 1px solid #edf0ec; font-size: 11px; }
 .public-dashboard-note { max-width: 640px; margin: 20px 0 0; color: #78877c; line-height: 1.6; }
+.public-dashboard-demo-result { margin: 0 0 22px; padding: 22px 28px; border: 2px solid #1b5e46; border-radius: 14px; background: #eef8f1; }
+.public-dashboard-demo-result h2 { margin: 8px 0; font-size: 24px; }
+.public-dashboard-demo-result p { margin: 5px 0; }
+.public-dashboard-highlight { background: #eef8f1; }
+.public-dashboard-job small { display: block; margin-top: 4px; color: #1b5e46; font-size: 10px; font-weight: 800; }
 @media (max-width: 700px) { .public-dashboard-main { padding: 34px 16px 54px; } .public-dashboard-intro { align-items: start; flex-direction: column; } .public-dashboard-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .public-dashboard-panel-head { flex-direction: column; } .public-dashboard-table-wrap table { min-width: 850px; } }
 .landing-hero-actions > span { color: #849289; font-size: 12px; }
 .landing-trust-line { display: flex; align-items: center; gap: 7px; margin-top: 24px; color: #5c7164; font-size: 12px; }
@@ -306,6 +311,7 @@ body {
 .precall-field { display: flex; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: var(--text-tertiary); }
 .precall-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .precall-field input { flex: 1; min-height: 42px; border: none; outline: none; background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; }
+.precall-field select { width: 100%; min-height: 42px; border: none; outline: none; background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; }
 .precall-error { margin: 10px 0 0; color: var(--danger); font-size: 12px; }
 .precall-cta { width: 100%; margin-top: 16px; min-height: 49px; }
 .precall-footnote { margin: 0; padding: 12px 18px 16px; border-top: 1px solid var(--border); color: var(--text-tertiary); font-size: 10.5px; }
