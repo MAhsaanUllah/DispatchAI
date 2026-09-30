@@ -130,6 +130,16 @@ The deployed `dispatchai-agent` Worker calls the public authenticated n8n Cloud 
 
 The `dispatchai-web` Worker serves the landing page, private Google invite flow, signed ElevenLabs session proxy, and live dashboard. After opening the private invite link, choose a display name and one of three synthetic locations, then continue with Google. The voice session uses six existing ElevenLabs client tools through the Cloudflare Agent and n8n Cloud. Once a confirmed booking succeeds, the current browser session retains its work-order ID and `/app` highlights the real cloud record. The dashboard remains read-only; this is not a production SaaS or real dispatch service.
 
+## Roadmap
+
+The demo intentionally stops at the invite-only, read-only boundary. Beyond it, the next concrete steps are:
+
+- **Deliver the notification outbox.** Confirmed bookings already queue customer and technician messages; connecting a real email sender completes the loop the demo leaves off.
+- **Dispatcher actions from the dashboard.** Today the cloud dashboard is read-only; authenticated dispatchers would reschedule or cancel straight from the work-order queue.
+- **Scripted voice-scenario checks.** Just as the codebase has regression tests, scripted conversation scenarios for interruption, outage, and recovery would keep the agent's dialogue verified as the prompt evolves.
+- **Agent-ended calls.** Calls currently end from the UI or the duration cap; enabling the agent's end-call tool lets the agent close the line itself once a booking is confirmed.
+- **Grow beyond one market.** Customers, zones, and crews are seed data, so additional trades or metros extend the same flow instead of requiring new architecture.
+
 ## Project scope and next steps
 
 Email delivery is intentionally off for the synthetic recruiter demo. The final human-spoken voice-to-dashboard journey should be considered unverified until a real browser call, booking, and dashboard readback are observed together.
