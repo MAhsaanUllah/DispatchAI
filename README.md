@@ -1,14 +1,32 @@
-# DispatchAI
+<p align="center">
+  <img src="assets/DispatchAI-logo.png" alt="DispatchAI" width="420" />
+</p>
 
-![Status: Work in Progress](https://img.shields.io/badge/Status-Work%20in%20Progress-amber)
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Work%20in%20Progress-amber?style=flat-square" alt="Status: Work in Progress" />
+  <img src="https://img.shields.io/badge/Tests-149%20passing-brightgreen?style=flat-square" alt="Tests: 149 passing" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/Node.js-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" />
+  <img src="https://img.shields.io/badge/Cloudflare%20Workers-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare Workers" />
+  <img src="https://img.shields.io/badge/ElevenLabs-000000?style=flat-square&logo=elevenlabs&logoColor=white" alt="ElevenLabs" />
+  <img src="https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white" alt="n8n" />
+  <img src="https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white" alt="Vitest" />
+</p>
 
 **Voice-assisted dispatch for HVAC and plumbing operations.** DispatchAI brings customer intake, technician availability, work-order scheduling, and dispatcher review into one system. It is a portfolio project built around a realistic Austin, Texas field-service workflow.
 
 The application combines a React operations dashboard, an ElevenLabs conversational voice interface, authenticated n8n workflows, and TypeScript booking rules. The local server uses SQLite; the deployed Cloudflare Worker now has a separate SQLite-backed Durable Object for demo bookings.
 
-**The hosted Cloudflare demo is invite-only** — access links are shared privately with reviewers. Google sign-in is required before a voice call or opening the cloud dashboard.
+**The hosted Cloudflare demo is invite-only** — access links are shared privately with reviewers. The demo uses synthetic Austin customers, properties, technicians, and schedules; Google sign-in is required before a voice call or opening the cloud dashboard. The selected demo location binds an existing synthetic customer/property on the server; the recruiter's name is conversational context only.
 
-The demo uses synthetic Austin customers, properties, technicians, and schedules. A private recruiter invite link and Google sign-in are required before starting a paid ElevenLabs voice call or opening the cloud dashboard. The selected demo location binds an existing synthetic customer/property on the server; the recruiter's name is conversational context only.
+> **Mock data notice:** Everything in the demo and in every screenshot is fictional synthetic sample data. Customers, properties, addresses, phone numbers, technicians, and work orders are invented for the mockup — no real customer or business records are used, and no real dispatch operation is connected.
+
+![DispatchAI — voice-first field service dispatch](assets/DispatchAI-Cover.png)
 
 ## Product preview
 
@@ -46,7 +64,7 @@ The deployed dashboard reads the Cloudflare business store, not a static preview
 - **Company directory and notifications:** Read-only company, technician, and service views accompany the work-order dashboard. Confirmed bookings enter a persistent notification outbox; optional email delivery requires a configured sender and real recipient.
 - **Workflow security:** Shared-secret authentication between the agent and n8n, plus signature verification for incoming ElevenLabs webhooks.
 - **Cloudflare integration:** A deployed Agents SDK Worker stores session state in a Durable Object. A second SQLite-backed Durable Object holds shared synthetic booking state behind secret-protected Worker endpoints. A separate Worker hosts the landing page, private invite/Google entry, and live read-only dashboard.
-- **Automated checks:** 130 passing tests across 21 files cover contracts, domain rules, workflow topology, agent tools, multi-turn routing, voice-tool replay, pre-call intake, UI states, and failure paths. All four package typechecks pass.
+- **Automated checks:** 149 passing tests across 22 files cover contracts, domain rules, workflow topology, agent tools, multi-turn routing, voice-tool replay, pre-call intake, UI states, and failure paths. All four package typechecks pass.
 
 ## Stack
 
