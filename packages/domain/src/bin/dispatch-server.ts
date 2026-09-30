@@ -8,13 +8,13 @@
  */
 import { createDispatchServer } from "../server.js";
 import { DispatchService } from "../service.js";
-import { DispatchStore } from "../store.js";
+import { SQLiteDispatchStore } from "../sqlite-store.js";
 
 const PORT = process.env.PORT || "3000";
 const HOST = process.env.HOST || "0.0.0.0";
 
 const { server } = createDispatchServer({
-  service: new DispatchService(new DispatchStore(process.env.DATABASE_URL))
+  service: new DispatchService(process.env.DATABASE_URL ? new SQLiteDispatchStore(process.env.DATABASE_URL) : undefined)
 });
 
 // Start listening

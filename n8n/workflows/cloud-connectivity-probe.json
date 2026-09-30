@@ -1,0 +1,38 @@
+{
+  "name": "DispatchAI - Cloud Connectivity Probe",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dispatchai-connectivity-probe",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d6b479bf-20eb-4c59-92ad-8ec4cc633c57",
+      "name": "Authenticated Probe",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, service: 'dispatchai-n8n-cloud', correlationId: $json.headers['x-correlation-id'] || null }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "720bf94e-09a9-4160-bc50-5b397776c54f",
+      "name": "Respond to Probe",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [520, 300]
+    }
+  ],
+  "connections": {
+    "Authenticated Probe": {
+      "main": [[{ "node": "Respond to Probe", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

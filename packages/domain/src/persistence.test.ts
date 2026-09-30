@@ -3,15 +3,15 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { DispatchService } from "./service.js";
-import { DispatchStore } from "./store.js";
+import { SQLiteDispatchStore } from "./sqlite-store.js";
 
 describe("local SQLite state and notification outbox", () => {
   it("keeps bookings, slots, idempotency and notices across restarts", () => {
     const directory = mkdtempSync(join(tmpdir(), "dispatchai-test-"));
     const path = join(directory, "state.sqlite");
-    let store: DispatchStore | undefined;
+    let store: SQLiteDispatchStore | undefined;
     try {
-      store = new DispatchStore(path);
+      store = new SQLiteDispatchStore(path);
       let service = new DispatchService(store);
       const availability = service.checkAvailability({ serviceType: "HVAC", serviceZone: "Austin-South", date: "2026-09-18" });
       expect(availability.ok).toBe(true);
@@ -27,7 +27,7 @@ describe("local SQLite state and notification outbox", () => {
       const id = created.data.workOrder.id;
       store.close();
 
-      store = new DispatchStore(path);
+      store = new SQLiteDispatchStore(path);
       service = new DispatchService(store);
       expect(store.workOrders.get(id)?.status).toBe("BOOKED");
       expect(store.slots.get(slotId)?.status).toBe("BOOKED");
@@ -42,7 +42,7 @@ describe("local SQLite state and notification outbox", () => {
       expect(moved.ok).toBe(true);
       store.close();
 
-      store = new DispatchStore(path);
+      store = new SQLiteDispatchStore(path);
       service = new DispatchService(store);
       expect(store.workOrders.get(id)?.scheduledStart).toBe(next.data.slots[0].startAt);
       expect(store.notifications).toHaveLength(4);
@@ -50,7 +50,7 @@ describe("local SQLite state and notification outbox", () => {
       expect(cancelled.ok).toBe(true);
       store.close();
 
-      store = new DispatchStore(path);
+      store = new SQLiteDispatchStore(path);
       expect(store.workOrders.get(id)?.status).toBe("CANCELLED");
       expect(store.notifications).toHaveLength(6);
       expect(store.notifications.every((notice) => notice.status === "PENDING_LOCAL")).toBe(true);

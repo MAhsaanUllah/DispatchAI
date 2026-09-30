@@ -1,13 +1,15 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "dispatchai-agent",
-  "workers_dev": false,
+  "workers_dev": true,
+  "preview_urls": false,
   "main": "packages/agent/src/cloudflare.ts",
   "compatibility_date": "2026-09-23",
   "compatibility_flags": ["nodejs_compat"],
+  // N8N_CLOUD_PROBE_URL is set on the deployed Worker only and is kept out of the repo.
   "durable_objects": {
-    "bindings": [{ "name": "DispatchCloudAgent", "class_name": "DispatchCloudAgent" }]
+    "bindings": [{ "name": "DispatchCloudAgent", "class_name": "DispatchCloudAgent" }, { "name": "DispatchBusinessStore", "class_name": "DispatchBusinessStore" }]
   },
   "vpc_services": [{ "binding": "N8N", "service_id": "01a0ce78-235e-7040-9dfd-ab3a3ed28b11", "remote": true }],
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DispatchCloudAgent"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DispatchCloudAgent"] }, { "tag": "v2", "new_sqlite_classes": ["DispatchBusinessStore"] }]
 }
