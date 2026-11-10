@@ -405,7 +405,8 @@ export class DispatchAgent {
   // Conversational text interaction pipeline
   public async processMessage(text: string): Promise<string> {
     const correlationId = this.generateCorrelationId();
-    const cleanText = text.trim();
+    // Normalise spoken/typed id forms ("W O 1001", "w.o. 1001", "wo-1001", "WO#1001") to "wo_1001".
+    const cleanText = text.trim().replace(/\bw\.?\s*o\.?[\s#_-]*(\d{4,6})\b/gi, "wo_$1");
 
     // Record user message in history
     this.state.history.push({
