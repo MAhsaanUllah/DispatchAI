@@ -2,9 +2,9 @@ import type { Directory } from "../api.js";
 
 type View = "team" | "services" | "company";
 
-function formatSlot(startAt: string, endAt: string) {
-  const options: Intl.DateTimeFormatOptions = { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
-  return `${new Intl.DateTimeFormat("en-US", options).format(new Date(startAt))}–${new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }).format(new Date(endAt))}`;
+function formatSlot(startAt: string, endAt: string, timeZone: string) {
+  const options: Intl.DateTimeFormatOptions = { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
+  return `${new Intl.DateTimeFormat("en-US", options).format(new Date(startAt))}–${new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date(endAt))}`;
 }
 
 export function DirectoryPanel({ view, directory, loading }: { view: View; directory: Directory | null; loading: boolean }) {
@@ -28,7 +28,7 @@ export function DirectoryPanel({ view, directory, loading }: { view: View; direc
           <div className="directory-card-top"><div className="directory-monogram">{tech.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><div><h2>{tech.name}</h2><span className={tech.status === "ACTIVE" ? "directory-status active" : "directory-status"}>{tech.status === "ACTIVE" ? "On roster" : "Off duty"}</span></div></div>
           <div className="directory-detail"><strong>Services</strong><span>{tech.skills.join(" · ")}</span></div>
           <div className="directory-detail"><strong>Coverage</strong><span>{tech.serviceZones.join(", ")}</span></div>
-          <div className="directory-detail"><strong>Next open slot</strong><span>{tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE") ? formatSlot(tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE")!.startAt, tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE")!.endAt) : "No open demo slot"}</span></div>
+          <div className="directory-detail"><strong>Next open slot</strong><span>{tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE") ? formatSlot(tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE")!.startAt, tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE")!.endAt, directory.company.timeZone) : "No open demo slot"}</span></div>
         </article>)}
       </div>
     </> : null}

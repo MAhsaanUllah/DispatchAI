@@ -82,7 +82,18 @@ export function isKnownService(serviceId: string, config: BusinessConfig = getBu
 // globalThis lookup keeps this file type-safe in packages without Node types (web, worker).
 export const readEnv = (name: string) => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env[name];
 
-export function getBusinessConfig(templateId = readEnv("BUSINESS_TEMPLATE") || "field-service"): BusinessConfig {
+// The owner's saved business settings (onboarding) override the env template for this process.
+let activeConfig: BusinessConfig | undefined;
+export function setBusinessConfig(config: BusinessConfig | undefined): void {
+  activeConfig = config === undefined ? undefined : BusinessConfigSchema.parse(config);
+}
+
+export function getBusinessConfig(templateId?: string): BusinessConfig {
+  if (templateId === undefined && activeConfig) return activeConfig;
+  return templateFor(templateId ?? (readEnv("BUSINESS_TEMPLATE") || "field-service"));
+}
+
+function templateFor(templateId: string): BusinessConfig {
   const config = businessTemplates.find((template) => template.templateId === templateId);
   if (!config) {
     const known = businessTemplates.map((template) => template.templateId).join(", ");

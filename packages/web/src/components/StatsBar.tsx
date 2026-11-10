@@ -4,15 +4,16 @@ import { WorkOrder } from "@dispatchai/shared";
 interface StatsBarProps {
   jobs: WorkOrder[];
   companyName?: string;
+  timeZone?: string;
 }
 
-// The dashboard follows the app's Austin (America/Chicago) date convention.
-const austinDateKey = (value: Date | string | undefined): string | null => {
+// "Today" is counted in the business time zone (default: the Austin demo zone).
+const austinDateKey = (value: Date | string | undefined, timeZone = "America/Chicago"): string | null => {
   if (!value) return null;
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return null;
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Chicago",
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit"
@@ -21,9 +22,9 @@ const austinDateKey = (value: Date | string | undefined): string | null => {
   return `${part("year")}-${part("month")}-${part("day")}`;
 };
 
-export const StatsBar: React.FC<StatsBarProps> = ({ jobs, companyName }) => {
-  const todayKey = austinDateKey(new Date());
-  const todayJobs = jobs.filter((job) => austinDateKey(job.scheduledStart) === todayKey);
+export const StatsBar: React.FC<StatsBarProps> = ({ jobs, companyName, timeZone }) => {
+  const todayKey = austinDateKey(new Date(), timeZone);
+  const todayJobs = jobs.filter((job) => austinDateKey(job.scheduledStart, timeZone) === todayKey);
 
   const total = todayJobs.length;
   const active = todayJobs.filter((j) => ["BOOKED", "DISPATCHED", "IN_PROGRESS"].includes(j.status)).length;

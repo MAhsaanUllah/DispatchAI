@@ -1,4 +1,5 @@
-import { DispatchService, getBusinessConfig, getDirectory, serviceZoneFor } from "@dispatchai/domain";
+import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
+import { BusinessConfigSchema } from "@dispatchai/shared";
 import { toolFailure, toolSuccess, verifyWebhookSignature } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
@@ -8,6 +9,11 @@ import { deliverBookingEmails } from "../../domain/src/email.js";
 import { SessionStore } from "./session-store.js";
 import { AuthStore, generateSetupCode, safeEqual } from "./auth-store.js";
 import { buildBookingEvent, sendBookingEvent } from "./outbound-events.js";
+import { SettingsStore } from "./settings-store.js";
+
+// Saved onboarding settings must be active before the business data (and its seed) is created below.
+const settings = new SettingsStore(process.env.DATABASE_URL);
+setBusinessConfig(settings.load().config);
 
 // Multi-session agent registry: in-memory cache in front of the durable SessionStore.
 const agents: Map<string, DispatchAgent> = new Map();
@@ -30,6 +36,7 @@ const n8nClient = new N8nClient({
   directService: domainService,
   // After each create/reschedule/cancel: emails (as the HTTP domain server did) and the signed n8n event. Neither throws.
   onMutation: async (kind, workOrder) => {
+    if (kind === "created") settings.markFirstBooking();
     await deliverBookingEmails(domainService.getStore(), workOrder.id);
     const url = process.env.N8N_EVENTS_URL;
     const secret = process.env.N8N_EVENTS_SECRET;
@@ -150,6 +157,9 @@ async function routeRequest(req: Request): Promise<Response> {
     return json(toolSuccess({ owner: name }, `setup_${Date.now()}`), 201, corsHeaders);
   }
 
+  // Business settings (onboarding). Protected by the owner session check below.
+  const businessRoute = pathname === "/api/business";
+
   // Owner login with PIN. Session token lives only in an HttpOnly cookie.
   const ownerToken = cookieValue(req, OWNER_COOKIE);
   if (pathname === "/api/auth/me" && method === "GET") {
@@ -175,6 +185,48 @@ async function routeRequest(req: Request): Promise<Response> {
   const selfAuthenticated = pathname.startsWith("/api/voice/tools/") || pathname === "/api/voice/webhook";
   if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !(await auth.isValidSession(ownerToken))) {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
+  }
+
+  if (businessRoute && method === "GET") {
+    const saved = settings.load();
+    return json({ ok: true, data: {
+      config: getBusinessConfig(),
+      configured: saved.config !== undefined,
+      canSwitchTemplate: !saved.firstBookingAt,
+      templates: businessTemplates.map((t) => ({ templateId: t.templateId, name: t.name, kind: t.kind, services: t.services.map((service) => service.name) }))
+    } }, 200, corsHeaders);
+  }
+  if (businessRoute && method === "PUT") {
+    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown };
+    const current = getBusinessConfig();
+    const templateId = typeof body.templateId === "string" ? body.templateId : current.templateId;
+    const switching = templateId !== current.templateId;
+    if (switching && settings.load().firstBookingAt) {
+      return json(toolFailure("TEMPLATE_LOCKED", "The business type cannot change after the first real booking", false, `biz_${Date.now()}`), 409, corsHeaders);
+    }
+    const base = switching ? businessTemplates.find((t) => t.templateId === templateId) : current;
+    if (!base) return json(toolFailure("INVALID_INPUT", "Unknown business type", false, `biz_${Date.now()}`), 400, corsHeaders);
+    const text = (value: unknown) => (typeof value === "string" ? value.trim() : undefined);
+    const zones = Array.isArray(body.serviceZones) ? body.serviceZones.map(text).filter((zone): zone is string => !!zone) : undefined;
+    const parsed = BusinessConfigSchema.safeParse({
+      ...base,
+      name: text(body.name) ?? base.name,
+      market: text(body.market) ?? base.market,
+      timeZone: text(body.timeZone) ?? base.timeZone,
+      serviceZones: zones ?? base.serviceZones
+    });
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return json(toolFailure("INVALID_INPUT", `${issue.path.join(".")}: ${issue.message}`, false, `biz_${Date.now()}`), 400, corsHeaders);
+    }
+    settings.saveConfig(parsed.data);
+    setBusinessConfig(parsed.data);
+    if (switching) {
+      // No real booking yet, so the old template's demo data is replaced by the new template's.
+      domainService.getStore().reset();
+      agents.clear();
+    }
+    return json(toolSuccess({ config: parsed.data }, `biz_${Date.now()}`), 200, corsHeaders);
   }
 
   // 2. Secret Authentication Enforcement for protected endpoints

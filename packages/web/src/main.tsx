@@ -4,13 +4,14 @@ import { LandingPage } from "./LandingPage.js";
 import { PublicDashboard } from "./PublicDashboard.js";
 import { SetupPage } from "./SetupPage.js";
 import { LoginPage } from "./LoginPage.js";
+import { BusinessWizard } from "./BusinessWizard.js";
 import "./index.css";
 
 const App = React.lazy(() => import("./App.js").then((module) => ({ default: module.App })));
 
-type Gate = "loading" | "setup" | "login" | "dashboard";
+type Gate = "loading" | "setup" | "login" | "onboarding" | "dashboard";
 
-// One-time setup until an owner exists, then PIN login, then the dashboard.
+// One-time setup until an owner exists, then PIN login, then onboarding until the business is saved, then the dashboard.
 function Dashboard() {
   const [gate, setGate] = useState<Gate>("loading");
   const check = () => {
@@ -19,14 +20,17 @@ function Dashboard() {
       .then(async (body) => {
         if (body?.data?.needsSetup === true) return setGate("setup");
         const me = await fetch("/api/auth/me").then((response) => response.json());
-        setGate(me?.data?.authenticated === true ? "dashboard" : "login");
+        if (me?.data?.authenticated !== true) return setGate("login");
+        const business = await fetch("/api/business").then((response) => response.json());
+        setGate(business?.data?.configured === true ? "dashboard" : "onboarding");
       })
       .catch(() => setGate("login"));
   };
   useEffect(check, []);
   if (gate === "loading") return <div>Loading dashboard...</div>;
   if (gate === "setup") return <SetupPage onDone={() => setGate("login")} />;
-  if (gate === "login") return <LoginPage onDone={() => setGate("dashboard")} />;
+  if (gate === "login") return <LoginPage onDone={check} />;
+  if (gate === "onboarding") return <BusinessWizard onDone={() => setGate("dashboard")} />;
   return <Suspense fallback={<div>Loading dashboard...</div>}><App /></Suspense>;
 }
 
