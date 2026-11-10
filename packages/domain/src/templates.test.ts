@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { BusinessConfigSchema } from "@dispatchai/shared";
-import { businessTemplates, getBusinessConfig } from "./templates.js";
+import { businessTemplates, detectService, getBusinessConfig } from "./templates.js";
+import { DispatchService } from "./service.js";
 import { getDirectory } from "./directory.js";
 import { DispatchStore } from "./store.js";
 
@@ -25,6 +26,34 @@ describe("business templates", () => {
     const directory = getDirectory(new DispatchStore());
     expect(directory.company.name).toBe("Maple Street Salon");
     expect(directory.services.map((s) => s.id)).toEqual(["HAIRCUT", "COLOR"]);
+  });
+
+  it("seeds salon staff and slots so a salon service can be booked", () => {
+    process.env.BUSINESS_TEMPLATE = "salon";
+    const service = new DispatchService();
+    const avail = service.checkAvailability({ serviceType: "HAIRCUT", serviceZone: "Main Street Studio", date: "2026-09-18" });
+    expect(avail.ok).toBe(true);
+    if (!avail.ok) return;
+    expect(avail.data.slots.length).toBeGreaterThan(0);
+    const created = service.createWorkOrder({
+      idempotencyKey: "idem_salon_1", customerId: "cust_901", propertyId: "prop_901", serviceType: "HAIRCUT",
+      issueSummary: "Trim", urgency: "STANDARD", slotId: avail.data.slots[0].slotId, createdBy: "VOICE_AGENT"
+    });
+    expect(created.ok).toBe(true);
+    if (created.ok) expect(created.data.workOrder.id).toBe("wo_1001");
+  });
+
+  it("rejects a service the active business does not offer", () => {
+    const result = new DispatchService().checkAvailability({ serviceType: "ELECTRICAL", serviceZone: "Austin-South", date: "2026-09-18" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INVALID_INPUT");
+  });
+
+  it("detects the service from caller text, later service wins", () => {
+    expect(detectService("my AC is leaking")).toBe("PLUMBING");
+    expect(detectService("AC blowing warm air")).toBe("HVAC");
+    expect(detectService("I need a haircut", getBusinessConfig("salon"))).toBe("HAIRCUT");
+    expect(detectService("hello there")).toBeNull();
   });
 
   it("fails clearly on an unknown template", () => {

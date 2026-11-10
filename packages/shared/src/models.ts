@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const ServiceTypeSchema = z.enum(["HVAC", "PLUMBING"]);
+// Service ids come from the active BusinessConfig; the domain service checks membership.
+export const ServiceTypeSchema = z.string().regex(/^[A-Z][A-Z0-9_]*$/, "Service id must be UPPER_SNAKE_CASE");
 export type ServiceType = z.infer<typeof ServiceTypeSchema>;
 
 export const CustomerSchema = z.object({

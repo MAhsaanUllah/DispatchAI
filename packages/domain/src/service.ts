@@ -25,6 +25,7 @@ import {
   LocalNotification
 } from "@dispatchai/shared";
 import { DispatchStore } from "./store.js";
+import { isKnownService } from "./templates.js";
 
 export class DispatchService {
   private store: DispatchStore;
@@ -141,6 +142,9 @@ export class DispatchService {
     }
 
     const { serviceType, serviceZone, date, preferredWindow } = parsed.data;
+    if (!isKnownService(serviceType)) {
+      return toolFailure("INVALID_INPUT", `Unknown service ${serviceType}`, false, correlationId);
+    }
     this.store.addUpcomingSlots();
 
     // Find active technicians matching serviceType and serviceZone
@@ -204,6 +208,9 @@ export class DispatchService {
     }
 
     const input = parsed.data;
+    if (!isKnownService(input.serviceType)) {
+      return toolFailure("INVALID_INPUT", `Unknown service ${input.serviceType}`, false, correlationId);
+    }
 
     // Idempotency check
     const cached = this.idempotencyRecord<CreateWorkOrderOutputData>("create", input.idempotencyKey, input);

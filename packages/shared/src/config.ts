@@ -13,7 +13,9 @@ export const BusinessServiceSchema = z.object({
   id: z.string().regex(/^[A-Z][A-Z0-9_]*$/, "Service id must be UPPER_SNAKE_CASE"),
   name: z.string().min(1),
   description: z.string().min(1),
-  priceNote: z.string().min(1)
+  priceNote: z.string().min(1),
+  // Lowercase words that signal this service in caller text. When several services match, the later one wins.
+  keywords: z.array(z.string().min(1)).min(1)
 });
 export type BusinessService = z.infer<typeof BusinessServiceSchema>;
 

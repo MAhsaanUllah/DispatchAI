@@ -48,7 +48,7 @@ describe("Tool Contracts & Response Envelopes", () => {
       expect(valid.success).toBe(true);
 
       const invalidService = CheckAvailabilityInputSchema.safeParse({
-        serviceType: "ELECTRICAL", // Not supported
+        serviceType: "electrical", // Bad format; membership in the business config is checked by the domain service
         serviceZone: "Austin-South",
         date: "2026-09-18"
       });

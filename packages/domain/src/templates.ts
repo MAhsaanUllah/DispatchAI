@@ -12,8 +12,8 @@ const raw: BusinessConfig[] = [
     kind: "onsite",
     serviceZones: ["Austin-Central", "Austin-North", "Austin-South", "Austin-East"],
     services: [
-      { id: "HVAC", name: "HVAC", description: "Heating, air conditioning and ventilation service", priceNote: "A dispatcher must confirm any diagnostic fee or estimate." },
-      { id: "PLUMBING", name: "Plumbing", description: "Leaks, drains, fixtures and water-service issues", priceNote: "A dispatcher must confirm any diagnostic fee or estimate." }
+      { id: "HVAC", name: "HVAC", description: "Heating, air conditioning and ventilation service", priceNote: "A dispatcher must confirm any diagnostic fee or estimate.", keywords: ["ac", "air condition", "hvac"] },
+      { id: "PLUMBING", name: "Plumbing", description: "Leaks, drains, fixtures and water-service issues", priceNote: "A dispatcher must confirm any diagnostic fee or estimate.", keywords: ["plumb", "leak", "drain", "pipe", "sink", "toilet"] }
     ],
     greeting: "I am DispatchAI, your Austin HVAC and plumbing assistant. You can tell me your service issue, provide your phone number, or ask for appointment availability.",
     note: "Portfolio demo company. Staff, coverage and schedules are seeded—not connected to a live company calendar."
@@ -26,8 +26,8 @@ const raw: BusinessConfig[] = [
     kind: "instore",
     serviceZones: ["Main Street Studio"],
     services: [
-      { id: "HAIRCUT", name: "Haircut", description: "Cut and style", priceNote: PRICE_NOTE },
-      { id: "COLOR", name: "Color", description: "Full or partial hair color", priceNote: PRICE_NOTE }
+      { id: "HAIRCUT", name: "Haircut", description: "Cut and style", priceNote: PRICE_NOTE, keywords: ["haircut", "cut", "trim", "style"] },
+      { id: "COLOR", name: "Color", description: "Full or partial hair color", priceNote: PRICE_NOTE, keywords: ["color", "colour", "dye", "highlight"] }
     ],
     greeting: "Hi, this is the Maple Street Salon booking assistant. Tell me which service you want and when, or give me your phone number.",
     note: "Fictional demo salon."
@@ -40,8 +40,8 @@ const raw: BusinessConfig[] = [
     kind: "instore",
     serviceZones: ["Riverside Garage"],
     services: [
-      { id: "OIL_CHANGE", name: "Oil change", description: "Oil and filter change", priceNote: PRICE_NOTE },
-      { id: "BRAKES", name: "Brake inspection", description: "Brake check and quote", priceNote: PRICE_NOTE }
+      { id: "OIL_CHANGE", name: "Oil change", description: "Oil and filter change", priceNote: PRICE_NOTE, keywords: ["oil"] },
+      { id: "BRAKES", name: "Brake inspection", description: "Brake check and quote", priceNote: PRICE_NOTE, keywords: ["brake"] }
     ],
     greeting: "Hi, this is the Riverside Auto Care booking assistant. Tell me what your vehicle needs and when, or give me your phone number.",
     note: "Fictional demo garage."
@@ -54,8 +54,8 @@ const raw: BusinessConfig[] = [
     kind: "onsite",
     serviceZones: ["North", "South"],
     services: [
-      { id: "STANDARD_CLEAN", name: "Standard clean", description: "Regular home cleaning", priceNote: PRICE_NOTE },
-      { id: "DEEP_CLEAN", name: "Deep clean", description: "Top-to-bottom cleaning", priceNote: PRICE_NOTE }
+      { id: "STANDARD_CLEAN", name: "Standard clean", description: "Regular home cleaning", priceNote: PRICE_NOTE, keywords: ["clean"] },
+      { id: "DEEP_CLEAN", name: "Deep clean", description: "Top-to-bottom cleaning", priceNote: PRICE_NOTE, keywords: ["deep"] }
     ],
     greeting: "Hi, this is the Bright Home Cleaning booking assistant. Tell me which cleaning you need and when, or give me your phone number.",
     note: "Fictional demo cleaning company."
@@ -63,6 +63,16 @@ const raw: BusinessConfig[] = [
 ];
 
 export const businessTemplates: readonly BusinessConfig[] = raw.map((config) => BusinessConfigSchema.parse(config));
+
+// shortcut: substring keyword match, last matching service wins; replace with LLM field extraction in PR 9.
+export function detectService(text: string, config: BusinessConfig = getBusinessConfig()): string | null {
+  const lower = text.toLowerCase();
+  return config.services.filter((service) => service.keywords.some((keyword) => lower.includes(keyword))).at(-1)?.id ?? null;
+}
+
+export function isKnownService(serviceId: string, config: BusinessConfig = getBusinessConfig()): boolean {
+  return config.services.some((service) => service.id === serviceId);
+}
 
 // globalThis lookup keeps this file type-safe in packages without Node types (web, worker).
 const envTemplate = () => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.BUSINESS_TEMPLATE;
