@@ -3,6 +3,7 @@ import { WorkOrder } from "@dispatchai/shared";
 
 interface StatsBarProps {
   jobs: WorkOrder[];
+  companyName?: string;
 }
 
 // The dashboard follows the app's Austin (America/Chicago) date convention.
@@ -20,7 +21,7 @@ const austinDateKey = (value: Date | string | undefined): string | null => {
   return `${part("year")}-${part("month")}-${part("day")}`;
 };
 
-export const StatsBar: React.FC<StatsBarProps> = ({ jobs }) => {
+export const StatsBar: React.FC<StatsBarProps> = ({ jobs, companyName }) => {
   const todayKey = austinDateKey(new Date());
   const todayJobs = jobs.filter((job) => austinDateKey(job.scheduledStart) === todayKey);
 
@@ -103,10 +104,11 @@ export const StatsBar: React.FC<StatsBarProps> = ({ jobs }) => {
         </div>
       </div>
 
-      {/* Austin Market Note */}
-      <div className="hide-on-mobile" style={{ fontSize: "11.5px", color: "var(--text-tertiary)", fontWeight: 500 }}>
-        Austin Metro Service Dispatch
-      </div>
+      {companyName && (
+        <div className="hide-on-mobile" style={{ fontSize: "11.5px", color: "var(--text-tertiary)", fontWeight: 500 }}>
+          {companyName}
+        </div>
+      )}
     </div>
   );
 };
