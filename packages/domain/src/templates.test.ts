@@ -36,11 +36,34 @@ describe("business templates", () => {
     if (!avail.ok) return;
     expect(avail.data.slots.length).toBeGreaterThan(0);
     const created = service.createWorkOrder({
-      idempotencyKey: "idem_salon_1", customerId: "cust_901", propertyId: "prop_901", serviceType: "HAIRCUT",
+      // Instore: no propertyId, the booking is at the salon.
+      idempotencyKey: "idem_salon_1", customerId: "cust_901", serviceType: "HAIRCUT",
       issueSummary: "Trim", urgency: "STANDARD", slotId: avail.data.slots[0].slotId, createdBy: "VOICE_AGENT"
     });
     expect(created.ok).toBe(true);
     if (created.ok) expect(created.data.workOrder.id).toBe("wo_1001");
+  });
+
+  it("starts with an empty store when SEED_DEMO_DATA=false", () => {
+    process.env.SEED_DEMO_DATA = "false";
+    try {
+      const store = new DispatchService().getStore();
+      expect([store.customers.size, store.technicians.size, store.slots.size, store.workOrders.size]).toEqual([0, 0, 0, 0]);
+    } finally {
+      delete process.env.SEED_DEMO_DATA;
+    }
+  });
+
+  it("requires a property for onsite bookings", () => {
+    const service = new DispatchService();
+    const avail = service.checkAvailability({ serviceType: "HVAC", serviceZone: "Austin-South", date: "2026-09-18" });
+    if (!avail.ok) throw new Error("availability failed");
+    const created = service.createWorkOrder({
+      idempotencyKey: "idem_onsite_no_property", customerId: "cust_101", serviceType: "HVAC",
+      issueSummary: "AC", urgency: "STANDARD", slotId: avail.data.slots[0].slotId, createdBy: "VOICE_AGENT"
+    });
+    expect(created.ok).toBe(false);
+    if (!created.ok) expect(created.error.code).toBe("INVALID_INPUT");
   });
 
   it("rejects a service the active business does not offer", () => {

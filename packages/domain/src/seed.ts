@@ -6,7 +6,7 @@ import {
   WorkOrder,
   BusinessConfig
 } from "@dispatchai/shared";
-import { getBusinessConfig } from "./templates.js";
+import { getBusinessConfig, readEnv } from "./templates.js";
 
 // Slots: stable fixture dates plus the current and next seven UTC days.
 function buildSlots(technicians: Technician[]): TechnicianSlot[] {
@@ -63,7 +63,8 @@ function templateSeed(config: BusinessConfig) {
     { id: "cust_901", firstName: "Jordan", lastName: "Lee", phone: "5555550901", email: "jordan.lee@example.com", createdAt },
     { id: "cust_902", firstName: "Priya", lastName: "Shah", phone: "5555550902", email: "priya.shah@example.com", createdAt }
   ];
-  const properties: Property[] = customers.map((customer, index) => ({
+  // Instore businesses have no customer addresses: the job happens at the business location.
+  const properties: Property[] = config.kind === "instore" ? [] : customers.map((customer, index) => ({
     id: `prop_${901 + index}`, customerId: customer.id, addressLine1: `${100 + index} Demo Street`, city: config.market, state: "TX", zipCode: "00000", serviceZone: config.serviceZones[index % config.serviceZones.length]
   }));
   const skills = config.services.map((service) => service.id);
@@ -74,6 +75,10 @@ function templateSeed(config: BusinessConfig) {
 }
 
 export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
+  // shortcut: demo data stays on by default until the onboarding wizard (PR 11) can add real staff; then default to off.
+  if (readEnv("SEED_DEMO_DATA") === "false") {
+    return { customers: [] as Customer[], properties: [] as Property[], technicians: [] as Technician[], slots: [] as TechnicianSlot[], workOrders: [] as WorkOrder[] };
+  }
   if (config.templateId !== "field-service") return templateSeed(config);
 
   // 1. 20 Synthetic Austin Customers

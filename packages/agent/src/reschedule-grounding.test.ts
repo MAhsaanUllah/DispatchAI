@@ -31,7 +31,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
     await agent.processMessage("5125550103"); // Maya Lin -> prop_203 (Austin-Central)
 
     const wo = domainService.getStore().workOrders.get("wo_1002")!;
-    const property = domainService.getStore().properties.get(wo.propertyId)!;
+    const property = domainService.getStore().properties.get(wo.propertyId!)!;
     expect(property.serviceZone).not.toBe("Austin-South");
 
     const reply = await agent.processMessage("Please reschedule wo_1002");

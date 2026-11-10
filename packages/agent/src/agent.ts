@@ -9,7 +9,7 @@ import {
   Urgency,
   WorkOrder
 } from "@dispatchai/shared";
-import { detectService, getBusinessConfig } from "@dispatchai/domain";
+import { detectService, getBusinessConfig, serviceZoneFor } from "@dispatchai/domain";
 import { N8nClient } from "./client.js";
 import { AgentState, ConversationMessage, createInitialAgentState, PendingConfirmationAction, SuccessfulCreateRecord } from "./state.js";
 
@@ -192,8 +192,8 @@ export class DispatchAgent {
       throw new Error(`Slot ${slotId} is not in current available slots. Check availability first.`);
     }
 
-    if (!this.state.customer || !this.state.selectedProperty || !this.state.serviceType) {
-      throw new Error("Cannot propose booking without customer, property, and serviceType context.");
+    if (!this.state.customer || !this.zone() || !this.state.serviceType) {
+      throw new Error("Cannot propose booking without customer, location, and serviceType context.");
     }
 
     this.state.selectedSlot = slot;
@@ -203,11 +203,11 @@ export class DispatchAgent {
 
     const action: PendingConfirmationAction = {
       type: "CREATE_WORK_ORDER",
-      description: `Book ${slot.technicianName} for ${this.state.serviceType} on ${slot.startAt} at ${this.state.selectedProperty.addressLine1}`,
+      description: `Book ${slot.technicianName} for ${this.state.serviceType} on ${slot.startAt} at ${this.place()}`,
       payload: {
         idempotencyKey: `idem_agent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         customerId: this.state.customer.id,
-        propertyId: this.state.selectedProperty.id,
+        propertyId: this.state.selectedProperty?.id,
         serviceType: this.state.serviceType,
         issueSummary: this.state.issueSummary || "Scheduled field-service maintenance",
         urgency: this.state.urgency,
@@ -353,6 +353,15 @@ export class DispatchAgent {
   }
 
   // Never invent a service zone; availability can only be searched for a known property.
+  // Onsite: the caller's property zone. Instore: the business location.
+  private zone(): string | undefined {
+    return serviceZoneFor(this.state.selectedProperty ?? undefined);
+  }
+
+  private place(): string {
+    return this.state.selectedProperty?.addressLine1 ?? getBusinessConfig().serviceZones[0];
+  }
+
   private missingPropertyReply(): string {
     return "I can check new appointment times, but first I need to know which property this is for. Could you share the phone number or service address on the account?";
   }
@@ -460,7 +469,7 @@ export class DispatchAgent {
 
       const rescheduleContext = this.state.rescheduleContext;
       const serviceType = rescheduleContext?.serviceType || this.state.serviceType || detectService(lower) || getBusinessConfig().services[0].id;
-      const serviceZone = rescheduleContext?.serviceZone || this.state.selectedProperty?.serviceZone;
+      const serviceZone = rescheduleContext?.serviceZone || this.zone();
       if (!serviceZone) {
         return this.pushAgentReply(this.missingPropertyReply());
       }
@@ -539,7 +548,7 @@ export class DispatchAgent {
           return this.pushAgentReply(reply);
         }
         const action = this.proposeBooking(matchedSlot.slotId, cleanText);
-        const reply = `I can book ${matchedSlot.technicianName} for ${matchedSlot.startAt.slice(0, 10)} (${matchedSlot.startAt.split("T")[1].substring(0, 5)}) at ${this.state.selectedProperty?.addressLine1}. Would you like me to confirm that appointment?`;
+        const reply = `I can book ${matchedSlot.technicianName} for ${matchedSlot.startAt.slice(0, 10)} (${matchedSlot.startAt.split("T")[1].substring(0, 5)}) at ${this.place()}. Would you like me to confirm that appointment?`;
         this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
         return reply;
       }
@@ -554,7 +563,7 @@ export class DispatchAgent {
       this.state.rescheduleContext = null;
 
       // Zone is derived from the identified property; never assume one.
-      const serviceZone = this.state.selectedProperty?.serviceZone;
+      const serviceZone = this.zone();
       if (!serviceZone) {
         return this.pushAgentReply(this.missingPropertyReply());
       }
@@ -605,7 +614,8 @@ export class DispatchAgent {
 
       const wo = woResult.data.workOrder;
       const property = this.state.selectedProperty;
-      const serviceZone = property && property.id === wo.propertyId ? property.serviceZone : null;
+      // Onsite: the caller's own property must match the order. Instore: the business location.
+      const serviceZone = wo.propertyId ? (property && property.id === wo.propertyId ? property.serviceZone : null) : serviceZoneFor(undefined);
       if (!serviceZone) {
         return this.pushAgentReply(this.missingPropertyReply());
       }

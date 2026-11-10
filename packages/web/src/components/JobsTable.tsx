@@ -1,44 +1,12 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Search, X, ArrowUpDown, ArrowUp, ArrowDown, AlertCircle } from "lucide-react";
-import { WorkOrder } from "@dispatchai/shared";
+import { WorkOrderView as WorkOrder } from "@dispatchai/shared";
 
 interface JobsTableProps {
   jobs: WorkOrder[];
   selectedJobId: string | null;
   onSelectJob: (job: WorkOrder) => void;
 }
-
-const TECH_NAMES: Record<string, string> = {
-  tech_01: "Carlos Mendoza",
-  tech_02: "Sarah Jenkins",
-  tech_03: "Robert Miller",
-  tech_04: "Emily Chen",
-  tech_05: "David Taylor",
-  tech_06: "Frank Alvarez"
-};
-
-const PROPERTY_ZONES: Record<string, string> = {
-  prop_201: "Austin-South",
-  prop_202: "Austin-South",
-  prop_203: "Austin-Central",
-  prop_204: "Austin-North",
-  prop_205: "Austin-South",
-  prop_206: "Austin-East",
-  prop_207: "Austin-Central",
-  prop_208: "Austin-South",
-  prop_209: "Austin-East",
-  prop_210: "Austin-North",
-  prop_211: "Austin-South",
-  prop_212: "Austin-East",
-  prop_213: "Austin-Central",
-  prop_214: "Austin-North",
-  prop_215: "Austin-South",
-  prop_216: "Austin-East",
-  prop_217: "Austin-Central",
-  prop_218: "Austin-North",
-  prop_219: "Austin-South",
-  prop_220: "Austin-North"
-};
 
 // Formats "wo_1001" to "WO-1001" per Section 17
 const formatWorkOrderId = (id: string): string => {
@@ -95,12 +63,12 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
       if (serviceFilter !== "ALL" && job.serviceType !== serviceFilter) return false;
       if (statusFilter !== "ALL" && job.status !== statusFilter) return false;
 
-      const zone = PROPERTY_ZONES[job.propertyId] || "Austin-Central";
+      const zone = job.zone ?? "";
       if (zoneFilter !== "ALL" && zone !== zoneFilter) return false;
 
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
-        const tech = (TECH_NAMES[job.technicianId || ""] || "").toLowerCase();
+        const tech = (job.technicianName ?? "").toLowerCase();
         const formattedId = formatWorkOrderId(job.id).toLowerCase();
         const matchId = job.id.toLowerCase().includes(term) || formattedId.includes(term);
         const matchSummary = job.issueSummary.toLowerCase().includes(term);
@@ -139,8 +107,8 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
       } else if (sortBy === "id") {
         comparison = a.id.localeCompare(b.id);
       } else if (sortBy === "technician") {
-        const nameA = TECH_NAMES[a.technicianId || ""] || "Unassigned";
-        const nameB = TECH_NAMES[b.technicianId || ""] || "Unassigned";
+        const nameA = a.technicianName ?? "Unassigned";
+        const nameB = b.technicianName ?? "Unassigned";
         comparison = nameA.localeCompare(nameB);
       } else {
         // Time
@@ -312,11 +280,8 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
               cursor: "pointer"
             }}
           >
-            <option value="ALL">All Austin Zones</option>
-            <option value="Austin-Central">Austin-Central</option>
-            <option value="Austin-North">Austin-North</option>
-            <option value="Austin-South">Austin-South</option>
-            <option value="Austin-East">Austin-East</option>
+            <option value="ALL">All Zones</option>
+            {[...new Set(jobs.map((job) => job.zone).filter((zone): zone is string => !!zone))].map((zone) => <option key={zone} value={zone}>{zone}</option>)}
           </select>
 
           {/* Status Filter (Section 18) */}
@@ -449,7 +414,7 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
               <tr>
                 <td colSpan={8} style={{ padding: "48px 20px", textAlign: "center", color: "var(--text-secondary)" }}>
                   <div style={{ fontSize: "13.5px", fontWeight: 500, color: "var(--text-primary)" }}>No work orders match the filter criteria.</div>
-                  <div style={{ fontSize: "12px", marginTop: "4px" }}>Try clearing search or filters to see all Austin operations.</div>
+                  <div style={{ fontSize: "12px", marginTop: "4px" }}>Try clearing search or filters to see all work orders.</div>
                 </td>
               </tr>
             ) : (
@@ -457,8 +422,8 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
                 const isSelected = job.id === selectedJobId;
                 const statusClass = `badge-${job.status.toLowerCase()}`;
                 const isHighUrgency = job.urgency === "HIGH" && job.status !== "COMPLETED" && job.status !== "CANCELLED";
-                const techName = TECH_NAMES[job.technicianId || ""] || "Unassigned";
-                const zone = PROPERTY_ZONES[job.propertyId] || "Austin-Central";
+                const techName = job.technicianName ?? "Unassigned";
+                const zone = job.zone ?? "—";
 
                 return (
                   <tr

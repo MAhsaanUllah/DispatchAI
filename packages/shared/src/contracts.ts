@@ -99,7 +99,8 @@ export type CheckAvailabilityOutputData = z.infer<
 export const CreateWorkOrderInputSchema = z.object({
   idempotencyKey: z.string().min(1, "idempotencyKey is required"),
   customerId: z.string().min(1, "customerId is required"),
-  propertyId: z.string().min(1, "propertyId is required"),
+  // Required for onsite businesses; instore businesses (salon, garage) book at their own location.
+  propertyId: z.string().min(1).optional(),
   serviceType: ServiceTypeSchema,
   issueSummary: z.string().min(1, "issueSummary is required"),
   urgency: UrgencySchema,
