@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import http from "node:http";
-import { handleRequest } from "../worker.js";
-import { serveStatic } from "../static.js";
+
+// A real install starts empty; set SEED_DEMO_DATA=true in .env for the fictional demo. Set before the worker loads.
+process.env.SEED_DEMO_DATA ??= "false";
+const { handleRequest } = await import("../worker.js");
+const { serveStatic } = await import("../static.js");
 
 const port = Number(process.env.AGENT_PORT || 8787);
 const host = process.env.HOST || "0.0.0.0";

@@ -1,9 +1,9 @@
-import { BusinessConfigSchema, type BusinessConfig } from "@dispatchai/shared";
+import { BusinessConfigSchema, type BusinessConfig, type BusinessConfigInput } from "@dispatchai/shared";
 
 const PRICE_NOTE = "Staff must confirm any fee or estimate.";
 
 // Fictional demo businesses. Field Service matches the original Austin demo seed exactly.
-const raw: BusinessConfig[] = [
+const raw: BusinessConfigInput[] = [
   {
     templateId: "field-service",
     name: "Austin Metro Service Dispatch",

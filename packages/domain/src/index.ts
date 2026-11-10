@@ -3,3 +3,4 @@ export * from "./store.js";
 export * from "./service.js";
 export * from "./directory.js";
 export * from "./templates.js";
+export * from "./schedule.js";

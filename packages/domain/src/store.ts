@@ -8,6 +8,8 @@ import {
   LocalNotification
 } from "@dispatchai/shared";
 import { generateSeedData } from "./seed.js";
+import { generateScheduleSlots } from "./schedule.js";
+import { getBusinessConfig, readEnv } from "./templates.js";
 
 export type Snapshot = {
   version: 1;
@@ -53,14 +55,43 @@ export class DispatchStore {
     this.notifications = snapshot.notifications ?? [];
   }
 
+  // Demo mode tops up fixture slots; a real business gets slots from its opening hours and staff.
   public addUpcomingSlots(): void {
     let changed = false;
-    for (const slot of generateSeedData().slots) {
+    const upcoming = readEnv("SEED_DEMO_DATA") === "false"
+      ? generateScheduleSlots(getBusinessConfig(), [...this.technicians.values()])
+      : generateSeedData().slots;
+    for (const slot of upcoming) {
       if (!slot.id.startsWith("slot_20") || this.slots.has(slot.id)) continue;
       this.slots.set(slot.id, slot);
       changed = true;
     }
     if (changed) this.persist();
+  }
+
+  // After hours or staff change: drop future free slots and regenerate. Booked/reserved slots are kept.
+  public rebuildFutureSlots(now = new Date().toISOString()): void {
+    for (const [id, slot] of this.slots) {
+      if (slot.status === "AVAILABLE" && slot.startAt > now) this.slots.delete(id);
+    }
+    this.addUpcomingSlots();
+    this.persist();
+  }
+
+  // Replace the staff list. Staff with a future booking cannot be removed. Returns the blocking staff ids.
+  public setStaff(staff: { id?: string; name: string; skills: string[] }[], serviceZones: string[], now = new Date().toISOString()): string[] {
+    const keep = new Set(staff.map((member) => member.id).filter(Boolean));
+    const blocked = [...this.technicians.keys()].filter((id) => !keep.has(id) && [...this.slots.values()].some((slot) => slot.technicianId === id && slot.status !== "AVAILABLE" && slot.startAt > now));
+    if (blocked.length > 0) return blocked;
+    let next = Math.max(0, ...[...this.technicians.keys()].map((id) => Number(/^tech_(\d+)$/.exec(id)?.[1] ?? 0))) + 1;
+    const updated = new Map<string, Technician>();
+    for (const member of staff) {
+      const id = member.id && this.technicians.has(member.id) ? member.id : `tech_${String(next++).padStart(2, "0")}`;
+      updated.set(id, { id, name: member.name, skills: member.skills, serviceZones, status: "ACTIVE" });
+    }
+    this.technicians = updated;
+    this.rebuildFutureSlots(now);
+    return [];
   }
 
   public persist(): void {

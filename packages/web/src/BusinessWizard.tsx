@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ScheduleSetup } from "./ScheduleSetup.js";
 
 type Template = { templateId: string; name: string; kind: "onsite" | "instore"; services: string[] };
 type Config = { templateId: string; name: string; market: string; timeZone: string; kind: "onsite" | "instore"; serviceZones: string[] };
@@ -19,7 +20,7 @@ const zonesList = (): string[] => {
 // Onboarding steps 1–2: pick the business type, then the basics. Also used later from the Company page to edit.
 export function BusinessWizard({ onDone, onCancel }: Props) {
   const [business, setBusiness] = useState<Business | null>(null);
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [templateId, setTemplateId] = useState("");
   const [name, setName] = useState("");
   const [market, setMarket] = useState("");
@@ -75,7 +76,7 @@ export function BusinessWizard({ onDone, onCancel }: Props) {
           : message.startsWith("name") ? "Enter the business name."
           : message || "Could not save. Try again.");
       }
-      onDone();
+      setStep(3);
     } catch {
       setError("Cannot reach the DispatchAI server.");
     } finally {
@@ -88,11 +89,11 @@ export function BusinessWizard({ onDone, onCancel }: Props) {
     <main style={{ display: "grid", placeItems: "start center", padding: "32px 16px" }}>
       <div style={{ width: "100%", maxWidth: 720, display: "grid", gap: 20, padding: 28, borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
         <div>
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)", fontWeight: 600 }}>STEP {step} OF 2</p>
-          <h1 style={{ margin: "4px 0 0", fontSize: 22 }}>{step === 1 ? "What kind of business is this?" : "Business details"}</h1>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)", fontWeight: 600 }}>STEP {step} OF 3</p>
+          <h1 style={{ margin: "4px 0 0", fontSize: 22 }}>{step === 1 ? "What kind of business is this?" : step === 2 ? "Business details" : "Services, hours and staff"}</h1>
         </div>
 
-        {step === 1 ? (
+        {step === 3 ? <ScheduleSetup onDone={onDone} onBack={() => setStep(2)} /> : step === 1 ? (
           <>
             {!business.canSwitchTemplate && (
               <p role="note" style={{ margin: 0, padding: 10, borderRadius: 8, background: "var(--surface-subtle, #f5f5f4)", fontSize: 13 }}>
@@ -148,7 +149,7 @@ export function BusinessWizard({ onDone, onCancel }: Props) {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button type="button" onClick={() => setStep(1)} style={{ ...input, cursor: "pointer" }}>Back</button>
               <button type="submit" disabled={saving} style={{ ...input, background: "var(--accent)", color: "#fff", borderColor: "var(--accent)", cursor: saving ? "wait" : "pointer", fontWeight: 600 }}>
-                {saving ? "Saving…" : "Save business"}
+                {saving ? "Saving…" : "Next"}
               </button>
             </div>
           </form>
