@@ -1,4 +1,4 @@
-import { DispatchService, getDirectory } from "@dispatchai/domain";
+import { DispatchService, getBusinessConfig, getDirectory } from "@dispatchai/domain";
 import { toolFailure, toolSuccess, verifyWebhookSignature } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
@@ -6,6 +6,7 @@ import { ELEVENLABS_AGENT_CONFIG, ELEVENLABS_TOOLS, ELEVENLABS_SYSTEM_PROMPT } f
 import { SQLiteDispatchStore } from "../../domain/src/sqlite-store.js";
 import { deliverBookingEmails } from "../../domain/src/email.js";
 import { SessionStore } from "./session-store.js";
+import { buildBookingEvent, sendBookingEvent } from "./outbound-events.js";
 
 // Multi-session agent registry: in-memory cache in front of the durable SessionStore.
 const agents: Map<string, DispatchAgent> = new Map();
@@ -18,8 +19,14 @@ const n8nClient = new N8nClient({
   baseUrl: process.env.N8N_BASE_URL || "http://localhost:5678",
   secret: dispatchSecret,
   directService: domainService,
-  // Same email side effect the HTTP domain server ran after each mutation; never throws.
-  onMutation: (workOrderId) => deliverBookingEmails(domainService.getStore(), workOrderId)
+  // After each create/reschedule/cancel: emails (as the HTTP domain server did) and the signed n8n event. Neither throws.
+  onMutation: async (kind, workOrder) => {
+    await deliverBookingEmails(domainService.getStore(), workOrder.id);
+    const url = process.env.N8N_EVENTS_URL;
+    const secret = process.env.N8N_EVENTS_SECRET;
+    // Not awaited: a slow n8n must not add latency to the caller's turn.
+    if (url && secret) void sendBookingEvent(url, secret, buildBookingEvent(`booking.${kind}`, workOrder, getBusinessConfig().timeZone));
+  }
 });
 
 export function getOrCreateAgent(sessionId: string): DispatchAgent {

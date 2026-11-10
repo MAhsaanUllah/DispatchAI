@@ -1,0 +1,109 @@
+{
+  "name": "DispatchAI Events Starter",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dispatchai-events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook: DispatchAI Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verifies x-dispatchai-signature = sha256=HMAC(secret, `${timestamp}.${body}`) and a 5-minute window.\n// Set DISPATCHAI_EVENTS_SECRET in n8n (same value as N8N_EVENTS_SECRET in DispatchAI) and allow the crypto module\n// (NODE_FUNCTION_ALLOW_BUILTIN=crypto). DispatchAI sends compact JSON, so JSON.stringify(body) equals the signed bytes.\nconst crypto = require('crypto');\nconst item = $input.first().json;\nconst headers = item.headers || {};\nconst timestamp = headers['x-dispatchai-timestamp'] || '';\nconst signature = headers['x-dispatchai-signature'] || '';\nconst body = JSON.stringify(item.body);\nconst secret = $env.DISPATCHAI_EVENTS_SECRET || '';\nconst expected = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');\nconst fresh = Math.abs(Date.now() - Number(timestamp) * 1000) <= 5 * 60 * 1000;\nconst valid = !!secret && fresh && signature.length === expected.length && crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));\nreturn [{ json: { route: valid ? item.body.type : 'invalid', event: valid ? item.body : null } }];"
+      },
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.route }}",
+        "rules": {
+          "rules": [
+            { "value2": "booking.created", "output": 0 },
+            { "value2": "booking.rescheduled", "output": 1 },
+            { "value2": "booking.cancelled", "output": 2 },
+            { "value2": "invalid", "output": 3 }
+          ]
+        }
+      },
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Replace with your action, e.g. a Slack/Email/Sheets node. Payload has IDs only: bookingId, customerRef, service, slotStart, slotEnd, status, timezone.\nreturn [{ json: { handled: 'booking.created', bookingId: $json.event.data.bookingId } }];"
+      },
+      "name": "On Booking Created (replace me)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 120]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { handled: 'booking.rescheduled', bookingId: $json.event.data.bookingId } }];"
+      },
+      "name": "On Booking Rescheduled (replace me)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { handled: 'booking.cancelled', bookingId: $json.event.data.bookingId } }];"
+      },
+      "name": "On Booking Cancelled (replace me)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 480]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: 'invalid signature' }) }}",
+        "options": { "responseCode": 401 }
+      },
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [720, 660]
+    }
+  ],
+  "connections": {
+    "Webhook: DispatchAI Event": { "main": [[{ "node": "Verify Signature", "type": "main", "index": 0 }]] },
+    "Verify Signature": { "main": [[{ "node": "Route by Event Type", "type": "main", "index": 0 }]] },
+    "Route by Event Type": {
+      "main": [
+        [{ "node": "On Booking Created (replace me)", "type": "main", "index": 0 }],
+        [{ "node": "On Booking Rescheduled (replace me)", "type": "main", "index": 0 }],
+        [{ "node": "On Booking Cancelled (replace me)", "type": "main", "index": 0 }],
+        [{ "node": "Respond Unauthorized", "type": "main", "index": 0 }]
+      ]
+    },
+    "On Booking Created (replace me)": { "main": [[{ "node": "Respond OK", "type": "main", "index": 0 }]] },
+    "On Booking Rescheduled (replace me)": { "main": [[{ "node": "Respond OK", "type": "main", "index": 0 }]] },
+    "On Booking Cancelled (replace me)": { "main": [[{ "node": "Respond OK", "type": "main", "index": 0 }]] }
+  },
+  "settings": {}
+}
