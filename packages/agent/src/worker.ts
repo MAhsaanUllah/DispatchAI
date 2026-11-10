@@ -3,18 +3,23 @@ import { toolFailure, toolSuccess, verifyWebhookSignature } from "@dispatchai/sh
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
 import { ELEVENLABS_AGENT_CONFIG, ELEVENLABS_TOOLS, ELEVENLABS_SYSTEM_PROMPT } from "./elevenlabs.config.js";
+import { SQLiteDispatchStore } from "../../domain/src/sqlite-store.js";
+import { deliverBookingEmails } from "../../domain/src/email.js";
 
 // Multi-session agent registry
 const agents: Map<string, DispatchAgent> = new Map();
 // ponytail: In-memory one-hour voice capabilities suit local demos; use durable session auth for multi-instance deployment.
 const voiceTokens = new Map<string, { sessionId: string; expiresAt: number }>();
-const domainService = new DispatchService();
+// One process owns the business data (single writer). DATABASE_URL = SQLite file path; unset = in-memory.
+const domainService = new DispatchService(process.env.DATABASE_URL ? new SQLiteDispatchStore(process.env.DATABASE_URL) : undefined);
 const isTestRuntime = process.env.NODE_ENV === "test";
 const dispatchSecret = process.env.N8N_WEBHOOK_SECRET || (isTestRuntime ? "dev_secret_dispatch_2026" : "");
 const n8nClient = new N8nClient({
   baseUrl: process.env.N8N_BASE_URL || "http://localhost:5678",
   secret: dispatchSecret,
-  directService: isTestRuntime ? domainService : undefined
+  directService: domainService,
+  // Same email side effect the HTTP domain server ran after each mutation; never throws.
+  onMutation: (workOrderId) => deliverBookingEmails(domainService.getStore(), workOrderId)
 });
 
 export function getOrCreateAgent(sessionId: string): DispatchAgent {
@@ -149,14 +154,11 @@ export async function handleRequest(req: Request): Promise<Response> {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-    if (isTestRuntime) {
-      domainService.getStore().reset();
-      return new Response(JSON.stringify(toolSuccess({ reset: true }, `reset_${Date.now()}`)), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-    return proxyDatabaseRequest("/api/reset", "POST", corsHeaders, JSON.stringify(body));
+    domainService.getStore().reset();
+    return new Response(JSON.stringify(toolSuccess({ reset: true }, `reset_${Date.now()}`)), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 
   // 3. State retrieval
@@ -177,31 +179,22 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   // 5. Jobs list for dashboard
   if (method === "GET" && pathname === "/api/jobs") {
-    if (isTestRuntime) {
-      const jobs = Array.from(domainService.getStore().workOrders.values());
-      return new Response(JSON.stringify({ ok: true, data: { jobs } }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-    return proxyDatabaseRequest("/api/jobs", "GET", corsHeaders);
+    const jobs = Array.from(domainService.getStore().workOrders.values());
+    return new Response(JSON.stringify({ ok: true, data: { jobs } }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 
   if (method === "GET" && pathname === "/api/directory") {
-    if (isTestRuntime) {
-      return new Response(JSON.stringify({ ok: true, data: getDirectory(domainService.getStore()) }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-    return proxyDatabaseRequest("/api/directory", "GET", corsHeaders);
+    return new Response(JSON.stringify({ ok: true, data: getDirectory(domainService.getStore()) }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 
   if (method === "GET" && pathname === "/api/notifications") {
-    if (isTestRuntime) {
-      return new Response(JSON.stringify({ ok: true, data: { notifications: [...domainService.getStore().notifications].reverse() } }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-    return proxyDatabaseRequest("/api/notifications", "GET", corsHeaders);
+    return new Response(JSON.stringify({ ok: true, data: { notifications: [...domainService.getStore().notifications].reverse() } }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 
   // 6. ElevenLabs Voice Agent Config
@@ -358,18 +351,6 @@ async function handleVoiceTool(
   });
 }
 
-async function proxyDatabaseRequest(path: string, method: string, corsHeaders: Record<string, string>, body?: string): Promise<Response> {
-  const baseUrl = (process.env.DATABASE_SERVICE_URL || "http://localhost:3000").replace(/\/$/, "");
-  const response = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers: { "x-dispatch-secret": dispatchSecret, "Content-Type": "application/json" },
-    body
-  });
-  return new Response(await response.text(), {
-    status: response.status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" }
-  });
-}
 
 async function handleConfirmedMutation(agent: DispatchAgent, type: string, params: any, correlationId: string) {
   const pending = agent.getState().pendingAction;
