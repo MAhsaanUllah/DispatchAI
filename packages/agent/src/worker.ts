@@ -40,7 +40,8 @@ const n8nClient = new N8nClient({
   // After each create/reschedule/cancel: emails (as the HTTP domain server did) and the signed n8n event. Neither throws.
   onMutation: async (kind, workOrder) => {
     if (kind === "created") settings.markFirstBooking();
-    await deliverBookingEmails(domainService.getStore(), workOrder.id);
+    const email = await pluginStore.get("email");
+    await deliverBookingEmails(domainService.getStore(), workOrder.id, email?.enabled ? { apiKey: email.secrets.apiKey, from: email.config.from } : undefined);
     // n8n plugin settings from the dashboard win; .env values stay as a fallback for scripted installs.
     const n8n = await pluginStore.get("n8n");
     const url = n8n?.enabled ? n8n.config.url : process.env.N8N_EVENTS_URL;
@@ -209,7 +210,8 @@ async function routeRequest(req: Request): Promise<Response> {
       return {
         id: plugin.id, name: plugin.name, category: plugin.category, description: plugin.description, limits: plugin.limits,
         enabled: record?.enabled ?? false,
-        fields: plugin.fields.map((field) => ({ ...field, value: field.secret ? "" : record?.config[field.key] ?? "", saved: field.secret ? Boolean(record?.secrets[field.key]) : undefined }))
+        fields: plugin.fields.map((field) => ({ ...field, value: field.secret ? "" : record?.config[field.key] ?? "", saved: field.secret ? Boolean(record?.secrets[field.key]) : undefined })),
+        preview: plugin.preview?.()
       };
     }));
     return json({ ok: true, data: { plugins: list } }, 200, corsHeaders);
