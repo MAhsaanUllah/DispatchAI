@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { DispatchService } from "./service.js";
+import { DispatchStore } from "./store.js";
 
 describe("DispatchService - Operational Tools & Business Logic", () => {
   let service: DispatchService;
@@ -113,6 +114,50 @@ describe("DispatchService - Operational Tools & Business Logic", () => {
           expect(slot.startAt.includes("13:00:00Z")).toBe(true);
         }
       }
+    });
+  });
+
+  describe("sequential work order ids", () => {
+    // Books the n-th free HVAC slot on a fixture date and returns the new work order id.
+    const book = (svc: DispatchService, key: string, slotIndex: number) => {
+      const avail = svc.checkAvailability({ serviceType: "HVAC", serviceZone: "Austin-South", date: "2026-09-18" });
+      if (!avail.ok) throw new Error("availability failed");
+      const created = svc.createWorkOrder({
+        idempotencyKey: key,
+        customerId: "cust_101",
+        propertyId: "prop_201",
+        serviceType: "HVAC",
+        issueSummary: "Sequential id test",
+        urgency: "STANDARD",
+        slotId: avail.data.slots[slotIndex].slotId,
+        createdBy: "VOICE_AGENT"
+      });
+      if (!created.ok) throw new Error("create failed");
+      return created.data.workOrder.id;
+    };
+
+    const num = (id: string) => Number(id.slice(3));
+    const highestSeeded = () => Math.max(...[...service.getStore().workOrders.keys()].map(num));
+
+    it("gives the next number after the highest existing id", () => {
+      const expected = highestSeeded() + 1;
+      expect(book(service, "idem_seq_1", 0)).toBe(`wo_${expected}`);
+      expect(book(service, "idem_seq_2", 0)).toBe(`wo_${expected + 1}`);
+    });
+
+    it("continues the sequence after reloading from a snapshot", () => {
+      const expected = highestSeeded() + 1;
+      book(service, "idem_seq_reload_1", 0);
+      const reloaded = new DispatchService(new DispatchStore(service.getStore().snapshot()));
+      expect(book(reloaded, "idem_seq_reload_2", 0)).toBe(`wo_${expected + 1}`);
+    });
+
+    it("ignores legacy timestamp ids when picking the next number", () => {
+      const expected = highestSeeded() + 1;
+      const store = service.getStore();
+      const legacy = { ...store.workOrders.get("wo_1001")!, id: "wo_1730000000000" };
+      store.workOrders.set(legacy.id, legacy);
+      expect(book(service, "idem_seq_legacy", 0)).toBe(`wo_${expected}`);
     });
   });
 
