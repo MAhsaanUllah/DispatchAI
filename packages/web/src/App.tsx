@@ -10,6 +10,7 @@ import { api, type Directory } from "./api.js";
 import { DirectoryPanel } from "./components/DirectoryPanel.js";
 import { SystemPanel } from "./components/SystemPanel.js";
 import { BusinessWizard } from "./BusinessWizard.js";
+import { PluginsPage } from "./PluginsPage.js";
 import { LocalNotification, WorkOrder } from "@dispatchai/shared";
 import { MessageSquare, Activity, Briefcase } from "lucide-react";
 
@@ -18,7 +19,7 @@ export const App: React.FC = () => {
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [editingBusiness, setEditingBusiness] = useState(false);
-  const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system">("dispatch");
+  const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system" | "plugins">("dispatch");
   const [notifications, setNotifications] = useState<LocalNotification[]>([]);
   const [selectedJob, setSelectedJob] = useState<WorkOrder | null>(null);
   const [agentState, setAgentState] = useState(api.getAgent().getState());
@@ -126,7 +127,7 @@ export const App: React.FC = () => {
 
       <main style={{ padding: "14px 24px 16px", maxWidth: "1680px", margin: "0 auto", width: "100%", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: activeView === "dispatch" ? "hidden" : "auto" }}>
         {activeView === "company" && editingBusiness ? <BusinessWizard onDone={() => window.location.reload()} onCancel={() => setEditingBusiness(false)} />
-          : activeView === "system" ? <SystemPanel /> : activeView !== "dispatch" ? <>
+          : activeView === "plugins" ? <PluginsPage /> : activeView === "system" ? <SystemPanel /> : activeView !== "dispatch" ? <>
             {activeView === "company" && (
               <button onClick={() => setEditingBusiness(true)} style={{ alignSelf: "flex-end", marginBottom: 12, padding: "7px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--accent)", background: "var(--accent)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
                 Edit business
