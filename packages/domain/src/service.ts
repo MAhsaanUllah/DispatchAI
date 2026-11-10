@@ -255,7 +255,12 @@ export class DispatchService {
     // Reserve / Book slot
     slot.status = "BOOKED";
 
-    const workOrderId = `wo_${Date.now()}`;
+    // Short ids only; legacy wo_<timestamp> ids (13 digits) are ignored.
+    const numbers = [...this.store.workOrders.keys()]
+      .map((id) => /^wo_(\d{1,6})$/.exec(id)?.[1])
+      .filter((n): n is string => n !== undefined)
+      .map(Number);
+    const workOrderId = `wo_${Math.max(1000, ...numbers) + 1}`;
     const now = new Date().toISOString();
 
     const workOrder: WorkOrder = {
