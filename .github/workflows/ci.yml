@@ -20,7 +20,5 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      # shortcut: report-only until the open advisories (zod 3 runtime, vitest/wrangler dev) are upgraded; then remove continue-on-error.
       - name: Dependency audit (high and above)
         run: npm audit --audit-level=high
-        continue-on-error: true
