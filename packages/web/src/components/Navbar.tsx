@@ -7,9 +7,10 @@ interface NavbarProps {
   onOpenVoiceModal?: () => void;
   activeView?: "dispatch" | "team" | "services" | "company" | "system";
   onViewChange?: (view: "dispatch" | "team" | "services" | "company" | "system") => void;
+  onLogout?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange, onLogout }) => {
   const [isResetting, setIsResetting] = useState(false);
 
   const handleResetClick = () => {
@@ -122,6 +123,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
           <RotateCcw size={12} className={isResetting ? "animate-spin" : ""} color="var(--text-secondary)" />
           <span>Reset Demo</span>
         </button>
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            style={{ padding: "5px 10px", backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--text-primary)", fontSize: "12px", fontWeight: 500, cursor: "pointer" }}
+          >
+            Log out
+          </button>
+        )}
       </div>
     </header>
   );

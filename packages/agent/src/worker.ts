@@ -72,6 +72,18 @@ class RateLimiter {
 
 const rateLimiter = new RateLimiter();
 
+const OWNER_COOKIE = "dispatch_owner";
+
+function cookieValue(req: Request, name: string): string | undefined {
+  return req.headers.get("Cookie")?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1) || undefined;
+}
+
+// Secure only over HTTPS (VPS behind Caddy); a plain http://localhost or LAN install would otherwise drop the cookie.
+function ownerCookie(req: Request, value: string, maxAge: number): string {
+  const https = new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
+  return `${OWNER_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${https ? "; Secure" : ""}`;
+}
+
 function json(body: unknown, status: number, headers: Record<string, string>): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
 }
@@ -136,6 +148,33 @@ async function routeRequest(req: Request): Promise<Response> {
     if (!/^\d{6,8}$/.test(pin)) return json(toolFailure("INVALID_INPUT", "PIN must be 6-8 digits", false, `setup_${Date.now()}`), 400, corsHeaders);
     if (!(await auth.createOwner(name, pin))) return json(toolFailure("SETUP_LOCKED", "Setup is already done", false, `setup_${Date.now()}`), 403, corsHeaders);
     return json(toolSuccess({ owner: name }, `setup_${Date.now()}`), 201, corsHeaders);
+  }
+
+  // Owner login with PIN. Session token lives only in an HttpOnly cookie.
+  const ownerToken = cookieValue(req, OWNER_COOKIE);
+  if (pathname === "/api/auth/me" && method === "GET") {
+    const authenticated = await auth.isValidSession(ownerToken);
+    return json({ ok: true, data: { authenticated, owner: authenticated ? auth.ownerName() : undefined } }, 200, corsHeaders);
+  }
+  if (pathname === "/api/auth/login" && method === "POST") {
+    const body = await req.json().catch(() => ({})) as { pin?: unknown };
+    const result = await auth.login(typeof body.pin === "string" ? body.pin : "");
+    if ("error" in result) {
+      return result.error === "LOCKED"
+        ? json(toolFailure("LOCKED", `Too many wrong PINs. Try again in ${Math.ceil((result.retryAfterMs ?? 0) / 60000)} minutes.`, true, `login_${Date.now()}`), 429, corsHeaders)
+        : json(toolFailure("WRONG_PIN", "PIN is wrong", false, `login_${Date.now()}`), 401, corsHeaders);
+    }
+    return json(toolSuccess({ owner: auth.ownerName() }, `login_${Date.now()}`), 200, { ...corsHeaders, "Set-Cookie": ownerCookie(req, result.token, 86400) });
+  }
+  if (pathname === "/api/auth/logout" && method === "POST") {
+    await auth.logout(ownerToken);
+    return json(toolSuccess({ loggedOut: true }, `logout_${Date.now()}`), 200, { ...corsHeaders, "Set-Cookie": ownerCookie(req, "", 0) });
+  }
+
+  // Once an owner exists, every other API call needs an owner session. Voice tool and webhook routes keep their own secret/signature checks.
+  const selfAuthenticated = pathname.startsWith("/api/voice/tools/") || pathname === "/api/voice/webhook";
+  if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !(await auth.isValidSession(ownerToken))) {
+    return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
   }
 
   // 2. Secret Authentication Enforcement for protected endpoints
