@@ -9,7 +9,7 @@ import {
   Urgency,
   WorkOrder
 } from "@dispatchai/shared";
-import { getBusinessConfig } from "@dispatchai/domain";
+import { detectService, getBusinessConfig } from "@dispatchai/domain";
 import { N8nClient } from "./client.js";
 import { AgentState, ConversationMessage, createInitialAgentState, PendingConfirmationAction, SuccessfulCreateRecord } from "./state.js";
 
@@ -459,7 +459,7 @@ export class DispatchAgent {
       this.state.pendingAction = null;
 
       const rescheduleContext = this.state.rescheduleContext;
-      const serviceType = rescheduleContext?.serviceType || this.state.serviceType || (lower.includes("plumb") ? "PLUMBING" : "HVAC");
+      const serviceType = rescheduleContext?.serviceType || this.state.serviceType || detectService(lower) || getBusinessConfig().services[0].id;
       const serviceZone = rescheduleContext?.serviceZone || this.state.selectedProperty?.serviceZone;
       if (!serviceZone) {
         return this.pushAgentReply(this.missingPropertyReply());
@@ -546,9 +546,9 @@ export class DispatchAgent {
     }
 
     // 5. Service request / Problem description (e.g. "AC blowing warm air", "Pipe burst")
-    if (lower.includes("ac") || lower.includes("air condition") || lower.includes("hvac") || lower.includes("plumb") || lower.includes("leak") || lower.includes("drain")) {
-      const isPlumbing = lower.includes("plumb") || lower.includes("pipe") || lower.includes("leak") || lower.includes("drain") || lower.includes("sink") || lower.includes("toilet");
-      const serviceType: ServiceType = isPlumbing ? "PLUMBING" : "HVAC";
+    const detectedService = detectService(lower);
+    if (detectedService) {
+      const serviceType: ServiceType = detectedService;
       this.state.serviceType = serviceType;
       this.state.issueSummary = cleanText;
       this.state.rescheduleContext = null;
