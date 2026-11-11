@@ -1,0 +1,62 @@
+# DispatchAI self-hosting. One file for a home PC and a VPS; turn extras on with profiles:
+#   PC:                docker compose up -d
+#   PC + n8n:          docker compose --profile automation up -d
+#   PC + phone calls:  docker compose --profile tunnel up -d        (Twilio needs a public HTTPS address)
+#   VPS:               docker compose --profile vps up -d           (Caddy gets an HTTPS certificate for PUBLIC_DOMAIN)
+# First start: docker compose logs app   -> shows the one-time setup code (or use SETUP_TOKEN in .env).
+
+services:
+  app:
+    build: .
+    image: dispatchai:local
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: /data/dispatchai.sqlite
+      AGENT_PORT: "8080"
+      WEB_ORIGIN: ${PUBLIC_URL:-http://localhost:8080}
+    volumes:
+      - app-data:/data
+    ports:
+      # Local access only. On a VPS, Caddy (profile vps) is the public entry point.
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+
+  n8n:
+    profiles: [automation]
+    # Pin the version you have tested in production.
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      # Lets the starter workflow verify DispatchAI's event signatures.
+      NODE_FUNCTION_ALLOW_BUILTIN: crypto
+      DISPATCHAI_EVENTS_SECRET: ${N8N_EVENTS_SECRET:-}
+      GENERIC_TIMEZONE: ${TZ:-UTC}
+    volumes:
+      - n8n-data:/home/node/.n8n
+    ports:
+      # n8n editor on this machine only. DispatchAI reaches it inside the network as http://n8n:5678.
+      - "127.0.0.1:5678:5678"
+
+  caddy:
+    profiles: [vps]
+    image: caddy:2
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${PUBLIC_DOMAIN:-localhost} --to app:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+
+  cloudflared:
+    profiles: [tunnel]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:-missing-set-TUNNEL_TOKEN-in-.env}
+
+volumes:
+  app-data:
+  n8n-data:
+  caddy-data:

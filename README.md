@@ -130,6 +130,28 @@ The deployed `dispatchai-agent` Worker calls the public authenticated n8n Cloud 
 
 The `dispatchai-web` Worker serves the landing page, private Google invite flow, signed ElevenLabs session proxy, and live dashboard. After opening the private invite link, choose a display name and one of three synthetic locations, then continue with Google. The voice session uses six existing ElevenLabs client tools through the Cloudflare Agent and n8n Cloud. Once a confirmed booking succeeds, the current browser session retains its work-order ID and `/app` highlights the real cloud record. The dashboard remains read-only; this is not a production SaaS or real dispatch service.
 
+## Self-host with Docker
+
+One business per install. Everything runs in one container; data stays in a Docker volume on your machine.
+
+```bash
+cp .env.example .env        # set SETUP_TOKEN (and MASTER_KEY on a VPS)
+docker compose up -d --build
+docker compose logs app     # shows the setup code if SETUP_TOKEN is empty
+```
+
+Open `http://localhost:8080/app`, enter the setup code, choose your PIN, then follow the onboarding wizard.
+
+| Where it runs | Command | Notes |
+| --- | --- | --- |
+| Home PC | `docker compose up -d` | Dashboard on this computer only. Phone calls stop when the PC is off or asleep. |
+| Home PC + n8n | `docker compose --profile automation up -d` | n8n editor at `http://localhost:5678`; in the n8n plugin use `http://n8n:5678/webhook/...`. |
+| Home PC + phone line | `docker compose --profile tunnel up -d` | Cloudflare Tunnel gives Twilio a public HTTPS address; route the tunnel to `http://app:8080`. |
+| VPS | `docker compose --profile vps up -d` | Caddy serves `https://PUBLIC_DOMAIN` with an automatic certificate. Set `MASTER_KEY`. |
+
+Check an install end to end: `SETUP_TOKEN=... node scripts/docker-smoke.mjs http://localhost:8080`.
+Back up the `app-data` volume (it holds the database and `master.key`).
+
 ## Roadmap
 
 The demo intentionally stops at the invite-only, read-only boundary. Beyond it, the next concrete steps are:
