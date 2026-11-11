@@ -22,7 +22,9 @@ import {
   ToolResult,
   toolSuccess,
   WorkOrder,
-  LocalNotification
+  LocalNotification,
+  Customer,
+  Property
 } from "@dispatchai/shared";
 import { DispatchStore } from "./store.js";
 import { bookingNotice, getBusinessConfig, isKnownService, serviceZoneFor } from "./templates.js";
@@ -33,6 +35,34 @@ export class DispatchService {
 
   constructor(store?: DispatchStore) {
     this.store = store ?? new DispatchStore();
+  }
+
+  // New caller from a conversation: a customer, plus their service address for onsite businesses.
+  public createCaller(
+    input: { name: string; phone: string; addressLine1?: string; serviceZone?: string },
+    correlationId: string = this.generateCorrelationId()
+  ): ToolResult<{ customer: Customer; property: Property | null }> {
+    const phone = input.phone.replace(/\D/g, "");
+    const [firstName, ...rest] = input.name.trim().split(/\s+/);
+    const config = getBusinessConfig();
+    if (!/^\d{10,15}$/.test(phone) || !firstName || input.name.length > 80) {
+      return toolFailure("INVALID_INPUT", "A name and a 10-15 digit phone number are required", false, correlationId);
+    }
+    if ([...this.store.customers.values()].some((c) => c.phone.replace(/\D/g, "") === phone)) {
+      return toolFailure("CUSTOMER_EXISTS", "A customer with this phone number already exists", false, correlationId);
+    }
+    const onsite = config.kind === "onsite";
+    if (onsite && (!input.addressLine1?.trim() || !input.serviceZone || !config.serviceZones.includes(input.serviceZone))) {
+      return toolFailure("INVALID_INPUT", "Onsite services need an address in one of the service areas", false, correlationId);
+    }
+    const customer: Customer = { id: `cust_${crypto.randomUUID().slice(0, 8)}`, firstName, lastName: rest.join(" ") || "-", phone, createdAt: new Date().toISOString() };
+    const property: Property | null = onsite
+      ? { id: `prop_${crypto.randomUUID().slice(0, 8)}`, customerId: customer.id, addressLine1: input.addressLine1!.trim().slice(0, 160), city: config.market, state: "", zipCode: "", serviceZone: input.serviceZone! }
+      : null;
+    this.store.customers.set(customer.id, customer);
+    if (property) this.store.properties.set(property.id, property);
+    this.store.persist();
+    return toolSuccess({ customer, property }, correlationId);
   }
 
   public getStore(): DispatchStore {

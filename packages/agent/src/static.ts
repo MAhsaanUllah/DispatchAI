@@ -24,8 +24,7 @@ const SECURITY_HEADERS = {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data:",
-    // shortcut: ElevenLabs allowed for the existing voice demo; remove when the browser Test call (chunk 11) replaces it.
-    "connect-src 'self' https://*.elevenlabs.io wss://*.elevenlabs.io",
+    "connect-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'"
