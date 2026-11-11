@@ -86,7 +86,8 @@ export function BusinessWizard({ onDone, onCancel }: Props) {
 
   const timeZones = zonesList();
   return (
-    <main style={{ display: "grid", placeItems: "start center", padding: "32px 16px" }}>
+    // html/body/#root do not scroll (dashboard layout), so this page scrolls itself; otherwise step 3's buttons are unreachable.
+    <main style={{ display: "grid", placeItems: "start center", padding: "32px 16px", height: "100%", overflowY: "auto", boxSizing: "border-box" }}>
       <div style={{ width: "100%", maxWidth: 720, display: "grid", gap: 20, padding: 28, borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
         <div>
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)", fontWeight: 600 }}>STEP {step} OF 3</p>
