@@ -7,8 +7,6 @@ type Staff = { id?: string; name: string; skills: string[] };
 type Props = { onDone: () => void; onBack: () => void };
 
 const DAYS: [Day, string][] = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
-const input: React.CSSProperties = { padding: "8px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)", fontSize: 14 };
-const section: React.CSSProperties = { display: "grid", gap: 10, padding: 16, border: "1px solid var(--border)", borderRadius: 10 };
 const idOf = (name: string) => name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
 // Onboarding step 3: what you offer, when you are open, and who works. Saving generates bookable slots.
@@ -29,7 +27,7 @@ export function ScheduleSetup({ onDone, onBack }: Props) {
     }).catch(() => setError("Cannot load your schedule settings."));
   }, []);
 
-  if (!hours) return <p>{error || "Loading…"}</p>;
+  if (!hours) return <p className="wizard__lede">{error || "Loading…"}</p>;
 
   const save = async () => {
     setError("");
@@ -59,61 +57,61 @@ export function ScheduleSetup({ onDone, onBack }: Props) {
     : { ...member, skills: member.skills.includes(skill) ? member.skills.filter((s) => s !== skill) : [...member.skills, skill] }));
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <fieldset style={section}>
-        <legend style={{ fontWeight: 700 }}>Services</legend>
+    <div className="wizard__body">
+      <fieldset className="fieldset">
+        <legend>Services</legend>
         {services.map((service, index) => (
-          <div key={index} style={{ display: "flex", gap: 8 }}>
-            <input aria-label={`Service ${index + 1}`} style={{ ...input, flex: 1 }} value={service.name} onChange={(e) => setServices(services.map((s, i) => i === index ? { ...s, name: e.target.value } : s))} />
-            <button type="button" aria-label={`Remove ${service.name || "service"}`} onClick={() => setServices(services.filter((_, i) => i !== index))} style={{ ...input, cursor: "pointer" }}>Remove</button>
+          <div key={index} className="staff-row__top">
+            <input className="input" aria-label={`Service ${index + 1}`} value={service.name} onChange={(e) => setServices(services.map((s, i) => i === index ? { ...s, name: e.target.value } : s))} />
+            <button type="button" className="btn btn--sm" aria-label={`Remove ${service.name || "service"}`} onClick={() => setServices(services.filter((_, i) => i !== index))}>Remove</button>
           </div>
         ))}
-        <button type="button" onClick={() => setServices([...services, { id: "", name: "" }])} style={{ ...input, justifySelf: "start", cursor: "pointer" }}>+ Add service</button>
+        <button type="button" className="btn btn--sm" onClick={() => setServices([...services, { id: "", name: "" }])}>Add service</button>
       </fieldset>
 
-      <fieldset style={section}>
-        <legend style={{ fontWeight: 700 }}>Opening hours</legend>
+      <fieldset className="fieldset">
+        <legend>Opening hours</legend>
         {DAYS.map(([day, label]) => {
           const value = hours[day];
           return (
-            <div key={day} style={{ display: "grid", gridTemplateColumns: "110px auto 1fr", gap: 10, alignItems: "center" }}>
+            <div key={day} className="hours-row">
               <span>{label}</span>
-              <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+              <label className="check">
                 <input type="checkbox" checked={value !== null} onChange={(e) => setHours({ ...hours, [day]: e.target.checked ? { open: "09:00", close: "17:00" } : null })} />
                 Open
               </label>
               {value ? (
-                <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <input aria-label={`${label} opens`} type="time" style={input} value={value.open} onChange={(e) => setHours({ ...hours, [day]: { ...value, open: e.target.value } })} />
-                  –
-                  <input aria-label={`${label} closes`} type="time" style={input} value={value.close} onChange={(e) => setHours({ ...hours, [day]: { ...value, close: e.target.value } })} />
+                <span className="time-pair">
+                  <input className="input" aria-label={`${label} opens`} type="time" value={value.open} onChange={(e) => setHours({ ...hours, [day]: { ...value, open: e.target.value } })} />
+                  <span className="field__hint">to</span>
+                  <input className="input" aria-label={`${label} closes`} type="time" value={value.close} onChange={(e) => setHours({ ...hours, [day]: { ...value, close: e.target.value } })} />
                 </span>
-              ) : <span style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Closed</span>}
+              ) : <span className="field__hint">Closed</span>}
             </div>
           );
         })}
-        <label style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13 }}>
-          Appointment length
-          <select aria-label="Appointment length" style={input} value={slotMinutes} onChange={(e) => setSlotMinutes(Number(e.target.value))}>
+        <label className="field">
+          <span className="field__label">Appointment length</span>
+          <select className="select" aria-label="Appointment length" value={slotMinutes} onChange={(e) => setSlotMinutes(Number(e.target.value))}>
             {[30, 45, 60, 90, 120].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}
           </select>
         </label>
       </fieldset>
 
-      <fieldset style={section}>
-        <legend style={{ fontWeight: 700 }}>Staff</legend>
-        {staff.length === 0 && <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>No staff yet. Add at least one person and tick the services they do; their open slots are made from your opening hours.</p>}
+      <fieldset className="fieldset">
+        <legend>Staff</legend>
+        {staff.length === 0 && <p className="field__hint">No staff yet. Add at least one person and tick the services they do; their open slots are made from your opening hours.</p>}
         {staff.map((member, index) => (
-          <div key={member.id ?? `new-${index}`} style={{ display: "grid", gap: 6, paddingBottom: 8, borderBottom: "1px solid var(--border)" }}>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input aria-label={`Staff ${index + 1} name`} style={{ ...input, flex: 1 }} value={member.name} onChange={(e) => setStaff(staff.map((m, i) => i === index ? { ...m, name: e.target.value } : m))} />
-              <button type="button" aria-label={`Remove ${member.name || "staff member"}`} onClick={() => setStaff(staff.filter((_, i) => i !== index))} style={{ ...input, cursor: "pointer" }}>Remove</button>
+          <div key={member.id ?? `new-${index}`} className="staff-row">
+            <div className="staff-row__top">
+              <input className="input" aria-label={`Staff ${index + 1} name`} value={member.name} onChange={(e) => setStaff(staff.map((m, i) => i === index ? { ...m, name: e.target.value } : m))} />
+              <button type="button" className="btn btn--sm" aria-label={`Remove ${member.name || "staff member"}`} onClick={() => setStaff(staff.filter((_, i) => i !== index))}>Remove</button>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 13 }}>
+            <div className="skill-list">
               {services.filter((service) => service.name.trim()).map((service) => {
                 const skill = idOf(service.name);
                 return (
-                  <label key={skill} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <label key={skill} className="check">
                     <input type="checkbox" checked={member.skills.includes(skill)} onChange={() => toggleSkill(index, skill)} />
                     {service.name}
                   </label>
@@ -122,13 +120,13 @@ export function ScheduleSetup({ onDone, onBack }: Props) {
             </div>
           </div>
         ))}
-        <button type="button" onClick={() => setStaff([...staff, { name: "", skills: [] }])} style={{ ...input, justifySelf: "start", cursor: "pointer" }}>+ Add staff member</button>
+        <button type="button" className="btn btn--sm" onClick={() => setStaff([...staff, { name: "", skills: [] }])}>Add staff member</button>
       </fieldset>
 
-      {error && <p role="alert" style={{ margin: 0, color: "var(--danger)", fontSize: 13 }}>{error}</p>}
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <button type="button" onClick={onBack} style={{ ...input, cursor: "pointer" }}>Back</button>
-        <button type="button" onClick={save} disabled={saving} style={{ ...input, background: "var(--accent)", color: "#fff", borderColor: "var(--accent)", fontWeight: 600, cursor: saving ? "wait" : "pointer" }}>
+      {error && <p role="alert" className="field__error">{error}</p>}
+      <div className="wizard__actions">
+        <button type="button" className="btn" onClick={onBack}>Back</button>
+        <button type="button" className="btn btn--primary" onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Finish setup"}
         </button>
       </div>

@@ -31,7 +31,7 @@ function Dashboard() {
       .catch(() => setGate("login"));
   };
   useEffect(check, []);
-  if (gate === "loading") return <div>Loading dashboard...</div>;
+  if (gate === "loading") return <div className="boot">Loading dashboard…</div>;
   if (gate === "setup") return <SetupPage onDone={() => setGate("login")} />;
   if (gate === "login") return <LoginPage onDone={check} />;
   if (gate === "onboarding") return <BusinessWizard onDone={() => setGate("dashboard")} />;

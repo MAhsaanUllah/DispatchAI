@@ -32,38 +32,28 @@ export function LoginPage({ onDone }: Props) {
   };
 
   return (
-    <main style={{ height: "100%", overflowY: "auto", boxSizing: "border-box", display: "grid", placeItems: "center", padding: 16 }}>
-      <form onSubmit={submit} aria-labelledby="login-title" style={{
-        width: "100%", maxWidth: 360, display: "grid", gap: 16, padding: 28, borderRadius: 12,
-        border: "1px solid var(--border)", background: "var(--surface)", boxShadow: "0 8px 30px rgba(0,0,0,0.06)"
-      }}>
+    <main className="auth">
+      <form onSubmit={submit} aria-labelledby="login-title" className="auth__panel">
         <div>
-          <h1 id="login-title" style={{ margin: 0, fontSize: 22 }}>Log in to DispatchAI</h1>
-          <p style={{ margin: "6px 0 0", color: "var(--text-secondary)", fontSize: 14 }}>Enter your name and PIN.</p>
+          <h1 id="login-title" className="auth__title">Log in to DispatchAI</h1>
+          <p className="auth__lede">Enter your name and PIN.</p>
         </div>
-        <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 600 }}>
-          Your name
-          <input
-            aria-label="Your name" autoComplete="username" value={name} onChange={(e) => setName(e.target.value)} maxLength={80}
-            style={{ padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", fontSize: 15 }}
-          />
-          <span style={{ fontWeight: 400, fontSize: 12, color: "var(--text-tertiary)" }}>Owner can leave this empty.</span>
-        </label>
-        <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 600 }}>
-          PIN
-          <input
-            aria-label="PIN" type="password" inputMode="numeric" autoComplete="current-password" autoFocus required
-            value={pin} onChange={(e) => setPin(e.target.value)}
-            style={{ padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", fontSize: 18, letterSpacing: 4 }}
-          />
-        </label>
-        {error && <p role="alert" style={{ margin: 0, color: "var(--danger)", fontSize: 13 }}>{error}</p>}
-        <button type="submit" disabled={busy || pin.length === 0} style={{
-          padding: "11px 14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--accent)",
-          background: "var(--accent)", color: "#fff", fontSize: 15, fontWeight: 600, cursor: busy ? "wait" : "pointer"
-        }}>
-          {busy ? "Checking…" : "Log in"}
-        </button>
+        <div className="auth__form">
+          <label className="field">
+            <span className="field__label">Your name</span>
+            <input className="input" aria-label="Your name" autoComplete="username" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+            <span className="field__hint">Owner can leave this empty.</span>
+          </label>
+          <label className="field">
+            <span className="field__label">PIN</span>
+            <input className="input input--pin" aria-label="PIN" type="password" inputMode="numeric" autoComplete="current-password" autoFocus required
+              value={pin} onChange={(e) => setPin(e.target.value)} />
+          </label>
+          {error && <p role="alert" className="auth__error">{error}</p>}
+          <button type="submit" className="btn btn--primary" disabled={busy || pin.length === 0}>
+            {busy ? "Checking…" : "Log in"}
+          </button>
+        </div>
       </form>
     </main>
   );

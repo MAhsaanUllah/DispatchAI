@@ -5,6 +5,7 @@ type Task = {
   createdAt: string; closedAt?: string; closedBy?: string; overdue: boolean; slaMinutes: number;
 };
 const KIND_LABEL: Record<Task["kind"], string> = { emergency: "Emergency", human: "Call back", tool_failure: "System error", delivery_failed: "n8n delivery" };
+const KIND_TONE: Record<Task["kind"], "alert" | "attention" | "closed"> = { emergency: "alert", human: "attention", tool_failure: "attention", delivery_failed: "attention" };
 
 const age = (iso: string) => {
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
@@ -29,33 +30,41 @@ export function InboxPage() {
   const open = tasks?.filter((t) => !t.closedAt) ?? [];
   const shown = showClosed ? tasks ?? [] : open;
   return (
-    <section aria-labelledby="inbox-title" style={{ display: "grid", gap: 14, maxWidth: 820 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", gap: 12 }}>
+    <section className="page" aria-labelledby="inbox-title">
+      <div className="page__head">
         <div>
-          <h1 id="inbox-title" style={{ margin: 0, fontSize: 22 }}>Inbox</h1>
-          <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: 14 }}>{open.length} open · callers and problems the AI handed to your team</p>
+          <h1 className="page__title" id="inbox-title">Inbox</h1>
+          <p className="page__lede">{open.length} open. Callers and problems the AI handed to your team.</p>
         </div>
-        <label style={{ fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}>
-          <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} /> Show closed
+        <label className="check">
+          <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
+          Show closed
         </label>
       </div>
-      {!tasks && <p>Loading…</p>}
-      {tasks && shown.length === 0 && <p style={{ color: "var(--text-tertiary)" }}>Nothing waiting. New call-backs, emergencies and errors show up here.</p>}
+
+      {!tasks && <p className="page__lede">Loading…</p>}
+      {tasks && shown.length === 0 && (
+        <div className="record">
+          <p className="drawer__text">Nothing waiting. New call-backs, emergencies and errors show up here.</p>
+        </div>
+      )}
       {shown.map((task) => (
-        <article key={task.id} style={{
-          display: "grid", gap: 6, padding: 14, borderRadius: 10, background: "var(--surface)",
-          border: `1px solid ${task.kind === "emergency" && !task.closedAt ? "var(--danger)" : "var(--border)"}`, opacity: task.closedAt ? 0.6 : 1
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-            <strong>{task.title}</strong>
-            <span style={{ fontSize: 12, color: task.overdue ? "var(--danger)" : "var(--text-tertiary)", whiteSpace: "nowrap" }}>
-              {KIND_LABEL[task.kind]} · {age(task.createdAt)}{task.overdue ? ` · over ${task.slaMinutes} min target` : ""}
+        <article key={task.id} className={`task ${task.kind === "emergency" && !task.closedAt ? "task--alert" : ""} ${task.closedAt ? "task--done" : ""}`}>
+          <div className="task__head">
+            <h2 className="task__title">{task.title}</h2>
+            <span className={`task__meta ${task.overdue ? "task__meta--overdue" : ""}`}>
+              <span className={`swatch swatch--${KIND_TONE[task.kind]}`} aria-hidden="true" />
+              {KIND_LABEL[task.kind]}
+              <span>{age(task.createdAt)}</span>
+              {task.overdue && <span>over {task.slaMinutes} min target</span>}
             </span>
           </div>
-          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{task.detail}</span>
+          <p className="task__detail">{task.detail}</p>
           {task.closedAt
-            ? <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Closed by {task.closedBy} · {age(task.closedAt)}</span>
-            : <button type="button" onClick={() => close(task.id)} style={{ justifySelf: "start", padding: "6px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", fontWeight: 600 }}>Mark done</button>}
+            ? <span className="task__meta">Closed by {task.closedBy}, {age(task.closedAt)}</span>
+            : <div className="task__actions">
+              <button type="button" className="btn btn--sm" onClick={() => close(task.id)}>Mark done</button>
+            </div>}
         </article>
       ))}
     </section>

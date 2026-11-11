@@ -30,13 +30,13 @@ export function TestCall({ isOpen, onClose, onTurn }: Props) {
     return () => stop();
   }, [isOpen]);
 
-  const speak = (text: string) => new Promise<void>((resolve) => {
-    if (!("speechSynthesis" in window)) return resolve();
+  const speak = async (text: string) => {
+    if (!("speechSynthesis" in window)) return;
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
+    utterance.onend = () => undefined;
+    utterance.onerror = () => undefined;
     window.speechSynthesis.speak(utterance);
-  });
+  };
 
   const send = async (text: string) => {
     if (!text.trim()) return;
@@ -103,34 +103,35 @@ export function TestCall({ isOpen, onClose, onTurn }: Props) {
 
   if (!isOpen) return null;
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="testcall-title" style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(0,0,0,0.3)", padding: 16 }}>
-      <div style={{ width: "100%", maxWidth: 520, display: "grid", gap: 12, padding: 20, borderRadius: 12, background: "var(--surface)", border: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 id="testcall-title" style={{ margin: 0, fontSize: 18 }}>Test call</h2>
-          <button type="button" onClick={() => { stop(); onClose(); }} aria-label="Close test call" style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer" }}>×</button>
+    <div className="modal" role="dialog" aria-modal="true" aria-labelledby="testcall-title">
+      <div className="modal__panel">
+        <div className="modal__head">
+          <h2 className="modal__title" id="testcall-title">Test call</h2>
+          <button type="button" onClick={() => { stop(); onClose(); }} aria-label="Close test call" className="modal__close">×</button>
         </div>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+        <p className="modal__lede">
           Talk to your agent like a caller would. Bookings made here are real bookings in your dashboard.
           {!speechSupported && " This browser has no speech recognition (try Chrome or Edge); type instead."}
         </p>
-        <div aria-live="polite" style={{ display: "grid", gap: 6, maxHeight: 280, overflowY: "auto", padding: 8, borderRadius: 8, background: "var(--surface-subtle, #f5f5f4)", minHeight: 80 }}>
-          {lines.length === 0 && <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Press Start and speak, or type a message.</span>}
+        <div aria-live="polite" className="modal__transcript">
+          {lines.length === 0 && <p className="field__hint">Press Start and speak, or type a message.</p>}
           {lines.map((line, i) => (
-            <div key={i} style={{ justifySelf: line.who === "you" ? "end" : "start", maxWidth: "85%", padding: "6px 10px", borderRadius: 8, fontSize: 14, background: line.who === "you" ? "var(--accent-soft)" : "var(--surface)" }}>
-              <span className="sr-only">{line.who === "you" ? "You: " : "Agent: "}</span>{line.text}
+            <div key={i} className={`message ${line.who === "you" ? "message--out" : ""}`}>
+              <span className="sr-only">{line.who === "you" ? "You: " : "Agent: "}</span>
+              <div className="message__body">{line.text}</div>
             </div>
           ))}
         </div>
-        {error && <p role="alert" style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>{error}</p>}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {error && <p role="alert" className="field__error">{error}</p>}
+        <div className="modal__foot">
           {speechSupported && (callOn
-            ? <button type="button" onClick={stop} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--danger)", background: "var(--danger)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>End call</button>
-            : <button type="button" onClick={start} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--accent)", background: "var(--accent)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Start</button>)}
-          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{busy ? "Agent is thinking…" : listening ? "Listening…" : ""}</span>
+            ? <button type="button" className="btn btn--danger" onClick={stop}>End call</button>
+            : <button type="button" className="btn btn--primary" onClick={start}>Start</button>)}
+          <span className="field__hint">{busy ? "Agent is thinking…" : listening ? "Listening…" : ""}</span>
         </div>
-        <form onSubmit={(e) => { e.preventDefault(); void send(typed); setTyped(""); }} style={{ display: "flex", gap: 8 }}>
-          <input aria-label="Type a message" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Type what the caller says…" style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)" }} />
-          <button type="submit" disabled={busy} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer" }}>Send</button>
+        <form onSubmit={(e) => { e.preventDefault(); void send(typed); setTyped(""); }} className="modal__row">
+          <input className="input" aria-label="Type a message" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Type what the caller says…" />
+          <button type="submit" className="btn" disabled={busy}>Send</button>
         </form>
       </div>
     </div>
