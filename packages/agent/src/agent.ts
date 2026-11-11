@@ -15,6 +15,11 @@ import { AgentState, ConversationMessage, createInitialAgentState, PendingConfir
 
 export type EventListener = (event: AgentEvent) => void;
 
+// shortcut: keyword lists; the LLM engine (chunk 11/12) should classify these instead.
+// Danger to people only; leaks and floods are normal plumbing jobs and must still be bookable.
+const EMERGENCY = /\b(gas leak|smell(s|ing)? gas|carbon monoxide|on fire|fire in|smoke (is )?coming|electric(al)? shock|sparks?)\b/i;
+const WANTS_HUMAN = /\b(real person|human|speak (to|with) (a |an |the )?(person|someone|staff|manager|owner|agent)|representative|call me back)\b/i;
+
 export function serviceDate(offsetDays = 0): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: getBusinessConfig().timeZone, year: "numeric", month: "2-digit", day: "2-digit"
@@ -427,6 +432,17 @@ export class DispatchAgent {
     });
 
     const lower = cleanText.toLowerCase();
+
+    // 0. Safety and human handoff come before any booking logic. Each creates a task in the owner's inbox.
+    if (EMERGENCY.test(lower)) {
+      this.emit("HANDOFF_REQUESTED", correlationId, undefined, { reason: "emergency", text: cleanText });
+      return this.pushAgentReply("If anyone is in danger, leave the area and call your local emergency number now. I have alerted our team to call you back as soon as possible.");
+    }
+    if (WANTS_HUMAN.test(lower)) {
+      this.emit("HANDOFF_REQUESTED", correlationId, undefined, { reason: "human", text: cleanText });
+      return this.pushAgentReply("I have asked a team member to call you back. Is there anything I can note for them?");
+    }
+
     const dateChangeMatch = lower.match(/(actually|instead|rather|change).*(today|tomorrow|\d{4}-\d{2}-\d{2})/i) ||
       lower.match(/^(check|how about|what about)\s+(today|tomorrow|\d{4}-\d{2}-\d{2})/i);
 

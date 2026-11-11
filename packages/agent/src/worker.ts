@@ -10,6 +10,7 @@ import { SessionStore } from "./session-store.js";
 import { AuthStore, generateSetupCode, safeEqual } from "./auth-store.js";
 import { buildBookingEvent } from "./outbound-events.js";
 import { Outbox } from "./outbox.js";
+import { Inbox, SLA_MINUTES } from "./inbox.js";
 import { SettingsStore } from "./settings-store.js";
 import { PluginStore } from "./plugin-store.js";
 import { pluginById, plugins } from "./plugins.js";
@@ -24,7 +25,9 @@ async function eventTarget(): Promise<{ url: string; secret: string } | undefine
   const secret = n8n?.enabled ? n8n.secrets.secret : process.env.N8N_EVENTS_SECRET;
   return url && secret ? { url, secret } : undefined;
 }
-export const outbox = new Outbox(process.env.DATABASE_URL, eventTarget);
+export const inbox = new Inbox(process.env.DATABASE_URL);
+export const outbox = new Outbox(process.env.DATABASE_URL, eventTarget, (d) =>
+  inbox.add("delivery_failed", d.id, `n8n did not receive ${d.type} for ${d.bookingId.replace(/^wo_/, "WO-")}`, `Last error: ${d.lastError ?? "unknown"} after ${d.attempts} tries. Use Retry on the Plugins page.`));
 // Retries due events (and anything left over from before a restart). unref: never keeps the process alive.
 setInterval(() => void outbox.drain(), 15_000).unref?.();
 setBusinessConfig(settings.load().config);
@@ -66,6 +69,19 @@ export function getOrCreateAgent(sessionId: string): DispatchAgent {
   if (!agent) {
     agent = new DispatchAgent(sessionId, n8nClient, sessions.loadState(sessionId));
     agents.set(sessionId, agent);
+    const self = agent;
+    // Things the agent cannot finish alone become inbox tasks for the owner/staff.
+    agent.subscribe((event) => {
+      const caller = self.getState().customer;
+      const who = caller ? `${caller.firstName} ${caller.lastName} (${caller.phone})` : "Unknown caller";
+      if (event.type === "HANDOFF_REQUESTED") {
+        const reason = event.payload?.reason === "emergency" ? "emergency" : "human";
+        inbox.add(reason, sessionId, reason === "emergency" ? `Possible emergency: ${who}` : `Call back: ${who}`, `Caller said: "${event.payload?.text ?? ""}"`);
+      } else if (event.type === "TOOL_CALL_FAILED" && event.payload?.retryable === true) {
+        // Retryable = system trouble (already retried), not a normal "slot taken" answer.
+        inbox.add("tool_failure", sessionId, `Booking system error for ${who}`, `${event.toolName}: ${event.payload?.message ?? "failed"}`);
+      }
+    });
   }
   return agent;
 }
@@ -226,6 +242,22 @@ async function routeRequest(req: Request): Promise<Response> {
     }));
     return json({ ok: true, data: { plugins: list } }, 200, corsHeaders);
   }
+  // HITL inbox: open tasks first, with an overdue flag from the per-kind SLA.
+  if (pathname === "/api/inbox" && method === "GET") {
+    const now = Date.now();
+    const tasks = inbox.list().map((task) => ({
+      ...task,
+      overdue: !task.closedAt && now - Date.parse(task.createdAt) > SLA_MINUTES[task.kind] * 60_000,
+      slaMinutes: SLA_MINUTES[task.kind]
+    }));
+    return json({ ok: true, data: { tasks } }, 200, corsHeaders);
+  }
+  const closeMatch = /^\/api\/inbox\/([\w-]+)\/close$/.exec(pathname);
+  if (closeMatch && method === "POST") {
+    if (!inbox.close(closeMatch[1], auth.ownerName() ?? "owner")) return json(toolFailure("NOT_FOUND", "No open task with that id", false, `inbox_${Date.now()}`), 404, corsHeaders);
+    return json(toolSuccess({ closed: closeMatch[1] }, `inbox_${Date.now()}`), 200, corsHeaders);
+  }
+
   // n8n delivery log and manual Retry.
   if (pathname === "/api/plugins/n8n/deliveries" && method === "GET") {
     return json({ ok: true, data: { deliveries: outbox.recent() } }, 200, corsHeaders);
