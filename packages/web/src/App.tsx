@@ -12,6 +12,7 @@ import { SystemPanel } from "./components/SystemPanel.js";
 import { BusinessWizard } from "./BusinessWizard.js";
 import { PluginsPage } from "./PluginsPage.js";
 import { InboxPage } from "./InboxPage.js";
+import { TeamLogins } from "./TeamLogins.js";
 import { LocalNotification, WorkOrder } from "@dispatchai/shared";
 import { MessageSquare, Activity, Briefcase } from "lucide-react";
 
@@ -20,6 +21,10 @@ export const App: React.FC = () => {
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [editingBusiness, setEditingBusiness] = useState(false);
+  const [isOwner, setIsOwner] = useState(true);
+  useEffect(() => {
+    fetch("/api/auth/me").then((r) => r.json()).then((body) => setIsOwner(body?.data?.role !== "staff")).catch(() => undefined);
+  }, []);
   const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox">("dispatch");
   const [notifications, setNotifications] = useState<LocalNotification[]>([]);
   const [selectedJob, setSelectedJob] = useState<WorkOrder | null>(null);
@@ -124,12 +129,13 @@ export const App: React.FC = () => {
   return (
     <div style={{ height: "100vh", maxHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--background)", overflow: "hidden" }}>
       {/* Shell Header */}
-      <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={austinTime} companyName={directory?.company.name} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
+      <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={austinTime} companyName={directory?.company.name} isOwner={isOwner} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
 
       <main style={{ padding: "14px 24px 16px", maxWidth: "1680px", margin: "0 auto", width: "100%", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: activeView === "dispatch" ? "hidden" : "auto" }}>
         {activeView === "company" && editingBusiness ? <BusinessWizard onDone={() => window.location.reload()} onCancel={() => setEditingBusiness(false)} />
           : activeView === "inbox" ? <InboxPage /> : activeView === "plugins" ? <PluginsPage /> : activeView === "system" ? <SystemPanel /> : activeView !== "dispatch" ? <>
-            {activeView === "company" && (
+            {activeView === "team" && isOwner && <TeamLogins />}
+            {activeView === "company" && isOwner && (
               <button onClick={() => setEditingBusiness(true)} style={{ alignSelf: "flex-end", marginBottom: 12, padding: "7px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--accent)", background: "var(--accent)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
                 Edit business
               </button>
