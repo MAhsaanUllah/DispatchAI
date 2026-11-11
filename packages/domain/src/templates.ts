@@ -103,13 +103,16 @@ function templateFor(templateId: string): BusinessConfig {
 }
 
 // Customer-facing text for a booking change: business name, service name and local time, no internal ids beyond the booking number.
-export function bookingNotice(workOrder: Pick<WorkOrder, "id" | "serviceType" | "scheduledStart">, eventType: "BOOKED" | "RESCHEDULED" | "CANCELLED", config: BusinessConfig = getBusinessConfig()) {
+export function bookingNotice(workOrder: Pick<WorkOrder, "id" | "serviceType" | "scheduledStart">, eventType: "BOOKED" | "RESCHEDULED" | "CANCELLED" | "REMINDER", config: BusinessConfig = getBusinessConfig()) {
   const service = config.services.find((s) => s.id === workOrder.serviceType)?.name ?? workOrder.serviceType;
   const when = workOrder.scheduledStart
     ? new Intl.DateTimeFormat("en-US", { timeZone: config.timeZone, weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(workOrder.scheduledStart))
     : "a time we will confirm";
   const where = config.kind === "instore" ? ` at ${config.serviceZones[0]}` : "";
   const ref = workOrder.id.replace(/^wo_/, "WO-");
+  if (eventType === "REMINDER") {
+    return { subject: `Appointment reminder · ${config.name}`, message: `Reminder: your ${service} appointment (${ref}) with ${config.name} is on ${when}${where}. Reply or call us if you need to change it.` };
+  }
   if (eventType === "CANCELLED") {
     return { subject: `Appointment cancelled · ${config.name}`, message: `Your ${service} appointment (${ref}) with ${config.name} on ${when} has been cancelled. Reply or call us to book a new time.` };
   }

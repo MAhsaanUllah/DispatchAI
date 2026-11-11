@@ -130,7 +130,7 @@ export const LocalNotificationSchema = z.object({
   workOrderId: z.string(),
   audience: z.enum(["CUSTOMER", "TECHNICIAN"]),
   recipientId: z.string(),
-  eventType: z.enum(["BOOKED", "RESCHEDULED", "CANCELLED"]),
+  eventType: z.enum(["BOOKED", "RESCHEDULED", "CANCELLED", "REMINDER"]),
   message: z.string(),
   channel: z.enum(["EMAIL", "INTERNAL"]).optional(),
   recipientAddress: z.string().optional(),

@@ -6,6 +6,7 @@ import { N8nClient } from "./client.js";
 import { ELEVENLABS_AGENT_CONFIG, ELEVENLABS_TOOLS, ELEVENLABS_SYSTEM_PROMPT } from "./elevenlabs.config.js";
 import { SQLiteDispatchStore } from "../../domain/src/sqlite-store.js";
 import { deliverBookingEmails } from "../../domain/src/email.js";
+import { dueReminders, reminderKey, ReminderLog } from "./reminders.js";
 import { SessionStore } from "./session-store.js";
 import { AuthStore, generateSetupCode, safeEqual } from "./auth-store.js";
 import { buildBookingEvent } from "./outbound-events.js";
@@ -68,6 +69,25 @@ const n8nClient = new N8nClient({
     }
   }
 });
+
+// Appointment reminders (plugin "reminders"): email only in v1. Checked every minute and once at start,
+// so reminders that fell due while the server was off still go out (once) if the appointment has not started.
+const reminderLog = new ReminderLog(process.env.DATABASE_URL);
+export async function runReminders(now = Date.now()): Promise<number> {
+  const reminders = await pluginStore.get("reminders");
+  if (!reminders?.enabled) return 0;
+  const email = await pluginStore.get("email");
+  const creds = email?.enabled ? { apiKey: email.secrets.apiKey, from: email.config.from } : undefined;
+  const store = domainService.getStore();
+  const due = dueReminders(store.workOrders.values(), Number(reminders.config.hoursBefore) || 24, now, (key) => reminderLog.has(key));
+  for (const wo of due) {
+    reminderLog.mark(reminderKey(wo));
+    if (domainService.queueReminder(wo.id)) await deliverBookingEmails(store, wo.id, creds, "REMINDER");
+  }
+  return due.length;
+}
+setTimeout(() => void runReminders(), 1000).unref?.();
+setInterval(() => void runReminders(), 60_000).unref?.();
 
 export function getOrCreateAgent(sessionId: string): DispatchAgent {
   let agent = agents.get(sessionId);
