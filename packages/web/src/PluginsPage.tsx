@@ -76,114 +76,196 @@ function CallLog() {
   );
 }
 
-function PluginCard({ plugin, onChanged }: { plugin: Plugin; onChanged: () => void }) {
+type Health = { ok: boolean; text: string };
+
+const save = async (plugin: Plugin, values: Record<string, string>, enabled: boolean) => {
+  const response = await fetch(`/api/plugins/${plugin.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values, enabled }) });
+  const body = await response.json().catch(() => ({}));
+  return response.ok ? null : (body?.error?.message as string) || "Could not save.";
+};
+const runTest = async (plugin: Plugin): Promise<Health> => {
+  try {
+    const body = await fetch(`/api/plugins/${plugin.id}/test`, { method: "POST" }).then((r) => r.json());
+    return { ok: !!body?.data?.ok, text: body?.data?.message ?? "Test failed." };
+  } catch {
+    return { ok: false, text: "Cannot reach the DispatchAI server." };
+  }
+};
+
+// Settings drawer: fill the fields, then "Save & Test". A failed test disconnects again, so only working plugins sit in "My system".
+function PluginDrawer({ plugin, onClose, onDone }: { plugin: Plugin; onClose: () => void; onDone: (health: Health) => void }) {
   const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(plugin.fields.map((f) => [f.key, f.value])));
-  const [status, setStatus] = useState<Status>(null);
+  const [message, setMessage] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
 
-  const put = async (enabled: boolean) => {
+  const saveAndTest = async () => {
     setBusy(true);
-    setStatus(null);
-    try {
-      const response = await fetch(`/api/plugins/${plugin.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values, enabled }) });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) return setStatus({ kind: "error", text: body?.error?.message || "Could not save." });
-      setStatus({ kind: "info", text: enabled ? "Saved and connected." : "Disconnected." });
-      onChanged();
-    } finally {
+    setMessage({ kind: "info", text: "Saving and testing…" });
+    const problem = await save(plugin, values, true);
+    if (problem) {
       setBusy(false);
+      return setMessage({ kind: "error", text: problem });
     }
+    const health = await runTest(plugin);
+    if (!health.ok && !plugin.enabled) await save(plugin, {}, false); // new connection failed: back to Available
+    setBusy(false);
+    if (!health.ok) return setMessage({ kind: "error", text: health.text });
+    onDone(health);
   };
 
-  const test = async () => {
-    setBusy(true);
-    setStatus({ kind: "info", text: "Testing…" });
-    try {
-      const body = await fetch(`/api/plugins/${plugin.id}/test`, { method: "POST" }).then((r) => r.json());
-      setStatus({ kind: body?.data?.ok ? "ok" : "error", text: body?.data?.message ?? "Test failed." });
-    } catch {
-      setStatus({ kind: "error", text: "Cannot reach the DispatchAI server." });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const color = status?.kind === "ok" ? "var(--success, #15803d)" : status?.kind === "error" ? "var(--danger)" : "var(--text-secondary)";
   return (
-    <article aria-labelledby={`plugin-${plugin.id}`} style={{ display: "grid", gap: 12, padding: 18, borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-        <div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase" }}>{plugin.category}</span>
-          <h2 id={`plugin-${plugin.id}`} style={{ margin: "2px 0 0", fontSize: 17 }}>{plugin.name}</h2>
+    <div role="dialog" aria-modal="true" aria-labelledby={`drawer-${plugin.id}`} style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", justifyContent: "flex-end", background: "rgba(0,0,0,0.25)" }}>
+      <div style={{ width: "100%", maxWidth: 460, height: "100%", overflowY: "auto", boxSizing: "border-box", display: "grid", alignContent: "start", gap: 12, padding: 20, background: "var(--surface)", borderLeft: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <h2 id={`drawer-${plugin.id}`} style={{ margin: 0, fontSize: 18 }}>{plugin.name}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer" }}>×</button>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 9px", borderRadius: 999, background: plugin.enabled ? "var(--accent-soft)" : "var(--surface-subtle, #f5f5f4)", color: plugin.enabled ? "var(--accent)" : "var(--text-secondary)" }}>
-          {plugin.enabled ? "Connected" : "Not connected"}
-        </span>
-      </header>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>{plugin.description}</p>
-      {plugin.fields.map((field) => (
-        <label key={field.key} style={{ display: "grid", gap: 5, fontSize: 13, fontWeight: 600 }}>
-          {field.label}
-          {field.options ? (
-            <select aria-label={field.label} style={input} value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}>
-              <option value="">Choose…</option>
-              {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          ) : (
-            <input
-              aria-label={field.label} style={input} type={field.secret ? "password" : "text"} autoComplete="off"
-              placeholder={field.secret && field.saved ? "Saved — leave empty to keep" : field.placeholder}
-              value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-            />
-          )}
-          {field.help && <span style={{ fontWeight: 400, fontSize: 12, color: "var(--text-tertiary)" }}>{field.help}</span>}
-        </label>
-      ))}
-      {plugin.status && (
-        <p role={plugin.status.warning ? "alert" : "status"} style={{ margin: 0, fontSize: 13, padding: plugin.status.warning ? 8 : 0, borderRadius: 8, background: plugin.status.warning ? "var(--danger-soft)" : "none", color: plugin.status.warning ? "var(--danger)" : "var(--text-secondary)" }}>
-          {plugin.status.text}
-        </p>
-      )}
-      {plugin.preview && (
-        <details style={{ fontSize: 13 }}>
-          <summary style={{ cursor: "pointer", fontWeight: 600 }}>Preview what customers receive</summary>
-          {plugin.preview.map((sample) => (
-            <div key={sample.title} style={{ marginTop: 8, padding: 10, borderRadius: 8, background: "var(--surface-subtle, #f5f5f4)" }}>
-              <strong style={{ display: "block" }}>{sample.title}</strong>
-              <span style={{ color: "var(--text-secondary)" }}>{sample.text}</span>
-            </div>
-          ))}
-        </details>
-      )}
-      {plugin.id === "n8n" && plugin.enabled && <DeliveryLog />}
-      {plugin.id === "twilio" && plugin.enabled && <CallLog />}
-      <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>Limits: {plugin.limits}</p>
-      {status && <p role={status.kind === "error" ? "alert" : "status"} style={{ margin: 0, fontSize: 13, color }}>{status.text}</p>}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" disabled={busy} onClick={() => put(true)} style={button(true)}>{plugin.enabled ? "Save" : "Connect"}</button>
-        <button type="button" disabled={busy} onClick={test} style={button()}>Test</button>
-        {plugin.enabled && <button type="button" disabled={busy} onClick={() => put(false)} style={button()}>Disconnect</button>}
+        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>{plugin.description}</p>
+        {plugin.fields.map((field) => (
+          <label key={field.key} style={{ display: "grid", gap: 5, fontSize: 13, fontWeight: 600 }}>
+            {field.label}
+            {field.options ? (
+              <select aria-label={field.label} style={input} value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}>
+                <option value="">Choose…</option>
+                {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            ) : (
+              <input
+                aria-label={field.label} style={input} type={field.secret ? "password" : "text"} autoComplete="off"
+                placeholder={field.secret && field.saved ? "Saved — leave empty to keep" : field.placeholder}
+                value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+              />
+            )}
+            {field.help && <span style={{ fontWeight: 400, fontSize: 12, color: "var(--text-tertiary)" }}>{field.help}</span>}
+          </label>
+        ))}
+        {plugin.preview && (
+          <details style={{ fontSize: 13 }}>
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>Preview what customers receive</summary>
+            {plugin.preview.map((sample) => (
+              <div key={sample.title} style={{ marginTop: 8, padding: 10, borderRadius: 8, background: "var(--surface-subtle, #f5f5f4)" }}>
+                <strong style={{ display: "block" }}>{sample.title}</strong>
+                <span style={{ color: "var(--text-secondary)" }}>{sample.text}</span>
+              </div>
+            ))}
+          </details>
+        )}
+        <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>Limits: {plugin.limits}</p>
+        {message && <p role={message.kind === "error" ? "alert" : "status"} style={{ margin: 0, fontSize: 13, color: message.kind === "error" ? "var(--danger)" : "var(--text-secondary)" }}>{message.text}</p>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" disabled={busy} onClick={saveAndTest} style={button(true)}>{busy ? "Working…" : "Save & Test"}</button>
+          <button type="button" disabled={busy} onClick={onClose} style={button()}>Cancel</button>
+        </div>
       </div>
-    </article>
+    </div>
   );
 }
 
-// Built-in plugins. Only working plugins are listed (no "coming soon").
+const cardStyle: React.CSSProperties = { display: "grid", gap: 8, padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", cursor: "grab" };
+
+// Plugins page: drag a card from "Available" into "My system" to connect it (or use the Add button);
+// drag it back (or Remove) to disconnect. Buttons give the same actions for keyboard and touch users.
 export function PluginsPage() {
   const [plugins, setPlugins] = useState<Plugin[] | null>(null);
   const [error, setError] = useState("");
+  const [drawer, setDrawer] = useState<Plugin | null>(null);
+  const [health, setHealth] = useState<Record<string, Health>>({});
+  const [over, setOver] = useState<"available" | "system" | null>(null);
   const load = () => fetch("/api/plugins").then((r) => r.json()).then((body) => setPlugins(body.data.plugins)).catch(() => setError("Cannot load plugins."));
   useEffect(() => { void load(); }, []);
 
+  const remove = async (plugin: Plugin) => {
+    if (!window.confirm(`Disconnect ${plugin.name}? It stops working until you add it again. Saved keys are kept.`)) return;
+    const problem = await save(plugin, {}, false);
+    if (problem) setError(problem);
+    void load();
+  };
+  const test = async (plugin: Plugin) => {
+    setHealth((current) => ({ ...current, [plugin.id]: { ok: true, text: "Testing…" } }));
+    const result = await runTest(plugin);
+    setHealth((current) => ({ ...current, [plugin.id]: result }));
+  };
+  const drop = (zone: "available" | "system") => (event: React.DragEvent) => {
+    event.preventDefault();
+    setOver(null);
+    const plugin = plugins?.find((p) => p.id === event.dataTransfer.getData("text/plain"));
+    if (!plugin) return;
+    if (zone === "system" && !plugin.enabled) setDrawer(plugin);
+    if (zone === "available" && plugin.enabled) void remove(plugin);
+  };
+  const zoneProps = (zone: "available" | "system") => ({
+    onDragOver: (event: React.DragEvent) => { event.preventDefault(); setOver(zone); },
+    onDragLeave: () => setOver(null),
+    onDrop: drop(zone),
+    style: {
+      display: "grid", alignContent: "start", gap: 10, minHeight: 220, padding: 14, borderRadius: 12,
+      border: `2px dashed ${over === zone ? "var(--accent)" : "var(--border)"}`, background: over === zone ? "var(--accent-soft)" : "transparent"
+    } as React.CSSProperties
+  });
+  const dragProps = (plugin: Plugin) => ({ draggable: true, onDragStart: (event: React.DragEvent) => event.dataTransfer.setData("text/plain", plugin.id) });
+
+  const available = plugins?.filter((p) => !p.enabled) ?? [];
+  const connected = plugins?.filter((p) => p.enabled) ?? [];
   return (
-    <section aria-labelledby="plugins-title" style={{ display: "grid", gap: 16, maxWidth: 760 }}>
+    <section aria-labelledby="plugins-title" style={{ display: "grid", gap: 16, maxWidth: 1100 }}>
       <div>
         <h1 id="plugins-title" style={{ margin: 0, fontSize: 22 }}>Plugins</h1>
-        <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: 14 }}>Connect outside services. Keys are encrypted on this server and never shown again.</p>
+        <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: 14 }}>
+          Drag a plugin into "My system" (or press Add) to connect it. Keys are encrypted on this server and never shown again.
+        </p>
       </div>
       {error && <p role="alert" style={{ color: "var(--danger)" }}>{error}</p>}
       {!plugins && !error && <p>Loading plugins…</p>}
-      {plugins?.map((plugin) => <PluginCard key={`${plugin.id}-${plugin.enabled}`} plugin={plugin} onChanged={load} />)}
+      {plugins && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+          <div aria-labelledby="available-title" role="region" {...zoneProps("available")}>
+            <h2 id="available-title" style={{ margin: 0, fontSize: 15 }}>Available ({available.length})</h2>
+            {available.length === 0 && <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>Everything is connected.</p>}
+            {available.map((plugin) => (
+              <article key={plugin.id} aria-label={plugin.name} {...dragProps(plugin)} style={cardStyle}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase" }}>{plugin.category}</span>
+                <strong>{plugin.name}</strong>
+                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{plugin.description}</span>
+                <button type="button" onClick={() => setDrawer(plugin)} style={{ ...button(true), justifySelf: "start" }}>Add</button>
+              </article>
+            ))}
+          </div>
+          <div aria-labelledby="system-title" role="region" {...zoneProps("system")}>
+            <h2 id="system-title" style={{ margin: 0, fontSize: 15 }}>My system ({connected.length})</h2>
+            {connected.length === 0 && <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>Nothing connected yet. Drag a plugin here.</p>}
+            {connected.map((plugin) => {
+              const h = health[plugin.id];
+              const failed = h && !h.ok;
+              return (
+                <article key={plugin.id} aria-label={plugin.name} {...dragProps(plugin)} style={{ ...cardStyle, borderColor: failed ? "var(--danger)" : "var(--border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+                    <strong>{plugin.name}</strong>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: failed ? "var(--danger-soft)" : "var(--accent-soft)", color: failed ? "var(--danger)" : "var(--accent)" }}>
+                      {failed ? "Test failed" : "Connected"}
+                    </span>
+                  </div>
+                  {h && <span role={failed ? "alert" : "status"} style={{ fontSize: 13, color: failed ? "var(--danger)" : "var(--text-secondary)" }}>{h.text}</span>}
+                  {plugin.status && <span style={{ fontSize: 13, color: plugin.status.warning ? "var(--danger)" : "var(--text-secondary)" }}>{plugin.status.text}</span>}
+                  {plugin.id === "n8n" && <DeliveryLog />}
+                  {plugin.id === "twilio" && <CallLog />}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button type="button" onClick={() => setDrawer(plugin)} style={button()}>Settings</button>
+                    <button type="button" onClick={() => test(plugin)} style={button()}>Test</button>
+                    <button type="button" onClick={() => remove(plugin)} style={button()}>Remove</button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {drawer && (
+        <PluginDrawer
+          plugin={drawer}
+          onClose={() => { setDrawer(null); void load(); }}
+          onDone={(result) => { setHealth((current) => ({ ...current, [drawer.id]: result })); setDrawer(null); void load(); }}
+        />
+      )}
     </section>
   );
 }
