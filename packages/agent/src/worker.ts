@@ -13,7 +13,8 @@ import { Outbox } from "./outbox.js";
 import { Inbox, SLA_MINUTES } from "./inbox.js";
 import { SettingsStore } from "./settings-store.js";
 import { PluginStore } from "./plugin-store.js";
-import { pluginById, plugins } from "./plugins.js";
+import { llmConfig, pluginById, plugins } from "./plugins.js";
+import { extract, toCanonical } from "./llm.js";
 
 // Saved onboarding settings must be active before the business data (and its seed) is created below.
 const settings = new SettingsStore(process.env.DATABASE_URL);
@@ -70,6 +71,14 @@ export function getOrCreateAgent(sessionId: string): DispatchAgent {
     agent = new DispatchAgent(sessionId, n8nClient, sessions.loadState(sessionId));
     agents.set(sessionId, agent);
     const self = agent;
+    // AI brain plugin (optional): only consulted for messages the rules did not understand.
+    agent.understand = async (text) => {
+      const ai = await pluginStore.get("ai");
+      if (!ai?.enabled) return null;
+      const config = getBusinessConfig();
+      const extraction = await extract(llmConfig(ai.config, ai.secrets), text, config.services);
+      return extraction ? toCanonical(extraction, config.services) : null;
+    };
     // Things the agent cannot finish alone become inbox tasks for the owner/staff.
     agent.subscribe((event) => {
       const caller = self.getState().customer;
@@ -263,7 +272,8 @@ async function routeRequest(req: Request): Promise<Response> {
         id: plugin.id, name: plugin.name, category: plugin.category, description: plugin.description, limits: plugin.limits,
         enabled: record?.enabled ?? false,
         fields: plugin.fields.map((field) => ({ ...field, value: field.secret ? "" : record?.config[field.key] ?? "", saved: field.secret ? Boolean(record?.secrets[field.key]) : undefined })),
-        preview: plugin.preview?.()
+        preview: plugin.preview?.(),
+        status: plugin.status?.() ?? undefined
       };
     }));
     return json({ ok: true, data: { plugins: list } }, 200, corsHeaders);

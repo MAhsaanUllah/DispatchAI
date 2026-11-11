@@ -1,8 +1,9 @@
 import { signEvent } from "@dispatchai/shared";
 import { bookingNotice } from "@dispatchai/domain";
 import type { PluginRecord } from "./plugin-store.js";
+import { chat, LlmError, usage, type LlmConfig } from "./llm.js";
 
-export type PluginField = { key: string; label: string; secret: boolean; placeholder?: string; help?: string };
+export type PluginField = { key: string; label: string; secret: boolean; placeholder?: string; help?: string; options?: { value: string; label: string }[] };
 export type TestResult = { ok: boolean; message: string };
 
 // Built-in plugins only (no uploaded code). Each one: fields the owner fills in, a real test, and plain-language limits.
@@ -17,6 +18,8 @@ export type Plugin = {
   test: (record: PluginRecord) => Promise<TestResult>;
   // Optional sample output shown on the card (e.g. email texts).
   preview?: () => { title: string; text: string }[];
+  // Optional live status line for the card (e.g. today's AI usage).
+  status?: () => { text: string; warning: boolean } | null;
 };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -98,7 +101,56 @@ export const plugins: Plugin[] = [
         return { title: notice.subject, text: notice.message };
       });
     }
+  },
+  {
+    id: "ai",
+    name: "AI brain",
+    category: "AI",
+    description: "Helps the agent understand callers who phrase things in their own words. The booking rules and the yes-confirmation stay in code; the AI only reads what the caller wants.",
+    fields: [
+      { key: "provider", label: "Provider", secret: false, options: [
+        { value: "workers-ai", label: "Cloudflare Workers AI (free daily allowance)" },
+        { value: "groq", label: "Groq (your key)" },
+        { value: "gemini", label: "Google Gemini (your key)" },
+        { value: "ollama", label: "Ollama on this computer (no key)" }
+      ] },
+      { key: "model", label: "Model", secret: false, placeholder: "@cf/meta/llama-3.1-8b-instruct", help: "Workers AI: @cf/meta/llama-3.1-8b-instruct · Groq: llama-3.1-8b-instant · Gemini: gemini-2.0-flash · Ollama: llama3.1" },
+      { key: "accountId", label: "Cloudflare account ID", secret: false, help: "Workers AI only. Cloudflare dashboard → Workers AI → Use REST API." },
+      { key: "apiKey", label: "API key / token", secret: true, help: "Not needed for Ollama." },
+      { key: "baseUrl", label: "Ollama URL", secret: false, placeholder: "http://localhost:11434", help: "Ollama only." }
+    ],
+    limits: "If the AI is down, slow or its free allowance is used up, the built-in rules keep answering (they understand simpler sentences). Check your provider's pricing page for current free limits.",
+    validate: (values) => {
+      const provider = values.provider;
+      if (!["workers-ai", "groq", "gemini", "ollama"].includes(provider ?? "")) return "Choose a provider";
+      if (!(values.model ?? "").trim()) return "Enter a model name";
+      if (provider === "workers-ai" && !/^[0-9a-f]{32}$/i.test(values.accountId ?? "")) return "Enter your 32-character Cloudflare account ID";
+      if (provider !== "ollama" && (values.apiKey ?? "").length < 10) return "Enter the API key";
+      if (provider === "ollama" && values.baseUrl && !isHttpUrl(values.baseUrl)) return "Ollama URL must start with http:// or https://";
+      return null;
+    },
+    test: async ({ config, secrets }) => {
+      try {
+        const answer = await chat(llmConfig(config, secrets), [{ role: "system", content: "Reply with the single word OK." }, { role: "user", content: "ping" }]);
+        return { ok: true, message: `The AI answered (“${answer.trim().slice(0, 40)}”). It will help with unclear messages.` };
+      } catch (error) {
+        const status = error instanceof LlmError ? error.status : 0;
+        return {
+          ok: false,
+          message: status === 401 || status === 403 ? "The provider rejected the key or account ID."
+            : status === 429 ? "The free allowance for today is used up. The built-in rules answer until it resets."
+            : status === 404 ? "Model not found. Check the model name."
+            : status === 0 ? "Could not reach the provider. For Ollama, check it is running." : `The provider answered with an error (${status}).`
+        };
+      }
+    },
+    status: () => usage.day === new Date().toISOString().slice(0, 10)
+      ? { text: `Today: ${usage.calls} AI calls, ${usage.failures} failed${usage.quotaHit ? " · free allowance used up, using built-in rules" : ""}.`, warning: usage.quotaHit }
+      : null
   }
 ];
+
+export const llmConfig = (config: Record<string, string>, secrets: Record<string, string>): LlmConfig =>
+  ({ provider: config.provider as LlmConfig["provider"], model: config.model, accountId: config.accountId, baseUrl: config.baseUrl, apiKey: secrets.apiKey });
 
 export const pluginById = (id: string) => plugins.find((plugin) => plugin.id === id);
