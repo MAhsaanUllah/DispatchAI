@@ -8,7 +8,8 @@ import { SQLiteDispatchStore } from "../../domain/src/sqlite-store.js";
 import { deliverBookingEmails } from "../../domain/src/email.js";
 import { SessionStore } from "./session-store.js";
 import { AuthStore, generateSetupCode, safeEqual } from "./auth-store.js";
-import { buildBookingEvent, sendBookingEvent } from "./outbound-events.js";
+import { buildBookingEvent } from "./outbound-events.js";
+import { Outbox } from "./outbox.js";
 import { SettingsStore } from "./settings-store.js";
 import { PluginStore } from "./plugin-store.js";
 import { pluginById, plugins } from "./plugins.js";
@@ -16,6 +17,16 @@ import { pluginById, plugins } from "./plugins.js";
 // Saved onboarding settings must be active before the business data (and its seed) is created below.
 const settings = new SettingsStore(process.env.DATABASE_URL);
 const pluginStore = new PluginStore(process.env.DATABASE_URL);
+// n8n plugin settings from the dashboard win; .env values stay as a fallback for scripted installs.
+async function eventTarget(): Promise<{ url: string; secret: string } | undefined> {
+  const n8n = await pluginStore.get("n8n");
+  const url = n8n?.enabled ? n8n.config.url : process.env.N8N_EVENTS_URL;
+  const secret = n8n?.enabled ? n8n.secrets.secret : process.env.N8N_EVENTS_SECRET;
+  return url && secret ? { url, secret } : undefined;
+}
+export const outbox = new Outbox(process.env.DATABASE_URL, eventTarget);
+// Retries due events (and anything left over from before a restart). unref: never keeps the process alive.
+setInterval(() => void outbox.drain(), 15_000).unref?.();
 setBusinessConfig(settings.load().config);
 
 // Multi-session agent registry: in-memory cache in front of the durable SessionStore.
@@ -42,12 +53,11 @@ const n8nClient = new N8nClient({
     if (kind === "created") settings.markFirstBooking();
     const email = await pluginStore.get("email");
     await deliverBookingEmails(domainService.getStore(), workOrder.id, email?.enabled ? { apiKey: email.secrets.apiKey, from: email.config.from } : undefined);
-    // n8n plugin settings from the dashboard win; .env values stay as a fallback for scripted installs.
-    const n8n = await pluginStore.get("n8n");
-    const url = n8n?.enabled ? n8n.config.url : process.env.N8N_EVENTS_URL;
-    const secret = n8n?.enabled ? n8n.secrets.secret : process.env.N8N_EVENTS_SECRET;
-    // Not awaited: a slow n8n must not add latency to the caller's turn.
-    if (url && secret) void sendBookingEvent(url, secret, buildBookingEvent(`booking.${kind}`, workOrder, getBusinessConfig().timeZone));
+    // Queued, then sent in the background: a slow or down n8n never adds latency to the caller's turn.
+    if (await eventTarget()) {
+      outbox.enqueue(buildBookingEvent(`booking.${kind}`, workOrder, getBusinessConfig().timeZone));
+      void outbox.drain();
+    }
   }
 });
 
@@ -216,6 +226,17 @@ async function routeRequest(req: Request): Promise<Response> {
     }));
     return json({ ok: true, data: { plugins: list } }, 200, corsHeaders);
   }
+  // n8n delivery log and manual Retry.
+  if (pathname === "/api/plugins/n8n/deliveries" && method === "GET") {
+    return json({ ok: true, data: { deliveries: outbox.recent() } }, 200, corsHeaders);
+  }
+  const retryMatch = /^\/api\/plugins\/n8n\/deliveries\/([\w-]+)\/retry$/.exec(pathname);
+  if (retryMatch && method === "POST") {
+    if (!outbox.retry(retryMatch[1])) return json(toolFailure("NOT_FOUND", "No undelivered event with that id", false, `retry_${Date.now()}`), 404, corsHeaders);
+    await outbox.drain();
+    return json({ ok: true, data: { delivery: outbox.recent(50).find((d) => d.id === retryMatch[1]) } }, 200, corsHeaders);
+  }
+
   const pluginMatch = /^\/api\/plugins\/([a-z0-9-]+)(\/test)?$/.exec(pathname);
   if (pluginMatch) {
     const plugin = pluginById(pluginMatch[1]);

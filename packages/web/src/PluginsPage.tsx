@@ -9,6 +9,44 @@ const button = (primary = false): React.CSSProperties => ({
   ...input, cursor: "pointer", fontWeight: 600, ...(primary ? { background: "var(--accent)", borderColor: "var(--accent)", color: "#fff" } : {})
 });
 
+type Delivery = { id: string; type: string; bookingId: string; status: "pending" | "delivered" | "dead"; attempts: number; lastError?: string; createdAt: string };
+const STATUS_LABEL = { delivered: "Delivered", pending: "Retrying", dead: "Failed" } as const;
+
+// Last 20 events sent to n8n, with a manual Retry for ones that did not get through.
+function DeliveryLog() {
+  const [rows, setRows] = useState<Delivery[] | null>(null);
+  const load = () => fetch("/api/plugins/n8n/deliveries").then((r) => r.json()).then((body) => setRows(body.data.deliveries)).catch(() => setRows([]));
+  useEffect(() => { void load(); }, []);
+  const retry = async (id: string) => {
+    await fetch(`/api/plugins/n8n/deliveries/${id}/retry`, { method: "POST" });
+    void load();
+  };
+  if (!rows) return null;
+  return (
+    <details style={{ fontSize: 13 }} open={rows.some((row) => row.status !== "delivered")}>
+      <summary style={{ cursor: "pointer", fontWeight: 600 }}>Recent deliveries ({rows.length})</summary>
+      {rows.length === 0 ? <p style={{ color: "var(--text-tertiary)" }}>No events sent yet. They appear here after the next booking.</p> : (
+        <table style={{ width: "100%", marginTop: 8, borderCollapse: "collapse" }}>
+          <thead><tr style={{ textAlign: "left", color: "var(--text-tertiary)" }}><th>When</th><th>Event</th><th>Booking</th><th>Status</th><th /></tr></thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} style={{ borderTop: "1px solid var(--border)" }}>
+                <td>{new Date(row.createdAt).toLocaleString()}</td>
+                <td>{row.type}</td>
+                <td>{row.bookingId.replace(/^wo_/, "WO-")}</td>
+                <td style={{ color: row.status === "dead" ? "var(--danger)" : undefined }}>
+                  {STATUS_LABEL[row.status]}{row.status !== "delivered" && row.lastError ? ` (${row.lastError}, ${row.attempts} tries)` : ""}
+                </td>
+                <td>{row.status !== "delivered" && <button type="button" onClick={() => retry(row.id)} style={button()}>Retry</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </details>
+  );
+}
+
 function PluginCard({ plugin, onChanged }: { plugin: Plugin; onChanged: () => void }) {
   const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(plugin.fields.map((f) => [f.key, f.value])));
   const [status, setStatus] = useState<Status>(null);
@@ -76,6 +114,7 @@ function PluginCard({ plugin, onChanged }: { plugin: Plugin; onChanged: () => vo
           ))}
         </details>
       )}
+      {plugin.id === "n8n" && plugin.enabled && <DeliveryLog />}
       <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>Limits: {plugin.limits}</p>
       {status && <p role={status.kind === "error" ? "alert" : "status"} style={{ margin: 0, fontSize: 13, color }}>{status.text}</p>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

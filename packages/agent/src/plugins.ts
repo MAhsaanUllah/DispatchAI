@@ -40,7 +40,7 @@ export const plugins: Plugin[] = [
       { key: "url", label: "Webhook URL", secret: false, placeholder: "http://n8n:5678/webhook/dispatchai-events", help: "Import n8n/workflows/dispatchai-events-starter.json in n8n and copy its webhook URL." },
       { key: "secret", label: "Signing secret", secret: true, help: "Any long random text. Set the same value as DISPATCHAI_EVENTS_SECRET in n8n." }
     ],
-    limits: "One attempt per event for now; failed deliveries are not retried yet. On a home PC, n8n must run on the same machine or network.",
+    limits: "Failed events are retried 5 times over about 8 minutes, then shown as Failed with a Retry button. On a home PC, n8n must run on the same machine or network.",
     validate: (values) => !isHttpUrl(values.url ?? "") ? "Webhook URL must start with http:// or https://"
       : (values.secret ?? "").length < 16 ? "Signing secret must be at least 16 characters" : null,
     test: async ({ config, secrets }) => {
