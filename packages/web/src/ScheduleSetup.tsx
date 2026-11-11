@@ -102,6 +102,7 @@ export function ScheduleSetup({ onDone, onBack }: Props) {
 
       <fieldset style={section}>
         <legend style={{ fontWeight: 700 }}>Staff</legend>
+        {staff.length === 0 && <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>No staff yet. Add at least one person and tick the services they do; their open slots are made from your opening hours.</p>}
         {staff.map((member, index) => (
           <div key={member.id ?? `new-${index}`} style={{ display: "grid", gap: 6, paddingBottom: 8, borderBottom: "1px solid var(--border)" }}>
             <div style={{ display: "flex", gap: 8 }}>
