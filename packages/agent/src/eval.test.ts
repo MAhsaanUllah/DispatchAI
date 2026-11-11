@@ -25,7 +25,8 @@ describe("Phase 9: Automated Agent Scenario Evaluation Benchmarks", () => {
   it("Benchmark 1: Complete end-to-end customer identification and grounded booking", async () => {
     // Step 1: Customer identification
     const r1 = await agent.processMessage("My phone number is 512-555-0101");
-    expect(r1).toContain("Alicia Ramirez");
+    expect(r1).not.toContain("Alicia");
+    expect(await agent.processMessage("1402 South Congress Ave")).toContain("Alicia");
     expect(agent.getState().customer?.firstName).toBe("Alicia");
 
     // Step 2: Issue report & availability query
@@ -53,6 +54,7 @@ describe("Phase 9: Automated Agent Scenario Evaluation Benchmarks", () => {
 
   it("Benchmark 2: Interruption handling and date constraint shift evaluation", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("Need HVAC repair");
     expect(agent.getState().queriedDate).toBe(serviceDate());
 
@@ -90,6 +92,7 @@ describe("Phase 9: Automated Agent Scenario Evaluation Benchmarks", () => {
 
   it("Benchmark 5: State coherence and event trace integrity", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     const state = agent.getState();
     expect(state.events.length).toBeGreaterThan(0);
 

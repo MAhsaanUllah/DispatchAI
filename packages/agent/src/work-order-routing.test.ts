@@ -25,6 +25,7 @@ describe("Work-order routing correctness", () => {
 
   async function bookNewWorkOrder(): Promise<{ id: string; reply: string }> {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("My AC is blowing warm air, can you send someone tomorrow?");
     const slot = agent.getState().availableSlots[0];
     expect(slot).toBeDefined();
@@ -51,12 +52,16 @@ describe("Work-order routing correctness", () => {
     it.each(["Show work order wo 1001", "Show W O 1001", "show w.o. 1001", "show wo-1001", "show WO#1001", "show wo_1001"])(
       "routes %s to get_work_order wo_1001",
       async (message) => {
-        await agent.processMessage(message);
+      await agent.processMessage("5125550101");
+      await agent.processMessage("1402 South Congress Ave");
+      await agent.processMessage(message);
         expect(toolCalls("get_work_order").map((e) => (e.payload as any).workOrderId)).toEqual(["wo_1001"]);
       }
     );
 
     it("prepares cancellation for a spaced id", async () => {
+      await agent.processMessage("5125550103");
+      await agent.processMessage("504 Colorado St");
       await agent.processMessage("Please cancel W O 1002");
       expect(agent.getState().pendingAction?.type).toBe("CANCEL_WORK_ORDER");
       expect((agent.getState().pendingAction?.payload as any).workOrderId).toBe("wo_1002");
@@ -71,6 +76,7 @@ describe("Work-order routing correctness", () => {
   describe("Defect 1: explicit work-order ids take precedence over phone detection", () => {
     it("routes a wo_ id with a long numeric sequence to get_work_order, not find_customer", async () => {
       await agent.processMessage("5125550101");
+      await agent.processMessage("1402 South Congress Ave");
       resetEvents();
 
       const reply = await agent.processMessage("Show work order wo_1790592271336");
@@ -83,7 +89,8 @@ describe("Work-order routing correctness", () => {
     });
 
     it("still performs a normal phone-number lookup", async () => {
-      const reply = await agent.processMessage("Hi, my number is 5125550101");
+      await agent.processMessage("Hi, my number is 5125550101");
+      const reply = await agent.processMessage("1402 South Congress Ave");
 
       expect(toolCalls("find_customer")).toHaveLength(1);
       expect(reply).toContain("Alicia");
@@ -103,12 +110,13 @@ describe("Work-order routing correctness", () => {
 
     it("keeps valid session context when a phone lookup finds nothing", async () => {
       await agent.processMessage("5125550101");
+      await agent.processMessage("1402 South Congress Ave");
 
       const reply = await agent.processMessage("Try 9998887777 instead");
 
-      expect(reply).toContain("could not find an existing customer");
-      expect(agent.getState().customer?.id).toBe("cust_101");
-      expect(agent.getState().selectedProperty?.id).toBe("prop_201");
+      // A new number starts a fresh check; the reply is the same as for a real account and reveals nothing.
+      expect(reply).toMatch(/service address/);
+      expect(agent.getState().customer).toBeNull();
     });
   });
 
@@ -220,6 +228,7 @@ describe("Work-order routing correctness", () => {
 
     it("resolves 'the work order' when exactly one reference exists", async () => {
       await agent.processMessage("5125550101");
+      await agent.processMessage("1402 South Congress Ave");
       await agent.processMessage("Show work order wo_1001");
       resetEvents();
 
@@ -232,6 +241,7 @@ describe("Work-order routing correctness", () => {
 
     it("resolves reschedule 'it' when exactly one reference exists", async () => {
       await agent.processMessage("5125550101");
+      await agent.processMessage("1402 South Congress Ave");
       await agent.processMessage("Show work order wo_1001");
       resetEvents();
 

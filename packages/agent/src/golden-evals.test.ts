@@ -31,6 +31,7 @@ function setup(template: Template) {
   };
   const newCaller = async () => {
     await say("5550001111");
+    await say("new");
     await say("My name is Sana Malik");
     if (template.address) await say(template.address);
     if (template.zone) await say(template.zone);

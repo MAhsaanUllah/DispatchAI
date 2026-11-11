@@ -16,6 +16,7 @@ describe("instore booking (salon template)", () => {
     const agent = new DispatchAgent("salon_chat", new N8nClient({ baseUrl: "http://localhost:5678", secret: "test", directService: service }));
 
     await agent.processMessage("5555550901");
+    await agent.processMessage("Jordan Lee");
     expect(agent.getState().customer?.id).toBe("cust_901");
     expect(agent.getState().selectedProperty ?? null).toBeNull();
 

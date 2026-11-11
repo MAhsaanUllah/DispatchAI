@@ -67,6 +67,7 @@ describe("events sent after a booking", () => {
   };
   const book = async (session: string) => {
     await chat(session, "5125550101");
+    await chat(session, "1402 South Congress Ave");
     const offer = await chat(session, "My AC is blowing warm air, can you send someone tomorrow?");
     await chat(session, `Please book ${offer.state.availableSlots[0].slotId}`);
     return chat(session, "yes");

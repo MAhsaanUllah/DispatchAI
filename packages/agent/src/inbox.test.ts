@@ -45,6 +45,7 @@ describe("handoff from a conversation", () => {
 
   it("answers a danger report with safety advice and opens one emergency task", async () => {
     await chat("caller_gas", "5125550101");
+    await chat("caller_gas", "1402 South Congress Ave");
     const reply = (await chat("caller_gas", "I think there is a gas leak in my kitchen")).body.reply;
     expect(reply).toMatch(/leave the area.*emergency number/i);
     await chat("caller_gas", "the gas leak smell is getting worse");
@@ -62,6 +63,7 @@ describe("handoff from a conversation", () => {
   it("does not treat a burst pipe as an emergency (it is a plumbing job)", async () => {
     const before = (await tasks()).length;
     await chat("caller_pipe", "5125550103");
+    await chat("caller_pipe", "504 Colorado St");
     const reply = (await chat("caller_pipe", "I have a burst pipe and water is leaking, can you come tomorrow?")).body.reply;
     expect(reply).not.toMatch(/emergency number/);
     expect((await tasks()).length).toBe(before);

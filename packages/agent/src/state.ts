@@ -58,6 +58,10 @@ export interface AgentState {
   rescheduleContext: RescheduleContext | null;
   // Collecting details for a caller with no account yet (name, then address/area for onsite businesses).
   newCaller?: { phone: string; step: "name" | "address" | "zone"; name?: string; address?: string } | null;
+  // Phone given, identity not yet proven: what the caller must match. Nothing from here is ever spoken to the caller.
+  verification?: { phone: string; customer: Customer | null; properties: Property[]; attempts: number } | null;
+  // Phone lookups in this conversation (limited to stop number guessing).
+  lookups?: number;
   history: ConversationMessage[];
   events: AgentEvent[];
 }
