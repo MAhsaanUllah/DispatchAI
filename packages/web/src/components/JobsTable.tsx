@@ -191,7 +191,7 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
             <col style={{ width: "90px" }} />
             <col style={{ width: "128px" }} />
             <col />
-            <col style={{ width: "122px" }} />
+            <col style={{ width: "136px" }} />
             <col style={{ width: "100px" }} />
           </colgroup>
           <thead>

@@ -296,6 +296,18 @@
 
 /* ── The board: one ink surface holding the figures and the work orders ── */
 
+/* The board is the one place that speaks in mono: identifiers, figures, times, statuses.
+   Everything the owner reads as language stays in the body face. */
+.board,
+.board__figures,
+.board__foot,
+.table--board,
+.plate,
+.swatch,
+.figure__value {
+  font-family: var(--font-outlier);
+}
+
 .board {
   display: flex;
   flex-direction: column;
@@ -463,6 +475,7 @@
 .table--board td {
   border-bottom-color: var(--color-ink-rule);
   color: var(--color-on-ink-muted);
+  white-space: nowrap;
 }
 
 .table--board tbody tr:hover { background: var(--color-ink-2); }
@@ -1509,8 +1522,8 @@
 }
 
 .public__title {
-  max-width: 18ch;
-  font-size: var(--text-3xl);
+  max-width: 22ch;
+  font-size: var(--text-4xl);
   line-height: 1.05;
 }
 

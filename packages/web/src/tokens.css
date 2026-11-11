@@ -84,10 +84,11 @@
   --color-error-on-ink: oklch(72% 0.15 27);
   --color-scrim: oklch(16% 0.014 262 / 0.55);
 
-  /* Type face. One family for the whole board. */
-  --font-display: "Chivo Mono", ui-monospace, monospace;
+  /* Type face. Public Sans carries the words; Chivo Mono is the board's face (data, times,
+     identifiers, figures). Mono stays the outlier, so it is never used as costume. */
+  --font-display: "Public Sans", ui-sans-serif, sans-serif;
   --font-body: var(--font-display);
-  --font-outlier: var(--font-body);
+  --font-outlier: "Chivo Mono", ui-monospace, monospace;
 
   /* Shape: square rules, no rounding except pills. */
   --radius-card: 0;
