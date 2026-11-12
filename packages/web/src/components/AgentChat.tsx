@@ -47,8 +47,11 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     return prompts;
   }, [business]);
 
+  // Keep the newest turn in view inside the chat's own scroll area. scrollIntoView moved the
+  // whole page on a phone, so the dashboard opened halfway down after login.
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const log = messagesEndRef.current?.closest<HTMLElement>(".console__body");
+    if (log) log.scrollTop = log.scrollHeight;
   };
 
   useEffect(() => {

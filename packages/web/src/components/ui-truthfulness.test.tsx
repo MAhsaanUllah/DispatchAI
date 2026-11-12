@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Navbar } from "./Navbar.js";
 import { StatsBar } from "./StatsBar.js";
+import { JobsTable } from "./JobsTable.js";
 import { WorkOrderDrawer } from "./WorkOrderDrawer.js";
 import { AgentChat } from "./AgentChat.js";
 import type { AgentState } from "@dispatchai/agent";
@@ -38,6 +39,30 @@ const visibleText = (html: string): string =>
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ");
+
+describe("JobsTable: an empty board says which kind of empty it is", () => {
+  const renderTable = (jobs: WorkOrder[], loading?: boolean) =>
+    visibleText(
+      renderToStaticMarkup(
+        <JobsTable jobs={jobs} selectedJobId={null} onSelectJob={() => {}} loading={loading} onTestCall={() => {}} />
+      )
+    );
+
+  it("says it is still loading before the first answer arrives", () => {
+    const text = renderTable([], true);
+
+    expect(text).toContain("Loading work orders");
+    expect(text).not.toContain("No bookings yet");
+  });
+
+  it("offers a test call when the business truly has no bookings", () => {
+    const text = renderTable([], false);
+
+    expect(text).toContain("No bookings yet");
+    expect(text).toContain("Test call");
+    expect(text).not.toContain("match the filter");
+  });
+});
 
 describe("StatsBar: the board metrics use real work-order data", () => {
   afterEach(() => {

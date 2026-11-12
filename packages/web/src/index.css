@@ -1626,7 +1626,7 @@
   font-size: var(--text-xs);
 }
 
-.flow__note svg { margin-top: 3px; flex: none; }
+.flow__note svg { margin-top: var(--space-2xs); flex: none; }
 
 /* Plugin status, as chips that open the Plugins page. */
 .chip-row { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-xs); }
@@ -1654,7 +1654,7 @@
 .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-md); }
 
 /* The closing facts line up with the flow's text column, not with its icon column. */
-.flow + .facts { margin: var(--space-lg) 0 0 48px; }
+.flow + .facts { margin-top: var(--space-2xl); margin-left: var(--space-2xl); }
 
 .fact {
   display: grid;

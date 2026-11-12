@@ -34,6 +34,12 @@ export const App: React.FC = () => {
   const [agentConnected, setAgentConnected] = useState<boolean | null>(null);
   const [localTime, setLocalTime] = useState("");
 
+  // A view switch starts at the top of the new screen; the pages are longer than the viewport.
+  useEffect(() => {
+    document.querySelector(".app-main")?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
+  }, [activeView]);
+
   // Local clock in the business time zone (from onboarding).
   const businessTimeZone = directory?.company.timeZone ?? "America/Chicago";
   useEffect(() => {
