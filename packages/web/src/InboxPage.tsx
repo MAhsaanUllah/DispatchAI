@@ -47,8 +47,14 @@ export function InboxPage() {
           <p className="page__lede">Callers and problems the agent handed to your team.</p>
         </div>
         <div className="segmented" role="group" aria-label="Which tasks to show">
-          <button type="button" className="segmented__item" aria-pressed={!showClosed} onClick={() => setShowClosed(false)}>Open</button>
-          <button type="button" className="segmented__item" aria-pressed={showClosed} onClick={() => setShowClosed(true)}>All</button>
+          <label className="segmented__item">
+            <input className="visually-hidden" type="radio" name="inbox-scope" checked={!showClosed} onChange={() => setShowClosed(false)} />
+            <span>Open</span>
+          </label>
+          <label className="segmented__item">
+            <input className="visually-hidden" type="radio" name="inbox-scope" checked={showClosed} onChange={() => setShowClosed(true)} />
+            <span>All</span>
+          </label>
         </div>
       </div>
 

@@ -41,6 +41,16 @@ export class DispatchStore {
     this.addUpcomingSlots();
   }
 
+  // True while this store still holds the fictional demo dataset. The seeded customers live on
+  // example.com, so this stays true for an old demo database and turns false once the owner
+  // works with real customers. It is what tells the dashboard "this is seeded, read only".
+  public get demo(): boolean {
+    for (const customer of this.customers.values()) {
+      if (customer.email?.toLowerCase().endsWith("@example.com")) return true;
+    }
+    return false;
+  }
+
   private restore(snapshot: Snapshot): void {
     if (snapshot.version !== 1 || !Array.isArray(snapshot.slots) || !Array.isArray(snapshot.workOrders)) {
       throw new Error("Unsupported or corrupt DispatchAI database snapshot");
@@ -58,9 +68,10 @@ export class DispatchStore {
   // Demo mode tops up fixture slots; a real business gets slots from its opening hours and staff.
   public addUpcomingSlots(): void {
     let changed = false;
-    const upcoming = readEnv("SEED_DEMO_DATA") === "false"
-      ? generateScheduleSlots(getBusinessConfig(), [...this.technicians.values()])
-      : generateSeedData().slots;
+    const demo = this.demo || readEnv("SEED_DEMO_DATA") !== "false";
+    const upcoming = demo
+      ? generateSeedData(getBusinessConfig(), { force: true }).slots
+      : generateScheduleSlots(getBusinessConfig(), [...this.technicians.values()]);
     for (const slot of upcoming) {
       if (!slot.id.startsWith("slot_20") || this.slots.has(slot.id)) continue;
       this.slots.set(slot.id, slot);
@@ -113,6 +124,8 @@ export class DispatchStore {
   }
 
   public reset(): void {
+    // A demo install resets back to the demo dataset even if the env now says "no demo data".
+    const wasDemo = this.demo;
     this.customers.clear();
     this.properties.clear();
     this.technicians.clear();
@@ -122,7 +135,7 @@ export class DispatchStore {
     this.integrationEvents = [];
     this.notifications = [];
 
-    const seed = generateSeedData();
+    const seed = wasDemo ? generateSeedData(getBusinessConfig(), { force: true }) : generateSeedData();
 
     for (const c of seed.customers) {
       this.customers.set(c.id, { ...c });

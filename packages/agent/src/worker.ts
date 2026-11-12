@@ -1,4 +1,4 @@
-import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, readEnv, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
+import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
 import { BusinessConfigSchema, type BusinessService } from "@dispatchai/shared";
 import { toolFailure, toolSuccess, verifyWebhookSignature } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
@@ -50,7 +50,7 @@ if (!auth.hasOwner()) {
     : `[setup] No owner yet. Open /app and enter setup code: ${setupCode}`);
 }
 // One process owns the business data (single writer). DATABASE_URL = SQLite file path; unset = in-memory.
-const domainService = new DispatchService(process.env.DATABASE_URL ? new SQLiteDispatchStore(process.env.DATABASE_URL) : undefined);
+export const domainService = new DispatchService(process.env.DATABASE_URL ? new SQLiteDispatchStore(process.env.DATABASE_URL) : undefined);
 const isTestRuntime = process.env.NODE_ENV === "test";
 const dispatchSecret = process.env.N8N_WEBHOOK_SECRET || (isTestRuntime ? "dev_secret_dispatch_2026" : "");
 const n8nClient = new N8nClient({
@@ -433,7 +433,7 @@ async function routeRequest(req: Request): Promise<Response> {
       canSwitchTemplate: !saved.firstBookingAt,
       // True only while this install still runs on the fictional demo dataset. The web uses it
       // to show the "seeded demo data" and "Reset Demo" affordances, which mean nothing on a real install.
-      demo: readEnv("SEED_DEMO_DATA") === "true",
+      demo: domainService.getStore().demo,
       templates: businessTemplates.map((t) => ({ templateId: t.templateId, name: t.name, kind: t.kind, services: t.services.map((service) => service.name) }))
     } }, 200, corsHeaders);
   }
@@ -544,6 +544,13 @@ async function routeRequest(req: Request): Promise<Response> {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
+    // Resetting restores the seeded demo dataset. A real install has no demo data to restore and
+    // live bookings must not be wiped, so the endpoint refuses there.
+    if (!domainService.getStore().demo) {
+      return new Response(JSON.stringify(toolFailure("NOT_DEMO_INSTALL", "This install holds real data, so there is no demo dataset to restore.", false, `reset_${Date.now()}`)), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
     domainService.getStore().reset();
     return new Response(JSON.stringify(toolSuccess({ reset: true }, `reset_${Date.now()}`)), {
       status: 200,
@@ -580,10 +587,9 @@ async function routeRequest(req: Request): Promise<Response> {
   }
 
   if (method === "GET" && pathname === "/api/directory") {
-    // The demo flag travels with the directory: the web shows "seeded demo data" and "Reset Demo"
+    // The directory carries the demo flag: the web shows "seeded demo data" and "Reset Demo"
     // only while this install still runs on the fictional dataset.
-    const directory = { ...getDirectory(domainService.getStore()), demo: readEnv("SEED_DEMO_DATA") === "true" };
-    return new Response(JSON.stringify({ ok: true, data: directory }), {
+    return new Response(JSON.stringify({ ok: true, data: getDirectory(domainService.getStore()) }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }

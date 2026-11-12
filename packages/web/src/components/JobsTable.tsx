@@ -6,6 +6,9 @@ interface JobsTableProps {
   jobs: WorkOrder[];
   selectedJobId: string | null;
   onSelectJob: (job: WorkOrder) => void;
+  // True until the first answer arrives, so the board never claims "no bookings" while loading.
+  loading?: boolean;
+  onTestCall?: () => void;
 }
 
 const formatWorkOrderId = (id: string): string => id.replace(/^wo_?/i, "WO-");
@@ -33,7 +36,7 @@ const STATE_OF = (job: WorkOrder): { tone: "live" | "attention" | "closed" | "al
   return { tone: "closed", word: job.status };
 };
 
-export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSelectJob }) => {
+export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSelectJob, loading = false, onTestCall }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [serviceFilter, setServiceFilter] = useState<string>("ALL");
   const [zoneFilter, setZoneFilter] = useState<string>("ALL");
@@ -225,8 +228,24 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
             {pagedJobs.length === 0 ? (
               <tr>
                 <td colSpan={7} className="board__empty">
-                  <div className="board__empty-title">No work orders match the filter criteria.</div>
-                  <div>Clear the filters to see every work order.</div>
+                  {loading ? (
+                    <div className="board__empty-title">Loading work orders…</div>
+                  ) : jobs.length === 0 ? (
+                    <>
+                      <div className="board__empty-title">No bookings yet.</div>
+                      <div>Run a Test call to take the first one.</div>
+                      {onTestCall && (
+                        <div className="board__empty-actions">
+                          <button type="button" className="btn btn--primary btn--sm" onClick={onTestCall}>Test call</button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="board__empty-title">No work orders match the filter criteria.</div>
+                      <div>Clear the filters to see every work order.</div>
+                    </>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -267,7 +286,9 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
 
       <div className="board__foot">
         <span>
-          Showing <strong>{filteredJobs.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> to <strong>{Math.min(currentPage * pageSize, filteredJobs.length)}</strong> of <strong>{filteredJobs.length}</strong>
+          {filteredJobs.length === 0
+            ? "No work orders"
+            : <>Showing <strong>{(currentPage - 1) * pageSize + 1}</strong> to <strong>{Math.min(currentPage * pageSize, filteredJobs.length)}</strong> of <strong>{filteredJobs.length}</strong></>}
         </span>
         <div className="board__foot-controls">
           <span>Page {currentPage} of {totalPages}</span>

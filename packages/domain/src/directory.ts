@@ -12,5 +12,5 @@ export function getDirectory(store: DispatchStore) {
       .sort((a, b) => a.startAt.localeCompare(b.startAt))
       .slice(0, 12)
   }));
-  return { company: { name, market, timeZone, serviceZones, note }, services, technicians };
+  return { company: { name, market, timeZone, serviceZones, note }, services, technicians, demo: store.demo };
 }

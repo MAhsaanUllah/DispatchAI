@@ -78,9 +78,10 @@ function templateSeed(config: BusinessConfig) {
   return { customers, properties, technicians, slots: buildSlots(technicians), workOrders: [] as WorkOrder[] };
 }
 
-export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
+export function generateSeedData(config: BusinessConfig = getBusinessConfig(), options: { force?: boolean } = {}) {
   // shortcut: demo data stays on by default until the onboarding wizard (PR 11) can add real staff; then default to off.
-  if (readEnv("SEED_DEMO_DATA") === "false") {
+  // `force` restores the demo dataset for an install that already runs on it, whatever the env says now.
+  if (!options.force && readEnv("SEED_DEMO_DATA") === "false") {
     return { customers: [] as Customer[], properties: [] as Property[], technicians: [] as Technician[], slots: [] as TechnicianSlot[], workOrders: [] as WorkOrder[] };
   }
   if (config.templateId !== "field-service") return templateSeed(config);
@@ -181,6 +182,15 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
 
   const slots = buildSlots(technicians);
 
+  // The demo board must look alive on the day it is opened, so the work orders sit on the
+  // business-local today and the days before it. Anchored to a fixed date they all fell in the
+  // past, and the board read zero while the table listed the same jobs.
+  const timeZone = getBusinessConfig().timeZone;
+  const today = localDate(new Date(), timeZone);
+  const [todayYear, todayMonth, todayDay] = today.split("-").map(Number);
+  const dayBefore = (offset: number) =>
+    new Date(Date.UTC(todayYear, todayMonth - 1, todayDay - offset)).toISOString().slice(0, 10);
+
   // 5. 25 Work Orders (Historical, completed, in-progress, dispatched, and booked)
   const workOrders: WorkOrder[] = [
     {
@@ -191,12 +201,12 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
       serviceType: "HVAC",
       issueSummary: "Central AC blowing warm air in master bedroom",
       urgency: "HIGH",
-      scheduledStart: "2026-09-18T08:00:00Z",
-      scheduledEnd: "2026-09-18T10:00:00Z",
+      scheduledStart: `${today}T08:00:00Z`,
+      scheduledEnd: `${today}T10:00:00Z`,
       status: "IN_PROGRESS",
       createdBy: "VOICE_AGENT",
-      createdAt: "2026-09-18T07:15:00Z",
-      updatedAt: "2026-09-18T08:00:00Z"
+      createdAt: `${today}T07:15:00Z`,
+      updatedAt: `${today}T08:00:00Z`
     },
     {
       id: "wo_1002",
@@ -206,12 +216,12 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
       serviceType: "PLUMBING",
       issueSummary: "Kitchen sink drain clogged and leaking beneath cabinet",
       urgency: "STANDARD",
-      scheduledStart: "2026-09-18T10:00:00Z",
-      scheduledEnd: "2026-09-18T12:00:00Z",
+      scheduledStart: `${today}T10:00:00Z`,
+      scheduledEnd: `${today}T12:00:00Z`,
       status: "DISPATCHED",
       createdBy: "WEB_AGENT",
-      createdAt: "2026-09-17T18:30:00Z",
-      updatedAt: "2026-09-18T09:00:00Z"
+      createdAt: `${dayBefore(1)}T18:30:00Z`,
+      updatedAt: `${today}T09:00:00Z`
     },
     {
       id: "wo_1003",
@@ -221,12 +231,12 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
       serviceType: "PLUMBING",
       issueSummary: "Main water shutoff valve dripping",
       urgency: "STANDARD",
-      scheduledStart: "2026-09-18T13:00:00Z",
-      scheduledEnd: "2026-09-18T15:00:00Z",
+      scheduledStart: `${today}T13:00:00Z`,
+      scheduledEnd: `${today}T15:00:00Z`,
       status: "BOOKED",
       createdBy: "HUMAN",
-      createdAt: "2026-09-17T14:00:00Z",
-      updatedAt: "2026-09-17T14:00:00Z"
+      createdAt: `${dayBefore(1)}T14:00:00Z`,
+      updatedAt: `${dayBefore(1)}T14:00:00Z`
     }
   ];
 
@@ -270,8 +280,7 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
     const cust = customers[(num - 1) % customers.length];
     const prop = properties[(num - 1) % properties.length];
     const tech = technicians[prof.techIndex];
-    const day = 18 - prof.dayOffset;
-    const dateStr = `2026-09-${day < 10 ? "0" + day : day}`;
+    const dateStr = dayBefore(prof.dayOffset);
 
     workOrders.push({
       id: `wo_10${num < 10 ? "0" + num : num}`,

@@ -16,6 +16,7 @@ import { LocalNotification, WorkOrder } from "@dispatchai/shared";
 
 export const App: React.FC = () => {
   const [jobs, setJobs] = useState<WorkOrder[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [editingBusiness, setEditingBusiness] = useState(false);
@@ -61,7 +62,7 @@ export const App: React.FC = () => {
       setJobs(nextJobs);
       setNotifications(nextNotifications);
       setAgentConnected(true);
-    }).catch(() => setAgentConnected(false));
+    }).catch(() => setAgentConnected(false)).finally(() => setJobsLoading(false));
 
     const unsubscribe = api.subscribeEvents((event) => {
       setAgentState({ ...api.getAgent().getState() });
@@ -132,7 +133,7 @@ export const App: React.FC = () => {
         {activeView === "company" && editingBusiness ? <BusinessWizard onDone={() => window.location.reload()} onCancel={() => setEditingBusiness(false)} />
           : activeView === "inbox" ? <InboxPage />
             : activeView === "plugins" ? <PluginsPage />
-              : activeView === "system" ? <SystemPanel />
+              : activeView === "system" ? <SystemPanel onOpenPlugins={() => setActiveView("plugins")} />
                 : !isBoard ? (
                   <div className="app-body">
                     <DirectoryPanel
@@ -147,14 +148,26 @@ export const App: React.FC = () => {
                   <div className="app-body app-body--flush">
                     <div className="split">
                       <div className="split__main board">
-                        <StatsBar jobs={jobs} companyName={directory?.company.name} timeZone={businessTimeZone} />
-                        <JobsTable jobs={jobs} selectedJobId={selectedJob?.id || null} onSelectJob={(job) => setSelectedJob(job)} />
+                        <StatsBar jobs={jobs} companyName={directory?.company.name} />
+                        <JobsTable
+                          jobs={jobs}
+                          selectedJobId={selectedJob?.id || null}
+                          onSelectJob={(job) => setSelectedJob(job)}
+                          loading={jobsLoading}
+                          onTestCall={() => setIsVoiceModalOpen(true)}
+                        />
                       </div>
                       <div className="split__side">
                         <AgentChat
                           state={agentState}
                           notifications={notifications}
                           connected={agentConnected}
+                          business={{
+                            name: directory?.company.name,
+                            services: directory?.services.map((service) => ({ id: service.id, name: service.name })) ?? [],
+                            zones: directory?.company.serviceZones ?? [],
+                            jobId: jobs[0]?.id
+                          }}
                           onSendMessage={handleSendMessage}
                           onConfirm={handleConfirm}
                           onReject={handleReject}

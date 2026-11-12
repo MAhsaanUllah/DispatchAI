@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Send, AlertTriangle, Check, X, Activity, Bell } from "lucide-react";
 import type { AgentState } from "@dispatchai/agent";
 import type { LocalNotification } from "@dispatchai/shared";
@@ -8,6 +8,9 @@ interface AgentChatProps {
   state: AgentState;
   notifications: LocalNotification[];
   connected?: boolean | null;
+  // The business the agent serves. The suggestions and the connection line are built from it,
+  // not written by hand, so they stay true when the owner switches template.
+  business?: { name?: string; services: { id: string; name: string }[]; zones: string[]; jobId?: string };
   onSendMessage: (text: string) => Promise<void>;
   onConfirm: () => Promise<void>;
   onReject: () => void | Promise<void>;
@@ -20,6 +23,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
   state,
   notifications,
   connected = null,
+  business,
   onSendMessage,
   onConfirm,
   onReject,
@@ -30,12 +34,18 @@ export const AgentChat: React.FC<AgentChatProps> = ({
   const [inputText, setInputText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const quickPrompts = [
-    { label: "Find Customer", text: "Look up customer Alicia Ramirez and view service records" },
-    { label: "Check HVAC slots", text: "Check available HVAC technician slots in Austin-North for today" },
-    { label: "Change request", text: "Wait, cancel that and tell me Carlos Mendoza's schedule instead" },
-    { label: "Lookup WO-1001", text: "What is the current status and technician for work order wo_1001?" }
-  ];
+  // Suggestions come from the business the agent actually runs for.
+  const quickPrompts = useMemo(() => {
+    const zone = business?.zones[0] ?? "your area";
+    const prompts = [{ label: "Find customer", text: "Look up a customer and view their service records" }];
+    for (const service of (business?.services ?? []).slice(0, 2)) {
+      prompts.push({ label: `Check ${service.name} slots`, text: `Check available ${service.name} technician slots in ${zone} for today` });
+    }
+    if (business?.jobId) {
+      prompts.push({ label: `Lookup ${business.jobId.replace(/^wo_?/i, "WO-")}`, text: `What is the current status and technician for work order ${business.jobId}?` });
+    }
+    return prompts;
+  }, [business]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -82,7 +92,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
                   className={`console__status ${connected === true ? "console__status--live" : connected === false ? "console__status--down" : ""}`}
                   role="status"
                 >
-                  {connected === true ? "Austin Dispatch Engine Connected" : connected === false ? "Dispatch Agent Unreachable" : "Checking dispatch agent…"}
+                  {connected === true ? `${business?.name ?? "Dispatch"} engine connected` : connected === false ? "Dispatch Agent Unreachable" : "Checking dispatch agent…"}
                 </div>
                 <p>
                   {connected === false
