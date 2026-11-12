@@ -932,8 +932,6 @@
 
 /* One grid. Cards fill the row they are given; the row never leaves a hole on the right. */
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-md); }
-/* A catalogue: cards keep one width, so the last row may end early. */
-.grid--cards { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-sm); }
 /* A list: one row per entry, full width. */
 .grid--rows { grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
 
@@ -1146,9 +1144,29 @@
   transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
 }
 
+/* While a card is airborne, the system zone invites the drop with a green dashed edge. */
+.zones--dragging .zone:not(.zone--over) {
+  outline: 1px dashed color-mix(in oklab, var(--color-accent) 55%, transparent);
+  outline-offset: 3px;
+}
+
+/* Over the system zone the frame goes green and breathes, so the drop target is unmistakable. */
 .zone--over {
   border: var(--rule-bar) solid var(--color-accent);
-  background: var(--color-paper-3);
+  background: color-mix(in oklab, var(--color-accent) 8%, var(--color-paper-3));
+  animation: zone-live 1.5s ease-in-out infinite;
+}
+
+@keyframes zone-live {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 16%, transparent); }
+  50% { box-shadow: 0 0 0 9px color-mix(in oklab, var(--color-accent) 6%, transparent); }
+}
+
+.zone--over .zone__drop { animation: drop-beat 0.9s ease-in-out infinite; }
+
+@keyframes drop-beat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
 }
 
 .zone__head {
@@ -1197,6 +1215,51 @@
 .plugin--dragging { opacity: 0.4; cursor: grabbing; transform: none; box-shadow: none; }
 
 .plugin--failed { border-color: var(--color-error); }
+
+/* Available plugins are fixed squares, centred as a tile wall: the catalogue keeps the same
+   rhythm whether it holds two plugins or eight. */
+.grid--tiles {
+  grid-template-columns: repeat(auto-fill, minmax(0, 232px));
+  justify-content: center;
+}
+
+.plugin--tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  text-align: center;
+  padding: var(--space-md) var(--space-sm);
+  animation: tile-in var(--dur-long) var(--ease-out) backwards;
+}
+
+.plugin--tile .plugin__top {
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.plugin--tile .plugin__category { margin-left: 0; }
+.plugin--tile .plugin__desc { width: 100%; margin-top: var(--space-2xs); }
+.plugin--tile .plugin__actions { margin-top: auto; justify-content: center; }
+
+/* The tile lifts under the pointer the way a card lifts off a table. */
+.plugin--tile:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 12px 24px -14px oklch(16% 0.014 262 / 0.5);
+}
+
+/* Picked up for a drag: lifted and slightly turned, so it reads as held. */
+.plugin--tile.plugin--dragging {
+  opacity: 0.55;
+  transform: scale(1.03) rotate(-1deg);
+  box-shadow: 0 18px 30px -16px oklch(16% 0.014 262 / 0.55);
+}
+
+@keyframes tile-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
 
 .plugin__top {
   display: flex;
@@ -1275,6 +1338,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .plugin:hover { transform: none; box-shadow: none; }
+  .plugin--tile { animation: none; }
+  .plugin--tile:hover { transform: none; box-shadow: none; }
+  .plugin--tile.plugin--dragging { transform: none; }
+  .zone--over { animation: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 16%, transparent); }
+  .zone--over .zone__drop { animation: none; }
 }
 
 .log {
@@ -2054,6 +2122,8 @@
   .app-main { padding: var(--space-md); }
   .page__head { flex-direction: column; align-items: stretch; }
   .grid { grid-template-columns: minmax(0, 1fr); }
+  /* The catalogue stays square on a phone: one 232px tile, centred. */
+  .grid--tiles { grid-template-columns: minmax(0, 232px); justify-content: center; }
   .flow + .facts { margin-left: 0; }
   .console__suggestions { grid-template-columns: minmax(0, 1fr); }
 

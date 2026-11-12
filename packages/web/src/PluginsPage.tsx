@@ -286,11 +286,11 @@ export function PluginsPage() {
             </div>
             {available.length === 0 && <p className="zone__hint">Everything is connected.</p>}
             {available.length > 0 && (
-              <div className="grid grid--cards zone__cards">
-                {available.map((plugin) => {
+              <div className="grid zone__cards grid--tiles">
+                {available.map((plugin, index) => {
                   const Icon = PLUGIN_ICON[plugin.id] ?? Plug;
                   return (
-                    <article key={plugin.id} data-plugin-id={plugin.id} ref={cardRef} aria-label={plugin.name} {...dragProps(plugin)} className={`plugin ${dragging === plugin.id ? "plugin--dragging" : ""}`}>
+                    <article key={plugin.id} data-plugin-id={plugin.id} ref={cardRef} aria-label={plugin.name} {...dragProps(plugin)} style={{ animationDelay: `${index * 55}ms` }} className={`plugin plugin--tile ${dragging === plugin.id ? "plugin--dragging" : ""}`}>
                       <div className="plugin__top">
                         <span className="plugin__icon" aria-hidden="true"><Icon size={16} /></span>
                         <strong className="plugin__name">{plugin.name}</strong>
