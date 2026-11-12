@@ -897,8 +897,10 @@
 
 /* One grid. Cards fill the row they are given; the row never leaves a hole on the right. */
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-md); }
-.grid--wide { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-.grid--narrow { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+/* A catalogue: cards keep one width, so the last row may end early. */
+.grid--cards { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-sm); }
+/* A list: one row per entry, full width. */
+.grid--rows { grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
 
 /* Tags: a quiet label for a category, a state or a count. */
 .tag {
@@ -982,6 +984,7 @@
 /* A segmented control: two states, one of them picked. Real radios, so the arrow keys work. */
 .segmented {
   display: inline-flex;
+  align-self: flex-start;
   border: var(--rule-bar) solid var(--color-ink);
   background: var(--color-paper-3);
 }
@@ -1013,7 +1016,7 @@
 
 .task {
   display: grid;
-  grid-template-columns: 116px minmax(0, 1fr) 150px 116px auto;
+  grid-template-columns: 116px minmax(0, 1fr) 116px auto;
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-xs) var(--space-sm);
@@ -1047,15 +1050,6 @@
 .task__detail {
   font-size: var(--text-xs);
   color: var(--color-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.task__caller {
-  font-family: var(--font-outlier);
-  font-size: var(--text-xs);
-  color: var(--color-ink-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1175,6 +1169,16 @@
   gap: var(--space-xs);
 }
 
+/* A connected plugin reads as one line of inventory: mark, name, category, state, actions. */
+.plugin__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.plugin__row .plugin__actions { margin-top: 0; }
+
 .plugin__icon {
   display: grid;
   place-items: center;
@@ -1191,11 +1195,13 @@
 .plugin__category { font-size: var(--text-xs); color: var(--color-muted); }
 
 .plugin__desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   font-size: var(--text-xs);
   color: var(--color-ink-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .plugin__status { font-size: var(--text-xs); color: var(--color-ink-2); }
@@ -1608,9 +1614,10 @@
 
 .flow__note {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-xs);
   align-self: start;
+  max-width: 70ch;
   margin-top: var(--space-xs);
   padding: var(--space-2xs) var(--space-sm);
   border-left: var(--rule-bar) solid var(--color-ink);
@@ -1618,6 +1625,8 @@
   color: var(--color-ink-2);
   font-size: var(--text-xs);
 }
+
+.flow__note svg { margin-top: 3px; flex: none; }
 
 /* Plugin status, as chips that open the Plugins page. */
 .chip-row { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-xs); }
@@ -1643,6 +1652,9 @@
 .chip--on .chip__state { color: var(--color-accent); }
 
 .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-md); }
+
+/* The closing facts line up with the flow's text column, not with its icon column. */
+.flow + .facts { margin: var(--space-lg) 0 0 48px; }
 
 .fact {
   display: grid;
@@ -1995,23 +2007,23 @@
   .app-main { padding: var(--space-md); }
   .page__head { flex-direction: column; align-items: stretch; }
   .grid { grid-template-columns: minmax(0, 1fr); }
+  .flow + .facts { margin-left: 0; }
   .console__suggestions { grid-template-columns: minmax(0, 1fr); }
 
-  /* The inbox row folds into three lines instead of five narrow columns. */
+  /* The inbox row folds into three lines instead of four narrow columns. */
   .task {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "kind when"
       "body body"
-      "caller actions";
+      "actions actions";
     row-gap: var(--space-2xs);
   }
 
   .task__kind { grid-area: kind; }
   .task__body { grid-area: body; }
-  .task__caller { grid-area: caller; }
   .task__when { grid-area: when; justify-items: end; }
-  .task__actions { grid-area: actions; }
+  .task__actions { grid-area: actions; justify-content: flex-start; }
   .task__title, .task__detail { white-space: normal; }
   .hours-row { grid-template-columns: minmax(0, 1fr); }
   .figure { flex-basis: 50%; }

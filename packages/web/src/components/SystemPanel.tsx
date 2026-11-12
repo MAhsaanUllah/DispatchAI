@@ -65,13 +65,13 @@ export function SystemPanel({ onOpenPlugins }: { onOpenPlugins: () => void }) {
     <section className="page" aria-label="System architecture">
       <div className="page__head">
         <div className="page__head-text">
-          <h1 className="page__title">How the dispatch loop is wired</h1>
+          <h1 className="page__title">How DispatchAI works</h1>
           <p className="page__lede">One server on this machine takes the call, confirms the booking and writes it to the database. Plugins carry it out from there.</p>
         </div>
       </div>
 
       <ol className="flow">
-        {STEPS.map((step, index) => {
+        {STEPS.map((step) => {
           const Icon = step.icon;
           return (
             <li className="flow__step" key={step.title}>
@@ -82,9 +82,11 @@ export function SystemPanel({ onOpenPlugins }: { onOpenPlugins: () => void }) {
                   <span className="flow__meta">{step.meta}</span>
                 </div>
                 <p className="flow__copy">{step.copy}</p>
+                {step.title === "DispatchAI server" && (
+                  <span className="flow__note"><Cpu size={12} aria-hidden="true" />The AI brain is a plugin, not the agent. Without it the rule-based agent still books.</span>
+                )}
                 {step.title === "Plugins" && <PluginChips onOpenPlugins={onOpenPlugins} />}
               </div>
-              {index === 1 && <span className="flow__note"><Cpu size={12} aria-hidden="true" />The AI brain is a plugin, not the agent. Without it the rule-based agent still books.</span>}
             </li>
           );
         })}

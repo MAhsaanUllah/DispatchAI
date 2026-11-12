@@ -286,7 +286,7 @@ export function PluginsPage() {
             </div>
             {available.length === 0 && <p className="zone__hint">Everything is connected.</p>}
             {available.length > 0 && (
-              <div className="grid grid--wide zone__cards">
+              <div className="grid grid--cards zone__cards">
                 {available.map((plugin) => {
                   const Icon = PLUGIN_ICON[plugin.id] ?? Plug;
                   return (
@@ -313,31 +313,31 @@ export function PluginsPage() {
             </div>
             {connected.length === 0 && <p className="zone__hint">Nothing connected yet. Drag a plugin here, or press Add.</p>}
             {connected.length > 0 && (
-              <div className="grid grid--wide zone__cards">
+              <div className="grid grid--rows zone__cards">
                 {connected.map((plugin) => {
                   const h = health[plugin.id];
                   const failed = h && !h.ok;
                   const Icon = PLUGIN_ICON[plugin.id] ?? Plug;
                   return (
                     <article key={plugin.id} data-plugin-id={plugin.id} ref={cardRef} aria-label={plugin.name} {...dragProps(plugin)} className={`plugin plugin--on ${failed ? "plugin--failed" : ""} ${dragging === plugin.id ? "plugin--dragging" : ""}`}>
-                      <div className="plugin__top">
+                      <div className="plugin__row">
                         <span className="plugin__icon" aria-hidden="true"><Icon size={16} /></span>
                         <strong className="plugin__name">{plugin.name}</strong>
+                        <span className="plugin__category">{plugin.category}</span>
                         <span className={`plugin__badge ${failed ? "plugin__badge--off" : "plugin__badge--on"}`}>
                           {failed ? "Test failed" : "Connected"}
                         </span>
+                        <div className="plugin__actions">
+                          <button type="button" className="btn btn--sm" onClick={() => openDrawer(plugin)}>Settings</button>
+                          <button type="button" className="btn btn--sm" onClick={() => test(plugin)}>Test</button>
+                          <button type="button" className="btn btn--sm" onClick={() => remove(plugin)}><Unplug size={12} aria-hidden="true" />Remove</button>
+                        </div>
                       </div>
-                      <span className="plugin__category">{plugin.category}</span>
                       {h && <span role={failed ? "alert" : "status"} className={`plugin__status ${failed ? "plugin__status--failed" : ""}`}>{h.text}</span>}
                       {plugin.status && <span className={`plugin__status ${plugin.status.warning ? "plugin__status--failed" : ""}`}>{plugin.status.text}</span>}
                       {flash?.id === plugin.id && <span className={`plugin__flash ${flash.on ? "plugin__flash--on" : ""}`} role="status">{flash.text}</span>}
                       {plugin.id === "n8n" && <DeliveryLog />}
                       {plugin.id === "twilio" && <CallLog />}
-                      <div className="plugin__actions">
-                        <button type="button" className="btn btn--sm" onClick={() => openDrawer(plugin)}>Settings</button>
-                        <button type="button" className="btn btn--sm" onClick={() => test(plugin)}>Test</button>
-                        <button type="button" className="btn btn--sm" onClick={() => remove(plugin)}><Unplug size={12} aria-hidden="true" />Remove</button>
-                      </div>
                     </article>
                   );
                 })}

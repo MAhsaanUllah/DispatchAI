@@ -13,11 +13,15 @@ const age = (iso: string) => {
   return minutes < 60 ? `${minutes} min ago` : minutes < 1440 ? `${Math.round(minutes / 60)} h ago` : `${Math.round(minutes / 1440)} d ago`;
 };
 
-// The caller is named in the task title ("Call back: +15125550101"); everything else falls back to its reference.
-const callerOf = (task: Task): string => {
-  const named = task.title.match(/^(?:Call back|Possible emergency|Booking system error for)\s*:\s*(.+)$/);
-  return named ? named[1].trim() : "";
+// The kind column already says what sort of task this is, so the title drops that prefix and
+// carries the subject only: the caller, or what n8n could not deliver.
+const KIND_PREFIX: Record<Task["kind"], RegExp> = {
+  emergency: /^Possible emergency:\s*/,
+  human: /^Call back:\s*/,
+  tool_failure: /^Booking system error for\s*/,
+  delivery_failed: /^n8n did not receive\s*/
 };
+const subjectOf = (task: Task): string => task.title.replace(KIND_PREFIX[task.kind], "").trim() || task.title;
 
 // Human-in-the-loop inbox: what the agent handed to a person. Open tasks first; overdue ones are marked.
 export function InboxPage() {
@@ -68,19 +72,16 @@ export function InboxPage() {
       )}
       {shown.length > 0 && (
         <ul className="task-list">
-          {shown.map((task) => {
-            const caller = callerOf(task);
-            return (
+          {shown.map((task) => (
               <li key={task.id} className={`task ${task.kind === "emergency" && !task.closedAt ? "task--alert" : ""} ${task.closedAt ? "task--done" : ""}`}>
                 <span className="task__kind">
                   <span className={`swatch swatch--${KIND_TONE[task.kind]}`} aria-hidden="true" />
                   {KIND_LABEL[task.kind]}
                 </span>
                 <span className="task__body">
-                  <span className="task__title">{task.title}</span>
+                  <span className="task__title">{subjectOf(task)}</span>
                   <span className="task__detail">{task.detail}</span>
                 </span>
-                <span className="task__caller">{caller}</span>
                 <span className="task__when">
                   {age(task.createdAt)}
                   {task.overdue && <span className="task__overdue">over {task.slaMinutes} min target</span>}
@@ -91,8 +92,7 @@ export function InboxPage() {
                     : <button type="button" className="btn btn--sm" onClick={() => close(task.id)}><Check size={12} aria-hidden="true" />Done</button>}
                 </span>
               </li>
-            );
-          })}
+            ))}
         </ul>
       )}
     </section>
