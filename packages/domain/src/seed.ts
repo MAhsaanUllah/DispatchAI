@@ -7,15 +7,19 @@ import {
   BusinessConfig
 } from "@dispatchai/shared";
 import { getBusinessConfig, readEnv } from "./templates.js";
+import { localDate } from "./schedule.js";
 
-// Slots: stable fixture dates plus the current and next seven UTC days.
+// Slots: stable fixture dates plus the current and next seven days in the business time zone.
+// The days must be business-local (the same calendar the agent asks for), not UTC days:
+// between 00:00 and 06:00 UTC the two disagree, and no slot would match the agent's date.
 function buildSlots(technicians: Technician[]): TechnicianSlot[] {
   const slots: TechnicianSlot[] = [];
+  const timeZone = getBusinessConfig().timeZone;
   const dates = ["2026-09-18", "2026-09-19"];
+  const today = localDate(new Date(), timeZone);
+  const [y, m, d] = today.split("-").map(Number);
   for (let offset = 0; offset <= 7; offset++) {
-    const day = new Date();
-    day.setUTCHours(0, 0, 0, 0);
-    day.setUTCDate(day.getUTCDate() + offset);
+    const day = new Date(Date.UTC(y, m - 1, d + offset));
     const date = day.toISOString().slice(0, 10);
     if (!dates.includes(date)) dates.push(date);
   }
