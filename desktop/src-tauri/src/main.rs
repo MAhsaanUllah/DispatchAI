@@ -28,7 +28,7 @@ fn main() {
             let port = TcpListener::bind("127.0.0.1:0")?.local_addr()?.port();
             // One-time first-run code. It is passed to the window in the URL hash, so the owner never types it.
             let mut bytes = [0u8; 6];
-            getrandom::fill(&mut bytes)?;
+            getrandom::fill(&mut bytes).map_err(|e| e.to_string())?;
             let code: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
 
             let child = Command::new(plain(res.join("node.exe")))
