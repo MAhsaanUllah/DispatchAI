@@ -35,8 +35,10 @@ export const App: React.FC = () => {
   const [localTime, setLocalTime] = useState("");
 
   // A view switch starts at the top of the new screen; the pages are longer than the viewport.
+  // The phone nav strip also rewinds, so the chosen cell leads the row instead of sitting off-screen.
   useEffect(() => {
     document.querySelector(".app-main")?.scrollTo({ top: 0 });
+    document.querySelector(".app-nav__links")?.scrollTo({ left: 0 });
     window.scrollTo({ top: 0 });
   }, [activeView]);
 

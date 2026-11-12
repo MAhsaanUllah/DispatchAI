@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Search, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight } from "lucide-react";
 import { WorkOrderView as WorkOrder } from "@dispatchai/shared";
 
 interface JobsTableProps {
@@ -190,12 +190,12 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
           <caption className="visually-hidden">Work orders, sorted by operational priority</caption>
           <colgroup>
             <col style={{ width: "84px" }} />
-            <col style={{ width: "122px" }} />
+            <col style={{ width: "140px" }} />
             <col style={{ width: "90px" }} />
             <col style={{ width: "128px" }} />
             <col />
-            <col style={{ width: "136px" }} />
-            <col style={{ width: "100px" }} />
+            <col style={{ width: "130px" }} />
+            <col style={{ width: "104px" }} />
           </colgroup>
           <thead>
             <tr>
@@ -270,12 +270,16 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
                         <span className={`swatch swatch--${state.tone}`} aria-hidden="true" />
                         <span className="state__word">{state.word}</span>
                       </span>
+                      {isHighUrgency && <span className="state__urg" title="High urgency">URG</span>}
                     </td>
                     <td>{job.serviceType}</td>
                     <td>{zone}</td>
                     <td className="table__issue" title={job.issueSummary}>{job.issueSummary}</td>
                     <td title={techName}>{techName}</td>
-                    <td className="table__num table__time">{formatTimeString(job.scheduledStart)}</td>
+                    <td className="table__num table__time">
+                      {formatTimeString(job.scheduledStart)}
+                      <ChevronRight size={12} className="table__chev" aria-hidden="true" />
+                    </td>
                   </tr>
                 );
               })
@@ -290,6 +294,9 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
             ? "No work orders"
             : <>Showing <strong>{(currentPage - 1) * pageSize + 1}</strong> to <strong>{Math.min(currentPage * pageSize, filteredJobs.length)}</strong> of <strong>{filteredJobs.length}</strong></>}
         </span>
+        {filteredJobs.some((job) => job.urgency === "HIGH" && job.status !== "COMPLETED" && job.status !== "CANCELLED") && (
+          <span className="board__legend"><span className="state__urg">URG</span> high urgency</span>
+        )}
         <div className="board__foot-controls">
           <span>Page {currentPage} of {totalPages}</span>
           <button type="button" className="btn btn--sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage <= 1}>Previous</button>

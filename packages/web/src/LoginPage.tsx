@@ -35,8 +35,9 @@ export function LoginPage({ onDone }: Props) {
     <main className="auth">
       <form onSubmit={submit} aria-labelledby="login-title" className="auth__panel">
         <div>
-          <h1 id="login-title" className="auth__title">Log in to DispatchAI</h1>
-          <p className="auth__lede">Enter your name and PIN.</p>
+          <p className="auth__brand"><span className="app-nav__mark"><img src="/favicon.svg" alt="" width="18" height="18" /></span><span>Dispatch<span className="public__brand-accent">AI</span></span></p>
+          <h1 id="login-title" className="auth__title">Log in</h1>
+          <p className="auth__lede">Your name and PIN. Nothing is kept in this browser.</p>
         </div>
         <div className="auth__form">
           <label className="field">

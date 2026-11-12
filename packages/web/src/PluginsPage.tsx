@@ -294,8 +294,8 @@ export function PluginsPage() {
                       <div className="plugin__top">
                         <span className="plugin__icon" aria-hidden="true"><Icon size={16} /></span>
                         <strong className="plugin__name">{plugin.name}</strong>
+                        <span className="plugin__category">{plugin.category}</span>
                       </div>
-                      <span className="plugin__category">{plugin.category}</span>
                       <p className="plugin__desc" title={plugin.description}>{plugin.description}</p>
                       <div className="plugin__actions">
                         <button type="button" className="btn btn--primary btn--sm" onClick={() => openDrawer(plugin)}>Add</button>

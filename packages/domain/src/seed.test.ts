@@ -33,7 +33,7 @@ describe("seeded work orders sit on the business-local day", () => {
 
   it("schedules today's active work on today's business-local date", () => {
     const today = localDate(new Date(), config.timeZone);
-    const active = generateSeedData(config).workOrders.filter((job) => job.status !== "COMPLETED");
+    const active = generateSeedData(config).workOrders.filter((job) => job.status !== "COMPLETED" && job.status !== "CANCELLED");
 
     expect(active.length).toBeGreaterThan(0);
     for (const job of active) {

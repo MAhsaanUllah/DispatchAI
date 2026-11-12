@@ -134,7 +134,7 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig(), o
     { id: "prop_220", customerId: "cust_120", addressLine1: "4600 Seton Center Pkwy", city: "Austin", state: "TX", zipCode: "78759", serviceZone: "Austin-North" }
   ];
 
-  // 3. 6 Technicians (HVAC, Plumbing, Dual, and one Off-Duty)
+  // 3. 5 Technicians: four on the roster, one off duty so the roster filter has something to hide.
   const technicians: Technician[] = [
     {
       id: "tech_01",
@@ -165,13 +165,6 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig(), o
       status: "ACTIVE"
     },
     {
-      id: "tech_05",
-      name: "David Taylor",
-      skills: ["HVAC", "PLUMBING"],
-      serviceZones: ["Austin-Central", "Austin-South", "Austin-North"],
-      status: "ACTIVE"
-    },
-    {
       id: "tech_06",
       name: "Frank Alvarez",
       skills: ["HVAC"],
@@ -191,7 +184,7 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig(), o
   const dayBefore = (offset: number) =>
     new Date(Date.UTC(todayYear, todayMonth - 1, todayDay - offset)).toISOString().slice(0, 10);
 
-  // 5. 25 Work Orders (Historical, completed, in-progress, dispatched, and booked)
+  // 5. 9 Work Orders: three live today, six past visits (one cancelled).
   const workOrders: WorkOrder[] = [
     {
       id: "wo_1001",
@@ -240,7 +233,7 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig(), o
     }
   ];
 
-  // 22 diverse, realistic field-service work orders across Austin metro
+  // Six past visits beside the three live ones: a small shop's board, not a demo dump.
   const historicalProfiles: Array<{
     serviceType: "HVAC" | "PLUMBING";
     issueSummary: string;
@@ -249,30 +242,14 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig(), o
     startHour: string;
     endHour: string;
     dayOffset: number;
-    status: "BOOKED" | "DISPATCHED" | "IN_PROGRESS" | "COMPLETED";
+    status: "COMPLETED" | "CANCELLED";
   }> = [
-    { serviceType: "HVAC", issueSummary: "Thermostat unresponsive and AC fan short cycling", techIndex: 1, urgency: "HIGH", startHour: "09:00:00Z", endHour: "11:00:00Z", dayOffset: 0, status: "IN_PROGRESS" },
-    { serviceType: "PLUMBING", issueSummary: "Main sewer line slow drainage and gurgling in downstairs half-bath", techIndex: 2, urgency: "STANDARD", startHour: "10:30:00Z", endHour: "12:30:00Z", dayOffset: 0, status: "DISPATCHED" },
-    { serviceType: "HVAC", issueSummary: "Capacitor failure on outdoor condenser unit with loud humming", techIndex: 0, urgency: "STANDARD", startHour: "11:00:00Z", endHour: "13:00:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "PLUMBING", issueSummary: "Water heater pressure relief valve continuously leaking", techIndex: 3, urgency: "HIGH", startHour: "11:30:00Z", endHour: "13:30:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "HVAC", issueSummary: "Ductwork air leak in attic trunk causing low airflow to south wing", techIndex: 4, urgency: "STANDARD", startHour: "13:00:00Z", endHour: "15:00:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "PLUMBING", issueSummary: "Garbage disposal unit seized and leaking around mounting flange", techIndex: 2, urgency: "STANDARD", startHour: "14:00:00Z", endHour: "16:00:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "HVAC", issueSummary: "Evaporator coil frozen with heavy ice buildup and condensation overflow", techIndex: 1, urgency: "HIGH", startHour: "14:30:00Z", endHour: "16:30:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "PLUMBING", issueSummary: "Master bathroom shower cartridge failure preventing hot water shutoff", techIndex: 3, urgency: "HIGH", startHour: "15:00:00Z", endHour: "17:00:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "HVAC", issueSummary: "Condensate drain line backed up causing safety float switch trip", techIndex: 0, urgency: "STANDARD", startHour: "15:30:00Z", endHour: "17:30:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "PLUMBING", issueSummary: "Outdoor hose bibb cracked from freeze with active spray", techIndex: 4, urgency: "STANDARD", startHour: "16:00:00Z", endHour: "18:00:00Z", dayOffset: 0, status: "BOOKED" },
     { serviceType: "HVAC", issueSummary: "Blower motor bearing worn out with high-pitched squeal", techIndex: 1, urgency: "STANDARD", startHour: "08:30:00Z", endHour: "10:30:00Z", dayOffset: 1, status: "COMPLETED" },
     { serviceType: "PLUMBING", issueSummary: "Tankless water heater mineral scaling and error code E02 flush", techIndex: 2, urgency: "STANDARD", startHour: "09:00:00Z", endHour: "11:00:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "HVAC", issueSummary: "Zone damper actuator replacement on upstairs HVAC zone", techIndex: 4, urgency: "STANDARD", startHour: "10:00:00Z", endHour: "12:00:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "PLUMBING", issueSummary: "Sump pump check valve failure and basement basin overflow", techIndex: 3, urgency: "STANDARD", startHour: "11:00:00Z", endHour: "13:00:00Z", dayOffset: 1, status: "COMPLETED" },
     { serviceType: "HVAC", issueSummary: "Refrigerant leak detection and system recharge with R-410A", techIndex: 0, urgency: "STANDARD", startHour: "12:30:00Z", endHour: "14:30:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "PLUMBING", issueSummary: "Kitchen island under-sink P-trap cracked and leaking water", techIndex: 2, urgency: "STANDARD", startHour: "13:30:00Z", endHour: "15:30:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "HVAC", issueSummary: "Seasonal AC efficiency tuneup, coil cleaning, and filter swap", techIndex: 1, urgency: "STANDARD", startHour: "14:00:00Z", endHour: "16:00:00Z", dayOffset: 1, status: "COMPLETED" },
     { serviceType: "PLUMBING", issueSummary: "Toilet fill valve continuous running water and flapper replacement", techIndex: 3, urgency: "STANDARD", startHour: "15:00:00Z", endHour: "17:00:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "HVAC", issueSummary: "Contactor points pitted causing intermittent heat pump startup", techIndex: 4, urgency: "STANDARD", startHour: "09:00:00Z", endHour: "11:00:00Z", dayOffset: 2, status: "COMPLETED" },
-    { serviceType: "PLUMBING", issueSummary: "Gas water heater pilot thermocouple replacement", techIndex: 2, urgency: "STANDARD", startHour: "11:00:00Z", endHour: "13:00:00Z", dayOffset: 2, status: "COMPLETED" },
-    { serviceType: "HVAC", issueSummary: "Ecobee smart thermostat wiring harness short and power cycle", techIndex: 0, urgency: "STANDARD", startHour: "13:00:00Z", endHour: "15:00:00Z", dayOffset: 2, status: "COMPLETED" },
-    { serviceType: "PLUMBING", issueSummary: "Emergency water main shutoff valve seized and corroded", techIndex: 3, urgency: "HIGH", startHour: "15:30:00Z", endHour: "17:30:00Z", dayOffset: 2, status: "COMPLETED" }
+    { serviceType: "HVAC", issueSummary: "Seasonal AC tuneup, coil cleaning and filter swap", techIndex: 1, urgency: "STANDARD", startHour: "10:00:00Z", endHour: "12:00:00Z", dayOffset: 2, status: "COMPLETED" },
+    { serviceType: "PLUMBING", issueSummary: "Outdoor hose bib replacement, booked by mistake", techIndex: 2, urgency: "STANDARD", startHour: "13:00:00Z", endHour: "15:00:00Z", dayOffset: 2, status: "CANCELLED" }
   ];
 
   historicalProfiles.forEach((prof, idx) => {

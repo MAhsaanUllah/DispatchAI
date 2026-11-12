@@ -137,7 +137,9 @@ describe("Duplicate voice booking replay hardening (real voice-tool HTTP path)",
     const before = await jobCount();
 
     await identify(sid, "5125550101");
-    const southSlots = await availableSlots(sid, "HVAC", "Austin-South", "2026-09-19");
+    // A smaller roster means the replay fixtures on 09-19 fill up; the second booking takes the
+    // other fixture day, which is still a normal new booking rather than a replay.
+    const southSlots = await availableSlots(sid, "HVAC", "Austin-South", "2026-09-18");
     const second = await tool(sid, "create_work_order", {
       slotId: southSlots[0].slotId,
       issueSummary: "Thermostat dead - replay test D"
