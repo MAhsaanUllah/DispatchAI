@@ -256,7 +256,7 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
                     <td>{zone}</td>
                     <td className="table__issue" title={job.issueSummary}>{job.issueSummary}</td>
                     <td title={techName}>{techName}</td>
-                    <td className="table__num"><span className="plate">{formatTimeString(job.scheduledStart)}</span></td>
+                    <td className="table__num table__time">{formatTimeString(job.scheduledStart)}</td>
                   </tr>
                 );
               })

@@ -129,7 +129,7 @@ export const WorkOrderDrawer: React.FC<WorkOrderDrawerProps> = ({ job, events, o
             <div className="drawer__row">
               <Calendar size={13} aria-hidden="true" />
               <span className="drawer__key">Schedule:</span>
-              <span className="plate drawer__plate">
+              <span className="drawer__figure">
                 {job.scheduledStart ? job.scheduledStart.replace("T", " ").substring(0, 16) : "Unscheduled"}
               </span>
             </div>

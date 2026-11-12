@@ -302,7 +302,6 @@
 .board__figures,
 .board__foot,
 .table--board,
-.plate,
 .swatch,
 .figure__value {
   font-family: var(--font-outlier);
@@ -498,6 +497,9 @@
 
 .table__num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* The scheduled time is the datum the owner scans for: set apart by weight, not by a box. */
+.table__time { color: var(--color-paper-3); font-weight: 800; }
+
 .table__sort {
   display: inline-flex;
   align-items: center;
@@ -527,7 +529,7 @@
 .swatch--attention { color: var(--color-attention); }
 .swatch--closed { color: var(--color-ink-2); }
 .swatch--alert { color: var(--color-error); }
-.table--board .swatch--live { color: var(--color-accent-2); }
+.table--board .swatch--live { color: var(--color-live-on-ink); }
 .table--board .swatch--closed { color: var(--color-on-ink-muted); }
 .table--board .swatch--attention { color: var(--color-attention-on-ink); }
 .table--board .swatch--alert { color: var(--color-error-on-ink); }
@@ -544,25 +546,10 @@
 .state__word--attention { color: var(--color-attention); }
 .state__word--closed { color: var(--color-muted); }
 .state__word--alert { color: var(--color-error); }
-.table--board .state__word--live { color: var(--color-accent-2); }
+.table--board .state__word--live { color: var(--color-live-on-ink); }
 .table--board .state__word--attention { color: var(--color-attention-on-ink); }
 .table--board .state__word--closed { color: var(--color-on-ink-muted); }
 .table--board .state__word--alert { color: var(--color-error-on-ink); }
-
-/* The platform plate: a square of ink holding one figure. */
-.plate {
-  display: inline-grid;
-  place-items: center;
-  min-width: 76px;
-  padding: var(--space-3xs) var(--space-xs);
-  background: var(--color-ink);
-  color: var(--color-accent-2);
-  font-size: var(--text-sm);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 
 /* ── Filters ───────────────────────────────────────────────────────────── */
 
@@ -862,7 +849,7 @@
   display: grid;
   gap: var(--space-sm);
   padding: var(--space-md);
-  border: var(--rule-bar) solid var(--color-accent-2);
+  border: var(--rule-bar) solid var(--color-attention);
   background: var(--color-paper-2);
 }
 
@@ -1129,7 +1116,7 @@
 .drawer__row { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--text-xs); }
 .drawer__key { color: var(--color-muted); }
 .drawer__quiet { color: var(--color-muted); }
-.drawer__plate { min-width: 0; }
+.drawer__figure { font-family: var(--font-outlier); font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .drawer--wide { width: 460px; }
 

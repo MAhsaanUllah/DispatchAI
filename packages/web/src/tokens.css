@@ -78,6 +78,9 @@
   --color-attention: oklch(46% 0.1 68);
   --color-attention-on-ink: oklch(80% 0.15 82);
 
+  /* Live on the ink board: the brand green lightened for a dark ground. */
+  --color-live-on-ink: oklch(74% 0.14 157);
+
   /* Alert. */
   --color-error: oklch(48% 0.17 27);
   --color-error-ink: oklch(99.5% 0.005 250);
