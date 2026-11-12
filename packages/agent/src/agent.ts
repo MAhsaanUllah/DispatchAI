@@ -68,12 +68,6 @@ export class DispatchAgent {
     }
   }
 
-  public setElevenLabsConversationId(conversationId: string) {
-    this.state.elevenLabsConversationId = conversationId;
-    const correlationId = this.generateCorrelationId();
-    this.emit("STATE_UPDATED", correlationId, undefined, { elevenLabsConversationId: conversationId });
-  }
-
   public setVisitorDetails(visitorName: string, visitorEmail: string) {
     this.state.visitorName = visitorName.trim();
     this.state.visitorEmail = visitorEmail.trim().toLowerCase();

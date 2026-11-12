@@ -38,11 +38,7 @@ describe("Work-order routing correctness", () => {
 
   beforeEach(() => {
     domainService = new DispatchService();
-    const n8nClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      directService: domainService
-    });
+    const n8nClient = new N8nClient({ directService: domainService });
     agent = new DispatchAgent("routing_session", n8nClient);
     emittedEvents = [];
     agent.subscribe((event) => emittedEvents.push(event));

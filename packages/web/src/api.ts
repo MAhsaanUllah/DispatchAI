@@ -99,25 +99,6 @@ export const api = {
     return this.getJobs();
   },
 
-  async createVoiceSession(requestedSessionId: string, visitor?: { name: string; email?: string; persona?: string }): Promise<any> {
-    return request("/api/voice/session", {
-      method: "POST",
-      body: JSON.stringify(import.meta.env.MODE === "cloudflare" ? {} : { sessionId: requestedSessionId, visitorName: visitor?.name, visitorEmail: visitor?.email })
-    });
-  },
-
-  async executeVoiceTool(toolName: string, parameters: any, voiceToolToken: string, convId?: string, requestedSessionId = sessionId): Promise<any> {
-    return request(`/api/voice/tools/${toolName}`, {
-      method: "POST",
-      headers: { "x-voice-session-token": voiceToolToken, "x-session-id": requestedSessionId },
-      body: JSON.stringify({ tool_name: toolName, parameters, conversation_id: convId })
-    });
-  },
-
-  async endVoiceSession(voiceToolToken: string) {
-    return request("/api/voice/end", { method: "POST", headers: { "x-voice-session-token": voiceToolToken }, body: "{}", keepalive: true });
-  },
-
   async sendChatMessage(text: string, _sessionId?: string): Promise<{ reply: string; events: AgentEvent[] }> {
     return this.sendMessage(text);
   },

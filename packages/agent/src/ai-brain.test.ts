@@ -12,7 +12,7 @@ const services = () => getBusinessConfig("salon").services;
 function fakeLlm(answer: string | number) {
   const realFetch = globalThis.fetch;
   const calls: { url: string; body: any }[] = [];
-  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const url = String(input);
     if (!/groq|cloudflare|googleapis|11434/.test(url)) return realFetch(input, init);
     calls.push({ url, body: JSON.parse(String(init?.body)) });
@@ -74,7 +74,7 @@ describe("agent with the AI fallback", () => {
   const salonAgent = () => {
     process.env.BUSINESS_TEMPLATE = "salon";
     const service = new DispatchService();
-    const agent = new DispatchAgent("ai_eval", new N8nClient({ baseUrl: "http://localhost:5678", secret: "x", directService: service }));
+    const agent = new DispatchAgent("ai_eval", new N8nClient({ directService: service }));
     agent.understand = async (text) => {
       const e = await extract(GROQ, text, getBusinessConfig().services);
       return e ? toCanonical(e, getBusinessConfig().services) : null;

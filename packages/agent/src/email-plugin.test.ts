@@ -9,7 +9,7 @@ type Sent = { url: string; auth: string; body: { from: string; to: string[]; sub
 function fakeResend(status = 200, message = "") {
   const sent: Sent[] = [];
   const realFetch = globalThis.fetch;
-  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     if (String(input) !== RESEND_URL) return realFetch(input, init);
     sent.push({ url: String(input), auth: String((init?.headers as Record<string, string>).Authorization), body: JSON.parse(String(init?.body)) });
     return new Response(JSON.stringify(status === 200 ? { id: "email_1" } : { message }), { status });

@@ -15,7 +15,7 @@ export function sanitizeInputString(input: string): string {
 }
 
 /**
- * Basic HMAC signature verification for external webhooks (e.g. ElevenLabs, n8n)
+ * Basic HMAC signature verification for external webhooks (e.g. n8n)
  */
 export async function verifyWebhookSignature(
   rawBody: string,

@@ -1,7 +1,5 @@
 import React, { Suspense, useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { LandingPage } from "./LandingPage.js";
-import { PublicDashboard } from "./PublicDashboard.js";
 import { SetupPage } from "./SetupPage.js";
 import { LoginPage } from "./LoginPage.js";
 import { BusinessWizard } from "./BusinessWizard.js";
@@ -40,8 +38,6 @@ function Dashboard() {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {window.location.pathname.startsWith("/app")
-      ? import.meta.env.MODE === "cloudflare" ? <PublicDashboard /> : <Dashboard />
-      : <LandingPage />}
+    <Dashboard />
   </React.StrictMode>
 );

@@ -8,10 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=@dispatchai/web",
-    "dev:domain": "node --env-file=.env ./node_modules/vite-node/dist/cli.mjs packages/domain/src/bin/dispatch-server.ts",
     "dev:agent": "node --env-file=.env ./node_modules/vite-node/dist/cli.mjs packages/agent/src/bin/agent-server.ts",
-    "dev:cloudflare": "wrangler dev --port 8788",
-    "smoke:cloudflare": "node --env-file=.env scripts/cloudflare-smoke.mjs",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
@@ -19,11 +16,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
-    "agents": "^0.33.0",
     "typescript": "^5.9.3",
     "vite-node": "^6.0.0",
-    "vitest": "^5.1.0",
-    "wrangler": "^4.160.0"
+    "vitest": "^5.1.0"
   },
   "overrides": {
     "react": "18.3.1"

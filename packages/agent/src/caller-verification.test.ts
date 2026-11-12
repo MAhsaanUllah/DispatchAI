@@ -7,7 +7,7 @@ import { addressMatches, nameMatches } from "./verify.js";
 // Security Finding 1: a phone number (or spoofed caller ID) must never reveal another customer's details.
 const setup = () => {
   const service = new DispatchService();
-  const agent = new DispatchAgent(`verify_${Math.random()}`, new N8nClient({ baseUrl: "http://localhost:5678", secret: "x", directService: service }));
+  const agent = new DispatchAgent(`verify_${Math.random()}`, new N8nClient({ directService: service }));
   const handoffs: string[] = [];
   agent.subscribe((event) => { if (event.type === "HANDOFF_REQUESTED") handoffs.push(event.payload?.text ?? ""); });
   return { service, agent, handoffs };

@@ -1,9 +1,8 @@
 import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
 import { BusinessConfigSchema, type BusinessService } from "@dispatchai/shared";
-import { toolFailure, toolSuccess, verifyWebhookSignature } from "@dispatchai/shared";
+import { toolFailure, toolSuccess } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
-import { ELEVENLABS_AGENT_CONFIG, ELEVENLABS_TOOLS, ELEVENLABS_SYSTEM_PROMPT } from "./elevenlabs.config.js";
 import { SQLiteDispatchStore } from "../../domain/src/sqlite-store.js";
 import { deliverBookingEmails } from "../../domain/src/email.js";
 import { dueReminders, reminderKey, ReminderLog } from "./reminders.js";
@@ -52,10 +51,7 @@ if (!auth.hasOwner()) {
 // One process owns the business data (single writer). DATABASE_URL = SQLite file path; unset = in-memory.
 export const domainService = new DispatchService(process.env.DATABASE_URL ? new SQLiteDispatchStore(process.env.DATABASE_URL) : undefined);
 const isTestRuntime = process.env.NODE_ENV === "test";
-const dispatchSecret = process.env.N8N_WEBHOOK_SECRET || (isTestRuntime ? "dev_secret_dispatch_2026" : "");
 const n8nClient = new N8nClient({
-  baseUrl: process.env.N8N_BASE_URL || "http://localhost:5678",
-  secret: dispatchSecret,
   directService: domainService,
   // After each create/reschedule/cancel: emails (as the HTTP domain server did) and the signed n8n event. Neither throws.
   onMutation: async (kind, workOrder) => {
@@ -202,10 +198,8 @@ async function routeRequest(req: Request): Promise<Response> {
   }
 
   const sessionId = sessionIdOf(req);
-  const requestSecret = req.headers.get("x-dispatch-secret");
-  const voiceToken = sessions.getToken(req.headers.get("x-voice-session-token") || "");
 
-  // 1. Rate Limit Enforcement
+  const agent = getOrCreateAgent(sessionId);
   const clientKey = req.headers.get("cf-connecting-ip") || "local";
   if (!rateLimiter.check(clientKey)) {
     return new Response(
@@ -256,8 +250,9 @@ async function routeRequest(req: Request): Promise<Response> {
     return json(toolSuccess({ loggedOut: true }, `logout_${Date.now()}`), 200, { ...corsHeaders, "Set-Cookie": ownerCookie(req, "", 0) });
   }
 
-  // Once an owner exists, every other API call needs an owner session. Voice tool and webhook routes keep their own secret/signature checks.
-  const selfAuthenticated = pathname.startsWith("/api/voice/tools/") || pathname === "/api/voice/webhook" || pathname === "/api/twilio/voice";
+  // Once an owner exists, every other API call needs an owner session. The Twilio phone line
+  // keeps its own signature check instead.
+  const selfAuthenticated = pathname === "/api/twilio/voice";
   if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !user) {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
   }
@@ -475,19 +470,6 @@ async function routeRequest(req: Request): Promise<Response> {
     return json(toolSuccess({ config: parsed.data }, `biz_${Date.now()}`), 200, corsHeaders);
   }
 
-  // 2. Secret Authentication Enforcement for protected endpoints
-  const isProtectedToolRoute = pathname.startsWith("/api/voice/tools/");
-  const hasServerSecret = !!dispatchSecret && requestSecret === dispatchSecret;
-  const hasVoiceToken = !!voiceToken && voiceToken.sessionId === sessionId && voiceToken.expiresAt > Date.now();
-  if (isProtectedToolRoute && !hasServerSecret && !hasVoiceToken) {
-    return new Response(
-      JSON.stringify(toolFailure("UNAUTHORIZED", "Invalid or missing x-dispatch-secret authentication header", false, `auth_${Date.now()}`)),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  const agent = getOrCreateAgent(sessionId);
-
   // 1. Text chat interaction
   if (method === "POST" && pathname === "/api/chat") {
     return (async () => {
@@ -600,108 +582,9 @@ async function routeRequest(req: Request): Promise<Response> {
     });
   }
 
-  // 6. ElevenLabs Voice Agent Config
-  if (method === "GET" && pathname === "/api/voice/config") {
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        data: {
-          config: ELEVENLABS_AGENT_CONFIG,
-          tools: ELEVENLABS_TOOLS,
-          systemPrompt: ELEVENLABS_SYSTEM_PROMPT
-        }
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  // 7. ElevenLabs Voice Session Creation/Binding
-  if (method === "POST" && pathname === "/api/voice/session") {
-    return (async () => {
-      try {
-        const apiKey = process.env.ELEVENLABS_API_KEY;
-        const agentId = process.env.ELEVENLABS_AGENT_ID;
-        if (!apiKey || !agentId || apiKey.startsWith("your_") || agentId.startsWith("your_")) {
-          return new Response(JSON.stringify(toolFailure("VOICE_NOT_CONFIGURED", "ElevenLabs API key and agent ID are required for a real voice session", false, `voice_${Date.now()}`)), {
-            status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        }
-        const body: any = await req.json().catch(() => ({}));
-        const visitorName = typeof body.visitorName === "string" ? body.visitorName.trim().slice(0, 80) : "";
-        const visitorEmail = typeof body.visitorEmail === "string" ? body.visitorEmail.trim().toLowerCase() : "";
-        if (visitorEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(visitorEmail)) {
-          return new Response(
-            JSON.stringify(toolFailure("INVALID_INPUT", "visitorEmail must be a valid email address", false, `voice_${Date.now()}`)),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        const response = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(agentId)}`, {
-          headers: { "xi-api-key": apiKey }
-        });
-        if (!response.ok) throw new Error(`ElevenLabs signed URL request failed (${response.status})`);
-        const signed = await response.json() as { signed_url?: string };
-        if (!signed.signed_url) throw new Error("ElevenLabs did not return a signed URL");
-        const voiceToolToken = crypto.randomUUID();
-        sessions.saveToken(voiceToolToken, { sessionId, expiresAt: Date.now() + 60 * 60 * 1000 });
-        const convId = body.conversationId || null;
-        if (convId) agent.setElevenLabsConversationId(convId);
-        if (visitorEmail) agent.setVisitorDetails(visitorName || "Website visitor", visitorEmail);
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            data: {
-              sessionId,
-              elevenLabsConversationId: convId,
-              status: "READY",
-              signedUrl: signed.signed_url,
-              voiceToolToken,
-              ...(visitorEmail ? { visitorName: visitorName || "Website visitor", visitorEmail } : {})
-            }
-          }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (err: any) {
-        return new Response(
-          JSON.stringify(toolFailure("VOICE_SESSION_ERROR", err.message, false, `err_${Date.now()}`)),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    })();
-  }
-
-  // 8. ElevenLabs Controlled Tool Webhook Execution Bridge
-  if (method === "POST" && pathname === "/api/voice/webhook") {
-    return (async () => {
-      const rawBody = await req.text();
-      const signature = req.headers.get("x-elevenlabs-signature") || "";
-      const webhookSecret = process.env.ELEVENLABS_WEBHOOK_SECRET || "";
-      if (!(await verifyWebhookSignature(rawBody, signature, webhookSecret))) {
-        return new Response(JSON.stringify(toolFailure("UNAUTHORIZED", "Invalid webhook signature", false, `auth_${Date.now()}`)), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      return handleVoiceTool(JSON.parse(rawBody), pathname, agent, corsHeaders);
-    })();
-  }
-
-  if (method === "POST" && pathname.startsWith("/api/voice/tools/")) {
-    return (async () => {
-      try {
-        const body: any = await req.json();
-        return handleVoiceTool(body, pathname, agent, corsHeaders);
-      } catch (err: any) {
-        return new Response(
-          JSON.stringify(toolFailure("VOICE_TOOL_ERROR", err.message, false, `err_${Date.now()}`)),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    })();
-  }
-
   // Health
   if (method === "GET" && pathname === "/health") {
-    return new Response(JSON.stringify({ status: "OK", service: "DispatchAgent-Cloudflare" }), {
+    return new Response(JSON.stringify({ status: "OK", service: "DispatchAI" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
@@ -711,68 +594,4 @@ async function routeRequest(req: Request): Promise<Response> {
     status: 404,
     headers: { ...corsHeaders, "Content-Type": "application/json" }
   });
-}
-
-// Cloudflare Workers fetch handler
-export default {
-  fetch(request: Request): Response | Promise<Response> {
-    return handleRequest(request);
-  }
-};
-
-async function handleVoiceTool(
-  body: any,
-  pathname: string,
-  agent: DispatchAgent,
-  corsHeaders: Record<string, string>
-): Promise<Response> {
-  const toolName = body.tool_name || body.toolName || pathname.replace("/api/voice/tools/", "");
-  const params = body.parameters || body.args || body;
-  const convId = body.conversation_id || body.elevenLabsConversationId;
-  if (convId) agent.setElevenLabsConversationId(convId);
-
-  const correlationId = `voice_corr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-  let result: any;
-  switch (toolName) {
-    case "find_customer": result = await agent.findCustomer(params.phone, correlationId); break;
-    case "check_availability": result = await agent.checkAvailability(params.serviceType, params.serviceZone, params.date, params.preferredWindow, correlationId); break;
-    case "get_work_order": result = await agent.getWorkOrder(params.workOrderId, correlationId); break;
-    case "create_work_order":
-      result = await handleConfirmedMutation(agent, "CREATE_WORK_ORDER", params, correlationId);
-      break;
-    case "reschedule_work_order":
-      result = await handleConfirmedMutation(agent, "RESCHEDULE_WORK_ORDER", params, correlationId);
-      break;
-    case "cancel_work_order":
-      result = await handleConfirmedMutation(agent, "CANCEL_WORK_ORDER", params, correlationId);
-      break;
-    default: result = toolFailure("UNKNOWN_TOOL", `Tool ${toolName} is not recognized`, false, correlationId);
-  }
-  return new Response(JSON.stringify({ result: result.ok ? (result.data || result) : result.error?.message, envelope: result }), {
-    status: result.ok ? 200 : result.error?.code === "CONFIRMATION_REQUIRED" ? 409 : 400,
-    headers: { ...corsHeaders, "Content-Type": "application/json" }
-  });
-}
-
-
-async function handleConfirmedMutation(agent: DispatchAgent, type: string, params: any, correlationId: string) {
-  const pending = agent.getState().pendingAction;
-  // An immediate redundant replay of the last successful booking must not open a second
-  // confirmation cycle: return the original result idempotently instead of mutating again.
-  if (!pending && type === "CREATE_WORK_ORDER") {
-    const replay = agent.findBookingReplay(params?.slotId);
-    if (replay) {
-      return toolSuccess({ workOrder: replay.workOrder, idempotentReplay: true }, correlationId);
-    }
-  }
-  if (!pending) {
-    if (type === "CREATE_WORK_ORDER") agent.proposeBooking(params.slotId, params.issueSummary, params.urgency || "STANDARD", "VOICE_AGENT");
-    if (type === "RESCHEDULE_WORK_ORDER") agent.proposeReschedule(params.workOrderId, params.newSlotId);
-    if (type === "CANCEL_WORK_ORDER") agent.proposeCancellation(params.workOrderId, params.reason);
-    return toolFailure("CONFIRMATION_REQUIRED", "Explicit customer confirmation is required before this action", false, correlationId);
-  }
-  if (pending.type !== type || params.confirmed !== true) {
-    return toolFailure("CONFIRMATION_REQUIRED", "The pending action must be explicitly confirmed", false, correlationId);
-  }
-  return agent.confirmPendingAction(correlationId);
 }

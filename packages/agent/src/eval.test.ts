@@ -12,11 +12,7 @@ describe("Phase 9: Automated Agent Scenario Evaluation Benchmarks", () => {
 
   beforeEach(() => {
     domainService = new DispatchService();
-    n8nClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      directService: domainService
-    });
+    n8nClient = new N8nClient({ directService: domainService });
     agent = new DispatchAgent("eval_session_909", n8nClient);
     emittedEvents = [];
     agent.subscribe((evt) => emittedEvents.push(evt));

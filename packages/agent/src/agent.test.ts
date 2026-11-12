@@ -12,11 +12,7 @@ describe("Phase 3: Cloudflare DispatchAgent & Text Interaction Path", () => {
 
   beforeEach(() => {
     domainService = new DispatchService();
-    n8nClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      directService: domainService
-    });
+    n8nClient = new N8nClient({ directService: domainService });
     agent = new DispatchAgent("test_session_101", n8nClient);
     emittedEvents = [];
     agent.subscribe((event) => emittedEvents.push(event));
@@ -152,11 +148,7 @@ describe("Visitor email routing from a public voice call", () => {
 
   beforeEach(() => {
     domainService = new DispatchService();
-    n8nClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      directService: domainService
-    });
+    n8nClient = new N8nClient({ directService: domainService });
     agent = new DispatchAgent("visitor_email_session", n8nClient);
   });
 

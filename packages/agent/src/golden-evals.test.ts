@@ -17,7 +17,7 @@ const YES = /^(yes|confirm|book it|go ahead|proceed|sure|please do|ok|yep)\b/i;
 function setup(template: Template) {
   process.env.BUSINESS_TEMPLATE = template.id;
   const service = new DispatchService();
-  const agent = new DispatchAgent(`eval_${template.id}`, new N8nClient({ baseUrl: "http://localhost:5678", secret: "eval", directService: service }));
+  const agent = new DispatchAgent(`eval_${template.id}`, new N8nClient({ directService: service }));
   const store = service.getStore();
   const transcript: string[] = [];
   let violations = 0;
