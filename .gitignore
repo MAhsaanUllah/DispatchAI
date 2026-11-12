@@ -72,3 +72,8 @@ master.key
 # E2E
 test-results/
 playwright-report/
+
+# Desktop (Tauri)
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/

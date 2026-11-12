@@ -1,0 +1,13 @@
+{
+  "name": "dispatchai-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "prepare:app": "node prepare.mjs",
+    "dev": "npm run prepare:app && tauri dev",
+    "build": "npm run prepare:app && tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
