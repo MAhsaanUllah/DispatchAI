@@ -43,7 +43,9 @@
   --dur-short: 220ms;
   --dur-long: 420ms;
 
-  /* Layout. */
+  /* Layout. One content measure for the whole console: the owner reads this on a laptop
+     or a phone, not across a wall. Everything sits inside it and centres. */
+  --content-width: 1200px;
   --container: 1440px;
   --gutter: 24px;
   --z-base: 1;

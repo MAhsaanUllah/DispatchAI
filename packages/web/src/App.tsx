@@ -126,7 +126,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-shell">
-      <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={localTime} companyName={directory?.company.name} isOwner={isOwner} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
+      <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={localTime} companyName={directory?.company.name} isOwner={isOwner} demo={directory?.demo} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
 
       <main className="app-main">
         {activeView === "company" && editingBusiness ? <BusinessWizard onDone={() => window.location.reload()} onCancel={() => setEditingBusiness(false)} />
@@ -135,13 +135,13 @@ export const App: React.FC = () => {
               : activeView === "system" ? <SystemPanel />
                 : !isBoard ? (
                   <div className="app-body">
+                    <DirectoryPanel
+                      view={activeView}
+                      directory={directory}
+                      loading={directoryLoading}
+                      onEdit={activeView === "company" && isOwner ? () => setEditingBusiness(true) : undefined}
+                    />
                     {activeView === "team" && isOwner && <TeamLogins />}
-                    {activeView === "company" && isOwner && (
-                      <div className="page__actions">
-                        <button type="button" className="btn btn--primary btn--sm" onClick={() => setEditingBusiness(true)}>Edit business</button>
-                      </div>
-                    )}
-                    <DirectoryPanel view={activeView} directory={directory} loading={directoryLoading} />
                   </div>
                 ) : (
                   <div className="app-body app-body--flush">

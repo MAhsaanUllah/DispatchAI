@@ -1,4 +1,4 @@
-import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
+import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, readEnv, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
 import { BusinessConfigSchema, type BusinessService } from "@dispatchai/shared";
 import { toolFailure, toolSuccess, verifyWebhookSignature } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
@@ -431,6 +431,9 @@ async function routeRequest(req: Request): Promise<Response> {
       config: getBusinessConfig(),
       configured: saved.config !== undefined,
       canSwitchTemplate: !saved.firstBookingAt,
+      // True only while this install still runs on the fictional demo dataset. The web uses it
+      // to show the "seeded demo data" and "Reset Demo" affordances, which mean nothing on a real install.
+      demo: readEnv("SEED_DEMO_DATA") === "true",
       templates: businessTemplates.map((t) => ({ templateId: t.templateId, name: t.name, kind: t.kind, services: t.services.map((service) => service.name) }))
     } }, 200, corsHeaders);
   }
@@ -577,7 +580,10 @@ async function routeRequest(req: Request): Promise<Response> {
   }
 
   if (method === "GET" && pathname === "/api/directory") {
-    return new Response(JSON.stringify({ ok: true, data: getDirectory(domainService.getStore()) }), {
+    // The demo flag travels with the directory: the web shows "seeded demo data" and "Reset Demo"
+    // only while this install still runs on the fictional dataset.
+    const directory = { ...getDirectory(domainService.getStore()), demo: readEnv("SEED_DEMO_DATA") === "true" };
+    return new Response(JSON.stringify({ ok: true, data: directory }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }

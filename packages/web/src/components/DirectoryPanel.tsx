@@ -2,25 +2,44 @@ import type { Directory } from "../api.js";
 
 type View = "team" | "services" | "company";
 
+const VIEW_COPY: Record<View, { title: string; lede: string }> = {
+  team: {
+    title: "Technician team",
+    lede: "Skills, coverage and the next open slot each technician takes."
+  },
+  services: {
+    title: "Service catalog",
+    lede: "What the agent can book. A dispatcher confirms any fee before it is quoted."
+  },
+  company: {
+    title: "Company profile",
+    lede: "The business the agent books for: market, time zone and coverage."
+  }
+};
+
 function formatSlot(startAt: string, endAt: string, timeZone: string) {
   const options: Intl.DateTimeFormatOptions = { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
   return `${new Intl.DateTimeFormat("en-US", options).format(new Date(startAt))} to ${new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date(endAt))}`;
 }
 
-export function DirectoryPanel({ view, directory, loading }: { view: View; directory: Directory | null; loading: boolean }) {
-  const title = { team: "Technician team", services: "Service catalog", company: "Company profile" }[view];
+export function DirectoryPanel({ view, directory, loading, onEdit }: { view: View; directory: Directory | null; loading: boolean; onEdit?: () => void }) {
+  const { title, lede } = VIEW_COPY[view];
   return <section className="page" aria-label={title}>
     <div className="page__head">
-      <div>
+      <div className="page__head-text">
         <h1 className="page__title">{title}</h1>
+        <p className="page__lede">{lede}</p>
       </div>
-      <span className="public__readonly">Seeded demo data, read only</span>
+      <div className="page__meta">
+        {directory?.demo && <span className="tag tag--quiet">Seeded demo data</span>}
+        {onEdit && <button type="button" className="btn btn--primary btn--sm" onClick={onEdit}>Edit business</button>}
+      </div>
     </div>
     {!directory ? <div className="page__note">{loading ? "Loading directory…" : "Directory unavailable. Start the local agent and database APIs to view company data."}</div> : null}
-    {directory && view === "team" ? <>
-      <p className="page__lede">Skills, service areas and upcoming slots used by availability checks. These are demo schedules, not live technician calendars.</p>
-      <div className="grid-3">
-        {directory.technicians.map((tech) => <article className="record" key={tech.id}>
+    {directory && view === "team" ? <div className="grid grid--auto">
+      {directory.technicians.map((tech) => {
+        const next = tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE");
+        return <article className="record" key={tech.id}>
           <div className="record__head">
             <h2 className="record__name">{tech.name}</h2>
             <span className="record__meta">{tech.status === "ACTIVE" ? "On roster" : "Off duty"}</span>
@@ -30,33 +49,43 @@ export function DirectoryPanel({ view, directory, loading }: { view: View; direc
             <div className="record__row"><dt>Coverage</dt><dd>{tech.serviceZones.join(", ")}</dd></div>
             <div className="record__row">
               <dt>Next open slot</dt>
-              <dd>{tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE") ? formatSlot(tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE")!.startAt, tech.upcomingSlots.find((slot) => slot.status === "AVAILABLE")!.endAt, directory.company.timeZone) : "No open demo slot"}</dd>
+              <dd>{next ? formatSlot(next.startAt, next.endAt, directory.company.timeZone) : "No open slot"}</dd>
             </div>
           </dl>
-        </article>)}
-      </div>
-    </> : null}
-    {directory && view === "services" ? <>
-      <p className="page__lede">The voice agent can classify these services and check technician availability. Pricing is not configured.</p>
-      <div className="grid-2">
-        {directory.services.map((service) => <article className="record" key={service.id}>
-          <div className="record__head">
-            <h2 className="record__name">{service.name}</h2>
-            <span className="record__meta">{service.id}</span>
-          </div>
-          <p className="drawer__text">{service.description}</p>
-          <div className="record__note">{service.priceNote}</div>
-        </article>)}
-      </div>
-    </> : null}
-    {directory && view === "company" ? <div className="record">
-      <div className="record__head"><h2 className="record__name">{directory.company.name}</h2></div>
-      <dl className="record__list">
-        <div className="record__row"><dt>Market</dt><dd>{directory.company.market}</dd></div>
-        <div className="record__row"><dt>Time zone</dt><dd>{directory.company.timeZone}</dd></div>
-        <div className="record__row"><dt>Service areas</dt><dd>{directory.company.serviceZones.join(", ")}</dd></div>
-      </dl>
-      <div className="record__note">{directory.company.note}</div>
+        </article>;
+      })}
     </div> : null}
+    {directory && view === "services" ? <div className="grid grid--auto">
+      {directory.services.map((service) => <article className="record" key={service.id}>
+        <div className="record__head">
+          <h2 className="record__name">{service.name}</h2>
+          <span className="record__meta">{service.id}</span>
+        </div>
+        <p className="drawer__text">{service.description}</p>
+        <div className="record__note">{service.priceNote}</div>
+      </article>)}
+    </div> : null}
+    {directory && view === "company" ? <>
+      <div className="grid grid--auto">
+        <article className="record">
+          <div className="record__head"><h2 className="record__name">{directory.company.name}</h2></div>
+          <p className="drawer__text">{directory.company.note}</p>
+        </article>
+        <article className="record">
+          <div className="record__head"><h2 className="record__name">Market</h2></div>
+          <p className="drawer__text">{directory.company.market}</p>
+        </article>
+        <article className="record">
+          <div className="record__head"><h2 className="record__name">Time zone</h2></div>
+          <p className="drawer__text drawer__text--mono">{directory.company.timeZone}</p>
+        </article>
+      </div>
+      <article className="record">
+        <div className="record__head"><h2 className="record__name">Service areas</h2></div>
+        <div className="tag-row">
+          {directory.company.serviceZones.map((zone) => <span className="tag" key={zone}>{zone}</span>)}
+        </div>
+      </article>
+    </> : null}
   </section>;
 }
