@@ -72,4 +72,11 @@ test("first run: setup, login, onboarding, then a caller books and it shows in t
   // 5. The booking is in the dashboard table.
   await expect(page.getByRole("row").filter({ hasText: /WO-/ }).first()).toBeVisible();
   await expect(page.getByText("No bookings yet")).toHaveCount(0);
+
+  // 6. The owner downloads a backup from the System page.
+  await page.getByRole("button", { name: /^System/ }).click();
+  const saved = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download backup" }).click();
+  expect((await saved).suggestedFilename()).toMatch(/^dispatchai-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  await expect(page.getByText(/Last downloaded from this browser/)).toBeVisible();
 });

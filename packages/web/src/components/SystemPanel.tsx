@@ -1,4 +1,5 @@
 import React from "react";
+import { BackupPanel } from "./BackupPanel.js";
 import { PhoneCall, Bot, Database, Plug, ShieldCheck, Cpu, Cable } from "lucide-react";
 
 type SystemPlugin = {
@@ -29,17 +30,17 @@ const STEPS = [
     icon: Database,
     title: "SQLite on this machine",
     meta: "One database file, no cloud",
-    copy: "Work orders, technicians, slots and customers live in a single file beside the server. Back it up by copying that file."
+    copy: "Work orders, technicians, slots and customers live in a single file beside the server. Back it up with the Backup section on this page."
   },
   {
     icon: Cable,
     title: "Plugins",
     meta: "What a confirmed booking touches",
-    copy: "Each plugin is optional and switched on from the Plugins page. A plugin that is off is simply skipped."
+    copy: "Each plugin is optional and switched on from the Features page. A plugin that is off is simply skipped."
   }
 ] as const;
 
-// Live plugin state, as chips that open the Plugins page.
+// Live plugin state, as chips that open the Features page.
 function PluginChips({ onOpenPlugins }: { onOpenPlugins: () => void }) {
   const [plugins, setPlugins] = React.useState<SystemPlugin[] | null>(null);
   React.useEffect(() => {
@@ -55,7 +56,7 @@ function PluginChips({ onOpenPlugins }: { onOpenPlugins: () => void }) {
           <span className="chip__state">{plugin.enabled ? "live" : "off"}</span>
         </button>
       ))}
-      <button type="button" className="chip chip--link" onClick={onOpenPlugins}>Manage plugins</button>
+      <button type="button" className="chip chip--link" onClick={onOpenPlugins}>Manage features</button>
     </div>
   );
 }
@@ -101,7 +102,7 @@ function HealthStrip() {
   );
 }
 
-export function SystemPanel({ onOpenPlugins }: { onOpenPlugins: () => void }) {
+export function SystemPanel({ onOpenPlugins, isOwner = false }: { onOpenPlugins: () => void; isOwner?: boolean }) {
   return (
     <section className="page" aria-label="System architecture">
       <div className="page__head">
@@ -112,6 +113,7 @@ export function SystemPanel({ onOpenPlugins }: { onOpenPlugins: () => void }) {
       </div>
 
       <HealthStrip />
+      {isOwner && <BackupPanel />}
 
       <ol className="flow">
         {STEPS.map((step) => {

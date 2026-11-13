@@ -150,7 +150,7 @@ export const App: React.FC = () => {
         {activeView === "company" && editingBusiness ? <BusinessWizard onDone={() => window.location.reload()} onCancel={() => setEditingBusiness(false)} />
           : activeView === "inbox" ? <InboxPage />
             : activeView === "plugins" ? <PluginsPage />
-              : activeView === "system" ? <SystemPanel onOpenPlugins={() => setActiveView("plugins")} />
+              : activeView === "system" ? <SystemPanel onOpenPlugins={() => setActiveView("plugins")} isOwner={isOwner} />
                 : !isBoard ? (
                   <div className="app-body">
                     <DirectoryPanel
