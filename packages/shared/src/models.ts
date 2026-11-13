@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WeekHoursSchema } from "./config.js";
 
 // Service ids come from the active BusinessConfig; the domain service checks membership.
 export const ServiceTypeSchema = z.string().regex(/^[A-Z][A-Z0-9_]*$/, "Service id must be UPPER_SNAKE_CASE");
@@ -34,7 +35,9 @@ export const TechnicianSchema = z.object({
   name: z.string().min(1),
   skills: z.array(ServiceTypeSchema),
   serviceZones: z.array(z.string()),
-  status: TechnicianStatusSchema
+  status: TechnicianStatusSchema,
+  // Days and hours this person works. Missing = the business opening hours. Slots never fall outside the business hours.
+  hours: WeekHoursSchema.optional()
 });
 export type Technician = z.infer<typeof TechnicianSchema>;
 

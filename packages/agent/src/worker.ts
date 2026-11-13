@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { createBackup } from "./backup.js";
 import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
-import { BusinessConfigSchema, type BusinessService } from "@dispatchai/shared";
+import { BusinessConfigSchema, WeekHoursSchema, type BusinessService } from "@dispatchai/shared";
 import { toolFailure, toolSuccess } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
@@ -431,15 +431,19 @@ async function routeRequest(req: Request): Promise<Response> {
     const known = new Set(config.services.map((service) => service.id));
     const list = Array.isArray(body.staff) ? body.staff : null;
     const staff = list?.map((raw) => {
-      const member = raw as { id?: unknown; name?: unknown; skills?: unknown };
+      const member = raw as { id?: unknown; name?: unknown; skills?: unknown; hours?: unknown };
       const name = typeof member.name === "string" ? member.name.trim() : "";
       const skills = Array.isArray(member.skills) ? member.skills.filter((skill): skill is string => typeof skill === "string" && known.has(skill)) : [];
-      return { id: typeof member.id === "string" ? member.id : undefined, name, skills };
+      const hours = member.hours == null ? undefined : WeekHoursSchema.safeParse(member.hours);
+      return { id: typeof member.id === "string" ? member.id : undefined, name, skills, hours: hours?.success ? hours.data : undefined, badHours: hours ? !hours.success : false };
     });
+    if (staff?.some((member) => member.badHours)) {
+      return json(toolFailure("INVALID_INPUT", "A staff member's hours are not valid (use HH:MM and a closing time after opening)", false, `staff_${Date.now()}`), 400, corsHeaders);
+    }
     if (!staff || staff.some((member) => !member.name || member.name.length > 80 || member.skills.length === 0)) {
       return json(toolFailure("INVALID_INPUT", "Each staff member needs a name and at least one service", false, `staff_${Date.now()}`), 400, corsHeaders);
     }
-    const blocked = domainService.getStore().setStaff(staff, config.serviceZones);
+    const blocked = domainService.getStore().setStaff(staff.map(({ badHours, ...member }) => member), config.serviceZones);
     if (blocked.length > 0) {
       return json(toolFailure("STAFF_HAS_BOOKINGS", `Cannot remove staff with upcoming bookings: ${blocked.join(", ")}`, false, `staff_${Date.now()}`), 409, corsHeaders);
     }
@@ -459,7 +463,7 @@ async function routeRequest(req: Request): Promise<Response> {
     } }, 200, corsHeaders);
   }
   if (businessRoute && method === "PUT") {
-    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown; services?: unknown; hours?: unknown; slotMinutes?: unknown; runsOn?: unknown };
+    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown; services?: unknown; hours?: unknown; slotMinutes?: unknown; runsOn?: unknown; greeting?: unknown };
     const current = getBusinessConfig();
     const templateId = typeof body.templateId === "string" ? body.templateId : current.templateId;
     const switching = templateId !== current.templateId;
@@ -479,7 +483,8 @@ async function routeRequest(req: Request): Promise<Response> {
       services: Array.isArray(body.services) ? toServices(body.services, base.services) : base.services,
       hours: body.hours ?? base.hours,
       slotMinutes: body.slotMinutes ?? base.slotMinutes,
-      runsOn: body.runsOn ?? current.runsOn
+      runsOn: body.runsOn ?? current.runsOn,
+      greeting: text(body.greeting) || base.greeting
     });
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -492,8 +497,10 @@ async function routeRequest(req: Request): Promise<Response> {
       domainService.getStore().reset();
       agents.clear();
     }
-    // Hours, slot length or zones may have changed: regenerate future free slots.
-    domainService.getStore().rebuildFutureSlots();
+    // Hours, slot length or zones may have changed. Staff cover every service area, so a new area must reach
+    // the people already on the roster; setStaff also regenerates the future free slots.
+    const store = domainService.getStore();
+    store.setStaff([...store.technicians.values()].map((tech) => ({ id: tech.id, name: tech.name, skills: tech.skills, hours: tech.hours })), parsed.data.serviceZones);
     return json(toolSuccess({ config: parsed.data }, `biz_${Date.now()}`), 200, corsHeaders);
   }
 

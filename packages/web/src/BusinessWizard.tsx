@@ -7,7 +7,7 @@ import { FEATURES, featureById, phoneNote, recommendedFor, RUNS_ON, type RunsOn 
 type Template = { templateId: string; name: string; kind: "onsite" | "instore"; services: string[] };
 type Config = { templateId: string; name: string; market: string; timeZone: string; kind: "onsite" | "instore"; serviceZones: string[]; runsOn: RunsOn };
 type Business = { config: Config; configured: boolean; canSwitchTemplate: boolean; templates: Template[] };
-type Props = { onDone: () => void; onCancel?: () => void };
+type Props = { onDone: () => void; onCancel?: () => void; startAt?: "details" | "schedule" };
 type StepId = "where" | "type" | "details" | "schedule" | "features" | "test";
 
 const LABELS: Record<string, string> = { "field-service": "Field service", salon: "Salon", "auto-repair": "Auto repair", "home-cleaning": "Home cleaning" };
@@ -33,15 +33,17 @@ const zonesList = (): string[] => {
 };
 
 // Onboarding (six steps) and, from the Company page, editing the same details (three steps).
-export function BusinessWizard({ onDone, onCancel }: Props) {
+export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
   const flow = onCancel ? EDIT_FLOW : CREATE_FLOW;
   const [business, setBusiness] = useState<Business | null>(null);
-  const [stepIndex, setStepIndex] = useState(0);
+  // Editing can open straight at the part the owner came to change.
+  const [stepIndex, setStepIndex] = useState(() => (onCancel && startAt === "schedule" ? 2 : onCancel && startAt === "details" ? 1 : 0));
   const [templateId, setTemplateId] = useState("");
   const [name, setName] = useState("");
   const [market, setMarket] = useState("");
   const [timeZone, setTimeZone] = useState("");
-  const [zones, setZones] = useState("");
+  const [areas, setAreas] = useState<string[]>([]);
+  const [newArea, setNewArea] = useState("");
   const [runsOn, setRunsOn] = useState<RunsOn>("desktop");
   const [ticked, setTicked] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -55,7 +57,7 @@ export function BusinessWizard({ onDone, onCancel }: Props) {
       setName(data.config.name);
       setMarket(data.config.market);
       setTimeZone(data.config.timeZone);
-      setZones(data.config.serviceZones.join("\n"));
+      setAreas(data.config.serviceZones);
       setRunsOn(data.config.runsOn ?? "desktop");
       setTicked(recommendedFor(data.config.templateId));
     }).catch(() => setError("Cannot load business settings."));
@@ -75,17 +77,18 @@ export function BusinessWizard({ onDone, onCancel }: Props) {
     // A new type starts from its own defaults; the owner edits them in the next step.
     if (template.templateId !== business.config.templateId) {
       setName(template.name);
-      setZones("");
+      setAreas([]);
     } else {
       setName(business.config.name);
-      setZones(business.config.serviceZones.join("\n"));
+      setAreas(business.config.serviceZones);
     }
   };
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
-    const serviceZones = zones.split("\n").map((zone) => zone.trim()).filter(Boolean);
+    // A name typed but not yet added with the button still counts.
+    const serviceZones = [...areas, newArea].map((zone) => zone.trim()).filter(Boolean);
     if (serviceZones.length === 0) return setError(chosen.kind === "instore" ? "Enter your location name." : "Enter at least one service area.");
     setSaving(true);
     try {
@@ -107,6 +110,12 @@ export function BusinessWizard({ onDone, onCancel }: Props) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const addArea = () => {
+    const name = newArea.trim();
+    if (name && !areas.includes(name)) setAreas([...areas, name]);
+    setNewArea("");
   };
 
   const toggle = (id: string) => setTicked((current) => {
@@ -195,10 +204,39 @@ export function BusinessWizard({ onDone, onCancel }: Props) {
               <input className="input" aria-label="Time zone" list="time-zones" value={timeZone} onChange={(e) => setTimeZone(e.target.value)} required placeholder="Asia/Karachi" />
               <datalist id="time-zones">{timeZones.map((zone) => <option key={zone} value={zone} />)}</datalist>
             </label>
-            <label className="field">
-              <span className="field__label">{chosen.kind === "instore" ? "Location name" : "Service areas (one per line)"}</span>
-              <textarea className={`input ${chosen.kind === "instore" ? "input--tall" : "input--taller"}`} aria-label={chosen.kind === "instore" ? "Location name" : "Service areas"} value={zones} onChange={(e) => setZones(e.target.value)} />
-            </label>
+            {chosen.kind === "instore" ? (
+              <label className="field">
+                <span className="field__label">Location name</span>
+                <input className="input" aria-label="Location name" value={areas[0] ?? ""} onChange={(e) => setAreas([e.target.value])} maxLength={80} />
+              </label>
+            ) : (
+              <fieldset className="fieldset">
+                <legend>Service areas</legend>
+                <p className="field__hint">Where your staff can go. Callers outside these areas are told you do not cover them.</p>
+                {areas.length > 0 && (
+                  <ul className="areas">
+                    {areas.map((area) => (
+                      <li key={area} className="areas__item">
+                        <span>{area}</span>
+                        <button type="button" className="btn btn--sm" aria-label={`Remove ${area}`} onClick={() => setAreas(areas.filter((item) => item !== area))}>Remove</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="areas__add">
+                  <input
+                    className="input"
+                    aria-label="New service area"
+                    placeholder="For example Johar Town"
+                    value={newArea}
+                    maxLength={80}
+                    onChange={(e) => setNewArea(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addArea(); } }}
+                  />
+                  <button type="button" className="btn" onClick={addArea}>Add area</button>
+                </div>
+              </fieldset>
+            )}
             {error && <p role="alert" className="field__error">{error}</p>}
             <div className="wizard__actions">
               <button type="button" className="btn" onClick={back}>Back</button>

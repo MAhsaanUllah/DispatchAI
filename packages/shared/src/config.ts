@@ -28,6 +28,9 @@ export const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as con
 const nineToFive = { open: "09:00", close: "17:00" };
 export const DEFAULT_HOURS = { sun: null, mon: nineToFive, tue: nineToFive, wed: nineToFive, thu: nineToFive, fri: nineToFive, sat: null };
 
+export const WeekHoursSchema = z.object({ sun: DayHoursSchema, mon: DayHoursSchema, tue: DayHoursSchema, wed: DayHoursSchema, thu: DayHoursSchema, fri: DayHoursSchema, sat: DayHoursSchema });
+export type WeekHours = z.infer<typeof WeekHoursSchema>;
+
 // One deployment = one business. A template is a ready-made BusinessConfig the owner edits during onboarding.
 export const BusinessConfigSchema = z.object({
   templateId: z.string().min(1),
@@ -40,7 +43,7 @@ export const BusinessConfigSchema = z.object({
   greeting: z.string().min(1),
   note: z.string(),
   // Opening hours in the business time zone; bookable slots are generated from these.
-  hours: z.object({ sun: DayHoursSchema, mon: DayHoursSchema, tue: DayHoursSchema, wed: DayHoursSchema, thu: DayHoursSchema, fri: DayHoursSchema, sat: DayHoursSchema }).default(DEFAULT_HOURS),
+  hours: WeekHoursSchema.default(DEFAULT_HOURS),
   slotMinutes: z.number().int().min(15).max(480).default(60),
   // Where this install runs; only the dashboard copy adapts (phone calls need a public address on a desktop install).
   runsOn: z.enum(["desktop", "cloud"]).default("desktop")
