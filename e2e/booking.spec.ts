@@ -73,7 +73,21 @@ test("first run: setup, login, onboarding, then a caller books and it shows in t
   await expect(page.getByRole("row").filter({ hasText: /WO-/ }).first()).toBeVisible();
   await expect(page.getByText("No bookings yet")).toHaveCount(0);
 
-  // 6. The owner downloads a backup from the System page.
+  // 6. The business can be changed later from its own pages: add a service area, and staff are editable too.
+  await page.getByRole("button", { name: /^Team/ }).click();
+  await expect(page.getByRole("button", { name: "Add or edit staff" })).toBeVisible();
+  await expect(page.getByText("business hours)")).toBeVisible();
+  await page.getByRole("button", { name: /^Company/ }).click();
+  await page.getByRole("button", { name: "Add or remove areas" }).click();
+  await page.getByLabel("New service area").fill("Johar Town");
+  await page.getByRole("button", { name: "Add area" }).click();
+  await page.getByRole("button", { name: "Next" }).click(); // details saved, on to hours and staff
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await expect(page.getByText("What the AI did today")).toBeVisible(); // saving reloads onto the dashboard
+  await page.getByRole("button", { name: /^Company/ }).click();
+  await expect(page.getByText("Johar Town")).toBeVisible();
+
+  // 7. The owner downloads a backup from the System page.
   await page.getByRole("button", { name: /^System/ }).click();
   const saved = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download backup" }).click();

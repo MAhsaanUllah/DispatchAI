@@ -20,7 +20,8 @@ export const App: React.FC = () => {
   const [jobsLoading, setJobsLoading] = useState(true);
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [directoryLoading, setDirectoryLoading] = useState(true);
-  const [editingBusiness, setEditingBusiness] = useState(false);
+  // Which part of the business is being edited, if any. Company opens the details, Services and Team open hours and staff.
+  const [editing, setEditing] = useState<null | "details" | "schedule">(null);
   const [isOwner, setIsOwner] = useState(true);
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((body) => setIsOwner(body?.data?.role !== "staff")).catch(() => undefined);
@@ -147,17 +148,18 @@ export const App: React.FC = () => {
       <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={localTime} companyName={directory?.company.name} isOwner={isOwner} demo={directory?.demo} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
 
       <main className="app-main">
-        {activeView === "company" && editingBusiness ? <BusinessWizard onDone={() => window.location.reload()} onCancel={() => setEditingBusiness(false)} />
+        {editing ? <BusinessWizard startAt={editing} onDone={() => window.location.reload()} onCancel={() => setEditing(null)} />
           : activeView === "inbox" ? <InboxPage />
             : activeView === "plugins" ? <PluginsPage />
-              : activeView === "system" ? <SystemPanel onOpenPlugins={() => setActiveView("plugins")} isOwner={isOwner} />
+              : activeView === "system" ? <SystemPanel onOpenPlugins={() => setActiveView("plugins")} onOpenInbox={() => setActiveView("inbox")} isOwner={isOwner} />
                 : !isBoard ? (
                   <div className="app-body">
                     <DirectoryPanel
                       view={activeView}
                       directory={directory}
                       loading={directoryLoading}
-                      onEdit={activeView === "company" && isOwner ? () => setEditingBusiness(true) : undefined}
+                      onEdit={isOwner ? () => setEditing(activeView === "company" ? "details" : "schedule") : undefined}
+                      onEditHours={activeView === "company" && isOwner ? () => setEditing("schedule") : undefined}
                     />
                     {activeView === "team" && isOwner && <TeamLogins />}
                   </div>

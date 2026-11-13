@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ScheduleSetup } from "./ScheduleSetup.js";
 import { TestCall } from "./TestCall.js";
 import { BookingMeter } from "./BookingMeter.js";
 import { FEATURES, featureById, phoneNote, recommendedFor, RUNS_ON, type RunsOn } from "./features.js";
 
 type Template = { templateId: string; name: string; kind: "onsite" | "instore"; services: string[] };
-type Config = { templateId: string; name: string; market: string; timeZone: string; kind: "onsite" | "instore"; serviceZones: string[]; runsOn: RunsOn };
+type Config = { templateId: string; name: string; market: string; timeZone: string; kind: "onsite" | "instore"; serviceZones: string[]; runsOn: RunsOn; greeting?: string };
 type Business = { config: Config; configured: boolean; canSwitchTemplate: boolean; templates: Template[] };
 type Props = { onDone: () => void; onCancel?: () => void; startAt?: "details" | "schedule" };
 type StepId = "where" | "type" | "details" | "schedule" | "features" | "test";
@@ -44,10 +44,19 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
   const [timeZone, setTimeZone] = useState("");
   const [areas, setAreas] = useState<string[]>([]);
   const [newArea, setNewArea] = useState("");
+  const [greeting, setGreeting] = useState("");
+  // Only a greeting the owner edited is sent, so a new business type keeps its own default.
+  const [greetingTouched, setGreetingTouched] = useState(false);
   const [runsOn, setRunsOn] = useState<RunsOn>("desktop");
   const [ticked, setTicked] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    heading.current?.focus();
+  }, [stepIndex]);
 
   useEffect(() => {
     fetch("/api/business").then((r) => r.json()).then((body) => {
@@ -58,6 +67,7 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
       setMarket(data.config.market);
       setTimeZone(data.config.timeZone);
       setAreas(data.config.serviceZones);
+      setGreeting(data.config.greeting ?? "");
       setRunsOn(data.config.runsOn ?? "desktop");
       setTicked(recommendedFor(data.config.templateId));
     }).catch(() => setError("Cannot load business settings."));
@@ -78,9 +88,13 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
     if (template.templateId !== business.config.templateId) {
       setName(template.name);
       setAreas([]);
+      setGreeting("");
+      setGreetingTouched(false);
     } else {
       setName(business.config.name);
       setAreas(business.config.serviceZones);
+      setGreeting(business.config.greeting ?? "");
+      setGreetingTouched(false);
     }
   };
 
@@ -95,7 +109,7 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
       const response = await fetch("/api/business", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId, name, market, timeZone, serviceZones, runsOn })
+        body: JSON.stringify({ templateId, name, market, timeZone, serviceZones, runsOn, ...(greetingTouched ? { greeting } : {}) })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -137,7 +151,7 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
         </ol>
 
         <div>
-          <h1 className="wizard__title">{info.title}</h1>
+          <h1 className="wizard__title" ref={heading} tabIndex={-1}>{info.title}</h1>
           <p className="wizard__why">{info.why}</p>
         </div>
 
@@ -237,6 +251,11 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
                 </div>
               </fieldset>
             )}
+            <label className="field">
+              <span className="field__label">What the agent says first</span>
+              <textarea className="input input--tall" aria-label="Agent greeting" value={greeting} placeholder="Leave empty to use the standard greeting for this business type" maxLength={400} onChange={(e) => { setGreeting(e.target.value); setGreetingTouched(true); }} />
+              <span className="field__hint">The agent opens every call and chat with this. Say your business name and what people can book.</span>
+            </label>
             {error && <p role="alert" className="field__error">{error}</p>}
             <div className="wizard__actions">
               <button type="button" className="btn" onClick={back}>Back</button>
@@ -255,10 +274,10 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
               {FEATURES.map((feature) => (
                 <li key={feature.id}>
                   <label className="pick">
-                    <input type="checkbox" checked={ticked.includes(feature.id)} onChange={() => toggle(feature.id)} aria-label={feature.name} />
+                    <input type="checkbox" checked={ticked.includes(feature.id)} onChange={() => toggle(feature.id)} aria-label={feature.name} aria-describedby={`benefit-${feature.id}`} />
                     <span className="pick__text">
                       <span className="pick__name">{feature.name}</span>
-                      <span className="pick__benefit">{feature.benefit}</span>
+                      <span className="pick__benefit" id={`benefit-${feature.id}`}>{feature.benefit}</span>
                       {feature.id === "twilio" && ticked.includes("twilio") && <span className="pick__note">{phoneNote(runsOn)}</span>}
                       {feature.id === "reminders" && ticked.includes("reminders") && <span className="pick__note">Needs Email, so Email is switched on too.</span>}
                     </span>

@@ -105,6 +105,14 @@ function PluginDrawer({ plugin, onClose, onDone }: { plugin: Plugin; onClose: ()
   const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(plugin.fields.map((f) => [f.key, f.value])));
   const [message, setMessage] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
+  const panel = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    panel.current?.focus();
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); opener?.focus?.(); };
+  }, []);
 
   const saveAndTest = async () => {
     setBusy(true);
@@ -123,7 +131,7 @@ function PluginDrawer({ plugin, onClose, onDone }: { plugin: Plugin; onClose: ()
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby={`drawer-${plugin.id}`}>
-      <div className="drawer drawer--wide">
+      <div className="drawer drawer--wide" ref={panel} tabIndex={-1}>
         <div className="drawer__head">
           <h2 className="drawer__id" id={`drawer-${plugin.id}`}>{plugin.name}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="modal__close">×</button>

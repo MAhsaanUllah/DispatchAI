@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { RotateCcw, Mic } from "lucide-react";
+import { RotateCcw, Mic, RefreshCw } from "lucide-react";
 
 interface NavbarProps {
   onReset: () => void;
@@ -62,6 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
             Reset Demo
           </button>
         )}
+        <button type="button" className="btn btn--quiet btn--sm" onClick={() => window.location.reload()} title="Reload the dashboard"><RefreshCw size={12} aria-hidden="true" />Refresh</button>
         {onLogout && (
           <button type="button" className="btn btn--quiet btn--sm" onClick={onLogout}>Log out</button>
         )}

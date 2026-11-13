@@ -60,7 +60,7 @@ export function BackupPanel() {
           <li>Stop DispatchAI. Restoring happens outside the app on purpose, so two programs never write to your data at once.</li>
           <li>On the machine that runs the Docker or source install, run this in the project folder:</li>
         </ol>
-        <pre className="backup__code"><code>{RESTORE}</code></pre>
+        <pre className="backup__code" tabIndex={0} aria-label="Restore command"><code>{RESTORE}</code></pre>
         <p>Add <code>--force</code> to replace an existing database: the old files are moved aside as <code>*.before-restore-&lt;time&gt;</code>, never deleted. Then start DispatchAI again. The desktop app has no restore command yet.</p>
       </details>
     </section>
