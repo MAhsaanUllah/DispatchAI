@@ -9,6 +9,12 @@ const OPENAI_COMPATIBLE: Record<string, string> = {
   gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 };
 
+// Called after every AI request with the token counts the provider reported (null when it reported none).
+export type UsageSink = (row: { provider: string; model: string; inputTokens: number | null; outputTokens: number | null; ok: boolean }) => void;
+let sink: UsageSink | undefined;
+export const setUsageSink = (next?: UsageSink) => { sink = next; };
+const whole = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : null);
+
 export class LlmError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -42,14 +48,17 @@ export async function chat(config: LlmConfig, messages: Message[], timeoutMs = 8
       signal: AbortSignal.timeout(timeoutMs)
     });
     if (!response.ok) throw new LlmError(response.status, `HTTP ${response.status}`);
-    const data = (await response.json()) as { result?: { response?: string }; choices?: { message?: { content?: string } }[] };
+    const data = (await response.json()) as { result?: { response?: string; usage?: { prompt_tokens?: number; completion_tokens?: number } }; choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
     const text = config.provider === "workers-ai" ? data.result?.response : data.choices?.[0]?.message?.content;
     if (typeof text !== "string") throw new LlmError(502, "No text in the AI response");
     count(false);
+    const used = data.usage ?? data.result?.usage;
+    sink?.({ provider: config.provider, model: config.model, inputTokens: whole(used?.prompt_tokens), outputTokens: whole(used?.completion_tokens), ok: true });
     return text;
   } catch (error) {
     const status = error instanceof LlmError ? error.status : 0;
     count(true, error instanceof Error ? error.message : "AI request failed", status === 429);
+    sink?.({ provider: config.provider, model: config.model, inputTokens: null, outputTokens: null, ok: false });
     throw error instanceof LlmError ? error : new LlmError(0, "Could not reach the AI provider");
   }
 }

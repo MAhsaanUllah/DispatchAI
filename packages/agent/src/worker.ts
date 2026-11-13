@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { createBackup } from "./backup.js";
-import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
+import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, localDate, serviceZoneFor, setBusinessConfig, zonedTimeToUtc } from "@dispatchai/domain";
 import { BusinessConfigSchema, WeekHoursSchema, type BusinessService } from "@dispatchai/shared";
 import { toolFailure, toolSuccess } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
@@ -16,8 +16,9 @@ import { Inbox, SLA_MINUTES } from "./inbox.js";
 import { SettingsStore } from "./settings-store.js";
 import { PluginStore } from "./plugin-store.js";
 import { llmConfig, pluginById, plugins } from "./plugins.js";
-import { extract, toCanonical } from "./llm.js";
-import { dialTwiml, gatherTwiml, hangupTwiml, isOpenNow, maskPhone, verifyTwilioSignature } from "./twilio.js";
+import { extract, setUsageSink, toCanonical } from "./llm.js";
+import { estimateCostUsd, UsageLog } from "./usage-store.js";
+import { dialTwiml, fetchTwilioAccount, gatherTwiml, hangupTwiml, isOpenNow, maskPhone, verifyTwilioSignature } from "./twilio.js";
 
 // shortcut: recent phone calls kept in memory (last 20) for the Twilio card; persist if owners need a call history.
 const recentCalls = new Map<string, { id: string; from: string; startedAt: string; turns: number; silences: number; outcome: string }>();
@@ -25,6 +26,8 @@ const recentCalls = new Map<string, { id: string; from: string; startedAt: strin
 // Saved onboarding settings must be active before the business data (and its seed) is created below.
 const settings = new SettingsStore(process.env.DATABASE_URL);
 const pluginStore = new PluginStore(process.env.DATABASE_URL);
+const usageLog = new UsageLog(process.env.DATABASE_URL);
+setUsageSink((row) => usageLog.add({ at: new Date().toISOString(), ...row }));
 // n8n plugin settings from the dashboard win; .env values stay as a fallback for scripted installs.
 async function eventTarget(): Promise<{ url: string; secret: string } | undefined> {
   const n8n = await pluginStore.get("n8n");
@@ -308,10 +311,38 @@ async function routeRequest(req: Request): Promise<Response> {
   }
 
   // Staff run the day (bookings, inbox, chat); only the owner changes settings, plugins, logins or resets data.
-  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset" || pathname === "/api/backup"
+  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset" || pathname === "/api/backup" || pathname === "/api/usage"
     || (method !== "GET" && (pathname === "/api/business" || pathname === "/api/staff"));
   if (ownerOnly && user?.role === "staff") {
     return json(toolFailure("FORBIDDEN", "Only the owner can change this", false, `auth_${Date.now()}`), 403, corsHeaders);
+  }
+
+  // What the AI brain and the phone line have used. Tokens are the provider's own counts; dollars are the owner's
+  // own prices times those tokens, so nothing here is a guessed price. Twilio figures come from Twilio's API.
+  if (pathname === "/api/usage" && method === "GET") {
+    const config = getBusinessConfig();
+    const dayStart = zonedTimeToUtc(localDate(new Date(), config.timeZone), "00:00", config.timeZone).toISOString();
+    const monthStart = zonedTimeToUtc(`${localDate(new Date(), config.timeZone).slice(0, 7)}-01`, "00:00", config.timeZone).toISOString();
+    const ai = await pluginStore.get("ai");
+    const prices = [ai?.config.priceIn, ai?.config.priceOut].map((value) => (value ?? "").trim());
+    const price = prices.every((value) => value !== "" && Number.isFinite(Number(value))) ? { input: Number(prices[0]), output: Number(prices[1]) } : null;
+    const today = usageLog.summary(dayStart);
+    const month = usageLog.summary(monthStart);
+    const twilio = await pluginStore.get("twilio");
+    let account: Awaited<ReturnType<typeof fetchTwilioAccount>> | undefined;
+    let accountError: string | undefined;
+    if (twilio?.enabled) {
+      try {
+        account = await fetchTwilioAccount(twilio.config.accountSid ?? "", twilio.secrets.authToken ?? "");
+      } catch (error) {
+        const status = error instanceof Error ? error.message : "";
+        accountError = status === "401" || status === "403" ? "Twilio rejected the Account SID or auth token." : "Could not read your Twilio account right now.";
+      }
+    }
+    return json({ ok: true, data: {
+      ai: { enabled: !!ai?.enabled, provider: ai?.config.provider ?? null, model: ai?.config.model ?? null, today, month, price, cost: price ? { today: estimateCostUsd(today, price), month: estimateCostUsd(month, price) } : null },
+      twilio: { enabled: !!twilio?.enabled, callsToday: [...recentCalls.values()].filter((call) => call.startedAt >= dayStart).length, account, error: accountError }
+    } }, 200, corsHeaders);
   }
 
   // Team logins (owner only): name + starting PIN; removing a login ends that person's sessions.

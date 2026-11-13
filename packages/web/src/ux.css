@@ -205,3 +205,16 @@
   .split__main > .board { flex: 1; }
 }
 .console__suggestions button { white-space: normal; text-align: left; overflow: visible; text-overflow: clip; height: auto; min-height: var(--space-xl-2); }
+
+/* ---------- Usage and cost ---------- */
+.usage { display: grid; gap: var(--space-sm); margin-top: var(--space-xl); }
+.usage__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
+.usage__title { font-size: var(--text-lg); font-weight: 800; }
+.usage__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--space-md); }
+.usage__card { display: grid; gap: var(--space-xs); align-content: start; padding: var(--space-md); border: var(--rule-bar) solid var(--color-rule); background: var(--color-paper-3); min-width: 0; }
+.usage__name { font-size: var(--text-md); font-weight: 800; overflow-wrap: break-word; }
+.usage__list { display: grid; gap: var(--space-xs); margin: 0; }
+.usage__row { display: grid; gap: var(--space-3xs); font-size: var(--text-sm); }
+.usage__row dt { font-weight: 500; }
+.usage__row dd { margin: 0; color: var(--color-ink-2); overflow-wrap: break-word; }
+.usage__note { display: block; font-size: var(--text-xs); color: var(--color-muted); }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Workflow, Mail, Sparkles, BellRing, PhoneCall, Plug, Unplug, type LucideIcon } from "lucide-react";
 import { BookingMeter } from "./BookingMeter.js";
+import { UsagePanel } from "./components/UsagePanel.js";
 import { FEATURES, GROUPS, phoneNote, type RunsOn } from "./features.js";
 
 type Field = { key: string; label: string; secret: boolean; placeholder?: string; help?: string; value: string; saved?: boolean; options?: { value: string; label: string }[] };
@@ -297,6 +298,7 @@ export function PluginsPage() {
             );
           })}
           </div>
+          <UsagePanel />
           <section className="explainer" aria-labelledby="else-title">
             <h2 className="explainer__title" id="else-title">Need something else?</h2>
             <ol className="explainer__steps">
