@@ -95,6 +95,31 @@ x-dispatchai-signature: <hex hmac>
 
 Replace the three "(replace me)" nodes with your own steps (a Google Sheet row, a WhatsApp message, your CRM).
 
+## Developer API and MCP
+
+For your own software, or for an AI assistant you trust. Both use keys that only the owner can create, so a key never exposes anything beyond this one business.
+
+Create a key (owner session; a dashboard screen for this is planned). The key is shown **once**, only a hash is stored, and revoking it stops it at once:
+
+```bash
+curl -b cookies.txt -X POST http://localhost:8080/api/api-keys -H "Content-Type: application/json" -d '{"name":"Website form","scope":"read"}'   # scope: read | write
+```
+
+**Developer API** (`Authorization: Bearer dsp_...`):
+
+| Call | Key | Does |
+| --- | --- | --- |
+| `GET /api/v1/bookings` | read | list bookings |
+| `GET /api/v1/free-times?serviceType=HVAC&serviceZone=North&date=2026-11-20` | read | free slots |
+| `POST /api/v1/customers/find` `{"phone":"..."}` | read | find a customer |
+| `POST /api/v1/customers` `{"name","phone","addressLine1","serviceZone"}` | write | create a customer |
+| `POST /api/v1/bookings` | write | book (`customerId`, `propertyId`, `serviceType`, `issueSummary`, `slotId`, `idempotencyKey` in the body or an `Idempotency-Key` header) |
+| `POST /api/v1/bookings/{id}/reschedule` `{"newSlotId"}` · `/cancel` `{"reason"}` | write | change a booking |
+
+A write goes through the same service, emails and n8n events as a phone booking. A read key that tries to write gets `403` and opens one task in the Inbox.
+
+**MCP** (for Claude or another assistant that speaks MCP over HTTP): point it at `https://YOUR-HOST/api/mcp` with the key as a Bearer token. A read key gets four look-up tools (`list_bookings`, `get_booking`, `find_customer`, `free_times`). A write key also gets `propose_booking`, `propose_reschedule`, `propose_cancel` and `confirm`: a change is only a proposal until `confirm` is called with the returned id (single use, 5 minutes, only by the key that proposed it). The tool descriptions tell the assistant to ask you first; the server enforces the two steps, not your "yes". Customer names and addresses go to your assistant's provider, so use a read key unless you need more.
+
 ## Back up your data
 
 The owner can download one backup file from the dashboard (System page) or `GET /api/backup`. It contains a consistent database snapshot and the `master.key` that decrypts your plugin keys, so **keep it private**. A `MASTER_KEY` set in the environment is never put in the file; store it in your secret manager.
@@ -149,8 +174,9 @@ Add a business type in `packages/domain/src/templates.ts`; add a plugin in `pack
 Honest list, so nobody trusts what has not been tried:
 
 - A **real phone call** through Twilio: speech recognition quality, delays and timeouts. Only recorded fixtures were used.
-- **Real email** through Resend and **real AI providers**. Provider request formats are tested against fixtures; model names in the form are examples, check your provider's docs.
-- The `vps` and `tunnel` Docker profiles were configuration-checked but not run on a real server.
+- **Real email** through Resend and **cloud AI providers**. Their request formats are tested against fixtures; model names in the form are examples, check your provider's docs. The AI brain was run end to end only with a local Ollama model.
+- The `vps` profile was run with Caddy on `localhost` (local certificate), not with a real domain; the `tunnel` profile was not run.
+- A real Claude or ChatGPT connector against `/api/mcp` (it needs a public HTTPS address). It was exercised with the official MCP SDK client only.
 - Windows installer signing, auto-update and macOS/Linux desktop builds.
 - Calendar sync: slots come from the opening hours and staff you enter, not from a live calendar. SMS and Google Calendar are planned.
 
