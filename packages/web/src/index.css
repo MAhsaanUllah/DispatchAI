@@ -2156,3 +2156,10 @@
   .public__title { font-size: var(--text-3xl); }
   .app-nav__name { font-size: var(--text-sm); }
 }
+
+/* System page health strip: live numbers from /api/system. */
+.health { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-sm); margin: 0 0 var(--space-xl); }
+.health__tile { display: grid; gap: var(--space-2xs); padding: var(--space-sm) var(--space-md); border: var(--rule-hair) solid var(--color-rule); background: var(--color-paper-3); }
+.health__tile--warn { border-color: var(--color-ink); }
+.health dt { font-size: var(--text-xs); color: var(--color-ink-2); }
+.health dd { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }

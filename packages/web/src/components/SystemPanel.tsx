@@ -60,6 +60,47 @@ function PluginChips({ onOpenPlugins }: { onOpenPlugins: () => void }) {
   );
 }
 
+type Health = {
+  uptimeSeconds: number;
+  database: { kind: "file" | "memory"; sizeBytes: number };
+  inbox: { open: number; overdue: number };
+  events: { pending: number; dead: number };
+  bookings: { total: number; lastCreatedAt: string | null };
+};
+
+const duration = (seconds: number) => seconds < 3600 ? `${Math.max(1, Math.round(seconds / 60))} min` : `${Math.floor(seconds / 3600)} h ${Math.round((seconds % 3600) / 60)} min`;
+const size = (bytes: number) => bytes < 1_048_576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1_048_576).toFixed(1)} MB`;
+
+// Live numbers from the server, so the owner can tell at a glance that the system is working.
+function HealthStrip() {
+  const [health, setHealth] = React.useState<Health | null | "error">(null);
+  React.useEffect(() => {
+    const load = () => fetch("/api/system").then((r) => (r.ok ? r.json() : Promise.reject())).then((body) => setHealth(body.data)).catch(() => setHealth("error"));
+    load();
+    const timer = setInterval(load, 15_000);
+    return () => clearInterval(timer);
+  }, []);
+  if (health === null) return null;
+  if (health === "error") return <p className="flow__note">Could not read the server status. Is the server still running?</p>;
+  const tiles = [
+    { label: "Server", value: `Up ${duration(health.uptimeSeconds)}`, warn: false },
+    { label: "Database", value: health.database.kind === "memory" ? "In memory (not saved)" : size(health.database.sizeBytes), warn: health.database.kind === "memory" },
+    { label: "Inbox", value: `${health.inbox.open} open${health.inbox.overdue ? ` · ${health.inbox.overdue} overdue` : ""}`, warn: health.inbox.overdue > 0 },
+    { label: "n8n events", value: `${health.events.pending} waiting · ${health.events.dead} failed`, warn: health.events.dead > 0 },
+    { label: "Bookings", value: `${health.bookings.total}${health.bookings.lastCreatedAt ? ` · last ${new Date(health.bookings.lastCreatedAt).toLocaleDateString()}` : ""}`, warn: false }
+  ];
+  return (
+    <dl className="health" aria-label="System health">
+      {tiles.map((tile) => (
+        <div key={tile.label} className={`health__tile${tile.warn ? " health__tile--warn" : ""}`}>
+          <dt>{tile.label}</dt>
+          <dd>{tile.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export function SystemPanel({ onOpenPlugins }: { onOpenPlugins: () => void }) {
   return (
     <section className="page" aria-label="System architecture">
@@ -69,6 +110,8 @@ export function SystemPanel({ onOpenPlugins }: { onOpenPlugins: () => void }) {
           <p className="page__lede">One server on this machine takes the call, confirms the booking and writes it to the database. Plugins carry it out from there.</p>
         </div>
       </div>
+
+      <HealthStrip />
 
       <ol className="flow">
         {STEPS.map((step) => {
