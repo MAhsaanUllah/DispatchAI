@@ -46,12 +46,20 @@ describe("business onboarding API", () => {
     expect((await put({ templateId: "salon", serviceZones: [" "] })).status).toBe(400);
   });
 
+  it("stores where it runs and rejects anything else", async () => {
+    expect((await call("/api/business")).body.data.config.runsOn).toBe("desktop");
+    expect((await put({ runsOn: "mars" })).status).toBe(400);
+    expect((await put({ runsOn: "cloud" })).status).toBe(200);
+    expect((await call("/api/business")).body.data.config.runsOn).toBe("cloud");
+  });
+
   it("switches to salon, renames it and replaces the demo data", async () => {
     const res = await put({ templateId: "salon", name: "Noor Salon", timeZone: "Asia/Karachi", serviceZones: ["Gulberg Branch"] });
     expect(res.status).toBe(200);
     const business = (await call("/api/business")).body.data;
     expect(business.configured).toBe(true);
-    expect(business.config).toMatchObject({ templateId: "salon", name: "Noor Salon", timeZone: "Asia/Karachi", serviceZones: ["Gulberg Branch"] });
+    // Where it runs belongs to the install, not the template: a type switch keeps it.
+    expect(business.config).toMatchObject({ templateId: "salon", name: "Noor Salon", timeZone: "Asia/Karachi", serviceZones: ["Gulberg Branch"], runsOn: "cloud" });
     expect((await call("/api/directory")).body.data.company.name).toBe("Noor Salon");
     expect((await call("/api/jobs")).body.data.jobs).toEqual([]);
   });

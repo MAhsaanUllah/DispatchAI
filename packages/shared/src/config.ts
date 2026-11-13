@@ -41,7 +41,9 @@ export const BusinessConfigSchema = z.object({
   note: z.string(),
   // Opening hours in the business time zone; bookable slots are generated from these.
   hours: z.object({ sun: DayHoursSchema, mon: DayHoursSchema, tue: DayHoursSchema, wed: DayHoursSchema, thu: DayHoursSchema, fri: DayHoursSchema, sat: DayHoursSchema }).default(DEFAULT_HOURS),
-  slotMinutes: z.number().int().min(15).max(480).default(60)
+  slotMinutes: z.number().int().min(15).max(480).default(60),
+  // Where this install runs; only the dashboard copy adapts (phone calls need a public address on a desktop install).
+  runsOn: z.enum(["desktop", "cloud"]).default("desktop")
 });
 export type BusinessConfig = z.infer<typeof BusinessConfigSchema>;
 export type BusinessConfigInput = z.input<typeof BusinessConfigSchema>;

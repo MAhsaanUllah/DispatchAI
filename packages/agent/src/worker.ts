@@ -459,7 +459,7 @@ async function routeRequest(req: Request): Promise<Response> {
     } }, 200, corsHeaders);
   }
   if (businessRoute && method === "PUT") {
-    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown; services?: unknown; hours?: unknown; slotMinutes?: unknown };
+    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown; services?: unknown; hours?: unknown; slotMinutes?: unknown; runsOn?: unknown };
     const current = getBusinessConfig();
     const templateId = typeof body.templateId === "string" ? body.templateId : current.templateId;
     const switching = templateId !== current.templateId;
@@ -478,7 +478,8 @@ async function routeRequest(req: Request): Promise<Response> {
       serviceZones: zones ?? base.serviceZones,
       services: Array.isArray(body.services) ? toServices(body.services, base.services) : base.services,
       hours: body.hours ?? base.hours,
-      slotMinutes: body.slotMinutes ?? base.slotMinutes
+      slotMinutes: body.slotMinutes ?? base.slotMinutes,
+      runsOn: body.runsOn ?? current.runsOn
     });
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
