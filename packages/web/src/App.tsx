@@ -165,6 +165,7 @@ export const App: React.FC = () => {
                   </div>
                 ) : (
                   <div className="app-body app-body--flush">
+                    <h1 className="visually-hidden">Dispatch</h1>
                     <div className="split">
                       <div className="split__main board">
                         <StatsBar jobs={jobs} companyName={directory?.company.name} />

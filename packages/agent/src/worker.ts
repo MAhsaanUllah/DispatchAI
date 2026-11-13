@@ -402,7 +402,11 @@ async function routeRequest(req: Request): Promise<Response> {
     const open = inbox.list().filter((task) => !task.closedAt);
     const deliveries = outbox.recent(100);
     const bookings = [...domainService.getStore().workOrders.values()];
+    const zone = getBusinessConfig().timeZone;
+    const dayStart = zonedTimeToUtc(localDate(new Date(), zone), "00:00", zone).toISOString();
+    const phoneOn = !!(await pluginStore.get("twilio"))?.enabled;
     return json({ ok: true, data: {
+      calls: { lineOn: phoneOn, today: phoneOn ? [...recentCalls.values()].filter((call) => call.startedAt >= dayStart).length : 0 },
       uptimeSeconds: Math.round(process.uptime()),
       database: { kind: dbPath ? "file" : "memory", sizeBytes: dbPath && existsSync(dbPath) ? statSync(dbPath).size : 0 },
       inbox: { open: open.length, overdue: open.filter((task) => now - Date.parse(task.createdAt) > SLA_MINUTES[task.kind] * 60_000).length },

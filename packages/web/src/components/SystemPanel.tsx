@@ -48,7 +48,7 @@ export function SystemPanel({ onOpenPlugins, onOpenInbox, isOwner = false }: { o
   React.useEffect(() => {
     const load = () => {
       fetch("/api/system").then((r) => (r.ok ? r.json() : Promise.reject())).then((body) => setHealth(body.data)).catch(() => setHealth("error"));
-      fetch("/api/plugins").then((r) => (r.ok ? r.json() : null)).then((body) => setPlugins(body?.data?.plugins ?? null)).catch(() => setPlugins(null));
+      if (isOwner) fetch("/api/plugins").then((r) => (r.ok ? r.json() : null)).then((body) => setPlugins(body?.data?.plugins ?? null)).catch(() => setPlugins(null));
     };
     load();
     fetch("/api/business").then((r) => r.json()).then((body) => setRunsOn(body.data.config.runsOn ?? "desktop")).catch(() => undefined);
@@ -58,8 +58,9 @@ export function SystemPanel({ onOpenPlugins, onOpenInbox, isOwner = false }: { o
 
   const data = health === "error" ? null : health;
   const problems = systemProblems(data, plugins);
-  const stateOf = (by: string | null): StepState => {
+  const stateOf = (by: string | null): StepState | null => {
     if (!by) return "auto";
+    if (!isOwner || !plugins) return null;
     const plugin = plugins?.find((p) => p.id === by);
     return !plugin?.enabled ? "off" : plugin.status?.warning ? "failing" : "live";
   };
@@ -117,7 +118,8 @@ export function SystemPanel({ onOpenPlugins, onOpenInbox, isOwner = false }: { o
           <h2 className="journey__title" id="journey-title">What happens to a booking</h2>
           <p className="journey__lede">Nine steps, from the call to your own tools. Nothing is saved without the caller's clear yes.</p>
         </div>
-        <BookingMeter live={liveIds} compact />
+        {isOwner && plugins && <BookingMeter live={liveIds} compact />}
+        {!isOwner && <p className="field__hint">Only the owner can see which features are switched on.</p>}
         <ol className="journey__list">
           {BOOKING_STEPS.map((step, index) => {
             const state = stateOf(step.by);
@@ -129,8 +131,8 @@ export function SystemPanel({ onOpenPlugins, onOpenInbox, isOwner = false }: { o
                   <span className="journey__name">{step.label}</span>
                   <span className="journey__by">{feature ? feature.name : "Built in, always on"}</span>
                 </span>
-                <span className={`state state--${state === "auto" ? "auto" : state}`}>{STEP_LABEL[state]}</span>
-                {(state === "off" || state === "failing") && <button type="button" className="btn btn--sm" onClick={() => go("features")}>{state === "off" ? "Set up" : "Fix"}</button>}
+                {state && <span className={`state state--${state}`}>{STEP_LABEL[state]}</span>}
+                {isOwner && (state === "off" || state === "failing") && <button type="button" className="btn btn--sm" onClick={() => go("features")}>{state === "off" ? "Set up" : "Fix"}</button>}
               </li>
             );
           })}

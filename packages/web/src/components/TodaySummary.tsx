@@ -13,10 +13,8 @@ export function TodaySummary({ jobs }: { jobs: WorkOrder[] }) {
   useEffect(() => {
     const load = async () => {
       const inbox = await fetch("/api/inbox").then((r) => r.json()).then((b) => b.data.tasks as { closedAt?: string }[]).catch(() => []);
-      const phoneOn = await fetch("/api/plugins").then((r) => r.json()).then((b) => (b.data.plugins as { id: string; enabled: boolean }[]).some((p) => p.id === "twilio" && p.enabled)).catch(() => false);
-      const calls = phoneOn
-        ? await fetch("/api/plugins/twilio/calls").then((r) => r.json()).then((b) => (b.data.calls as { startedAt: string }[]).filter((c) => sameLocalDay(c.startedAt)).length).catch(() => null)
-        : null;
+      // /api/system is open to staff too; the plugin list is owner-only and would answer them with a 403.
+      const calls = await fetch("/api/system").then((r) => r.json()).then((b) => (b.data.calls.lineOn ? (b.data.calls.today as number) : null)).catch(() => null);
       setCounts({ calls, handedOver: inbox.filter((task) => !task.closedAt).length });
     };
     void load();
