@@ -36,9 +36,9 @@ const isHttpUrl = (value: string) => {
 export const plugins: Plugin[] = [
   {
     id: "n8n",
-    name: "n8n automations",
-    category: "Automation",
-    description: "Sends a signed event to your n8n workflow when a booking is created, rescheduled or cancelled. IDs only, no names or addresses.",
+    name: "Custom workflow (n8n)",
+    category: "Custom workflow",
+    description: "Paste your n8n webhook link and DispatchAI sends a signed event when a booking is created, rescheduled or cancelled (IDs only, no names or addresses). Host n8n on your cloud server or use n8n Cloud.",
     fields: [
       { key: "url", label: "Webhook URL", secret: false, placeholder: "http://n8n:5678/webhook/dispatchai-events", help: "Import n8n/workflows/dispatchai-events-starter.json in n8n and copy its webhook URL." },
       { key: "secret", label: "Signing secret", secret: true, help: "Any long random text. Set the same value as DISPATCHAI_EVENTS_SECRET in n8n." }

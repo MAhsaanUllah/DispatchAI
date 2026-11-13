@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Workflow, Mail, Sparkles, BellRing, PhoneCall, Plug, Unplug, type LucideIcon } from "lucide-react";
+import { BookingMeter } from "./BookingMeter.js";
+import { FEATURES, GROUPS, phoneNote, type RunsOn } from "./features.js";
 
 type Field = { key: string; label: string; secret: boolean; placeholder?: string; help?: string; value: string; saved?: boolean; options?: { value: string; label: string }[] };
 type Plugin = {
@@ -173,47 +175,30 @@ function PluginDrawer({ plugin, onClose, onDone }: { plugin: Plugin; onClose: ()
   );
 }
 
-// Plugins page: drag a card from "Available" into "My system" to connect it (or use the Add button);
-// drag it back (or Remove) to disconnect. Buttons give the same actions for keyboard and touch users.
+type State = "live" | "failing" | "needs-key" | "off";
+const STATE_LABEL: Record<State, string> = { live: "Live", failing: "Failing", "needs-key": "Needs a key", off: "Off" };
+
+// What the owner sees at a glance: is it doing its job right now?
+const stateOf = (plugin: Plugin, health?: Health): State => {
+  if (plugin.enabled) return (health && !health.ok) || plugin.status?.warning ? "failing" : "live";
+  return plugin.fields.some((field) => field.secret && !field.saved) ? "needs-key" : "off";
+};
+
+// Features page: grouped by what the owner wants done. Each card says what it does, whether it works now,
+// and what changes when it is on. Add / Settings / Test / Remove are plain buttons, so keyboard and touch work.
 export function PluginsPage() {
   const [plugins, setPlugins] = useState<Plugin[] | null>(null);
   const [error, setError] = useState("");
   const [drawer, setDrawer] = useState<Plugin | null>(null);
   const [health, setHealth] = useState<Record<string, Health>>({});
-  const [over, setOver] = useState<"available" | "system" | null>(null);
-  const [dragging, setDragging] = useState<string | null>(null);
-  const [flash, setFlash] = useState<{ id: string; text: string; on: boolean } | null>(null);
+  const [flash, setFlash] = useState<{ id: string; text: string } | null>(null);
+  const [runsOn, setRunsOn] = useState<RunsOn>("desktop");
 
-  // Card positions, kept so a plugin can slide from one zone to the other instead of jumping.
-  const cards = useRef(new Map<string, HTMLElement>());
-  const flip = useRef<{ id: string; rect: DOMRect } | null>(null);
-  const cardRef = useCallback((node: HTMLElement | null) => {
-    const id = node?.dataset.pluginId;
-    if (!id) return;
-    if (node) cards.current.set(id, node);
-    else cards.current.delete(id);
+  const load = () => fetch("/api/plugins").then((r) => r.json()).then((body) => setPlugins(body.data.plugins)).catch(() => setError("Cannot load features."));
+  useEffect(() => {
+    void load();
+    fetch("/api/business").then((r) => r.json()).then((body) => setRunsOn(body.data.config.runsOn ?? "desktop")).catch(() => undefined);
   }, []);
-
-  const load = () => fetch("/api/plugins").then((r) => r.json()).then((body) => setPlugins(body.data.plugins)).catch(() => setError("Cannot load plugins."));
-  useEffect(() => { void load(); }, []);
-
-  // The card moved zone: play the move from where it was to where it landed.
-  useLayoutEffect(() => {
-    const pending = flip.current;
-    if (!pending) return;
-    flip.current = null;
-    const node = cards.current.get(pending.id);
-    if (!node) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    const landed = node.getBoundingClientRect();
-    const dx = pending.rect.left - landed.left;
-    const dy = pending.rect.top - landed.top;
-    if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
-    node.animate(
-      [{ transform: `translate(${dx}px, ${dy}px)`, opacity: 0.2 }, { transform: "translate(0, 0)", opacity: 1 }],
-      { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }
-    );
-  }, [plugins]);
 
   // The connect/disconnect result is stated once, then it goes quiet.
   useEffect(() => {
@@ -222,135 +207,101 @@ export function PluginsPage() {
     return () => clearTimeout(timer);
   }, [flash]);
 
-  const capture = (id: string) => {
-    const node = cards.current.get(id);
-    if (node) flip.current = { id, rect: node.getBoundingClientRect() };
-  };
-
   const remove = async (plugin: Plugin) => {
-    if (!window.confirm(`Disconnect ${plugin.name}? It stops working until you add it again. Saved keys are kept.`)) return;
-    capture(plugin.id);
+    if (!window.confirm(`Switch off ${plugin.name}? It stops working until you add it again. Saved keys are kept.`)) return;
     const problem = await save(plugin, {}, false);
     if (problem) setError(problem);
-    else setFlash({ id: plugin.id, text: `${plugin.name} disconnected`, on: false });
+    else setFlash({ id: plugin.id, text: `${plugin.name} is off` });
     void load();
-  };
-  const openDrawer = (plugin: Plugin) => {
-    capture(plugin.id);
-    setDrawer(plugin);
   };
   const test = async (plugin: Plugin) => {
     setHealth((current) => ({ ...current, [plugin.id]: { ok: true, text: "Testing…" } }));
     const result = await runTest(plugin);
     setHealth((current) => ({ ...current, [plugin.id]: result }));
   };
-  const drop = (zone: "available" | "system") => (event: React.DragEvent) => {
-    event.preventDefault();
-    setOver(null);
-    setDragging(null);
-    const plugin = plugins?.find((p) => p.id === event.dataTransfer.getData("text/plain"));
-    if (!plugin) return;
-    if (zone === "system" && !plugin.enabled) openDrawer(plugin);
-    if (zone === "available" && plugin.enabled) void remove(plugin);
-  };
-  const zoneProps = (zone: "available" | "system") => ({
-    onDragOver: (event: React.DragEvent) => { event.preventDefault(); setOver(zone); },
-    onDragLeave: () => setOver((current) => (current === zone ? null : current)),
-    onDrop: drop(zone),
-    className: `zone ${over === zone ? "zone--over" : ""}`
-  });
-  const dragProps = (plugin: Plugin) => ({
-    draggable: true,
-    onDragStart: (event: React.DragEvent) => { event.dataTransfer.setData("text/plain", plugin.id); setDragging(plugin.id); },
-    onDragEnd: () => { setDragging(null); setOver(null); }
-  });
 
-  const available = plugins?.filter((p) => !p.enabled) ?? [];
-  const connected = plugins?.filter((p) => p.enabled) ?? [];
+  const liveIds = plugins?.filter((p) => stateOf(p, health[p.id]) === "live").map((p) => p.id) ?? [];
   return (
-    <section className="page" aria-labelledby="plugins-title">
+    <section className="page" aria-labelledby="features-title">
       <div className="page__head">
         <div className="page__head-text">
-          <h1 className="page__title" id="plugins-title">Plugins</h1>
-          <p className="page__lede">Connect the tools your business runs on. Keys stay encrypted on this server and are never shown again.</p>
+          <h1 className="page__title" id="features-title">Features</h1>
+          <p className="page__lede">Switch on what you need. Each one automates one more step of a booking. Keys stay encrypted on this server and are never shown again.</p>
         </div>
       </div>
       {error && <p role="alert" className="field__error">{error}</p>}
-      {!plugins && !error && <p className="page__lede">Loading plugins…</p>}
+      {!plugins && !error && <p className="page__lede">Loading features…</p>}
       {plugins && (
-        <div className={`zones ${dragging ? "zones--dragging" : ""}`}>
-          <section aria-labelledby="available-title" {...zoneProps("available")}>
-            <div className="zone__head">
-              <h2 className="zone__title" id="available-title">Available <span className="zone__count">{available.length}</span></h2>
-              {over === "available" && <span className="zone__drop">Drop to disconnect</span>}
-            </div>
-            {available.length === 0 && <p className="zone__hint">Everything is connected.</p>}
-            {available.length > 0 && (
-              <div className="grid zone__cards grid--tiles">
-                {available.map((plugin, index) => {
-                  const Icon = PLUGIN_ICON[plugin.id] ?? Plug;
-                  return (
-                    <article key={plugin.id} data-plugin-id={plugin.id} ref={cardRef} aria-label={plugin.name} {...dragProps(plugin)} style={{ animationDelay: `${index * 55}ms` }} className={`plugin plugin--tile ${dragging === plugin.id ? "plugin--dragging" : ""}`}>
-                      <div className="plugin__top">
-                        <span className="plugin__icon" aria-hidden="true"><Icon size={16} /></span>
-                        <strong className="plugin__name">{plugin.name}</strong>
-                        <span className="plugin__category">{plugin.category}</span>
-                      </div>
-                      <p className="plugin__desc" title={plugin.description}>{plugin.description}</p>
-                      <div className="plugin__actions">
-                        <button type="button" className="btn btn--primary btn--sm" onClick={() => openDrawer(plugin)}>Add</button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-          <section aria-labelledby="system-title" {...zoneProps("system")}>
-            <div className="zone__head">
-              <h2 className="zone__title" id="system-title">My system <span className="zone__count">{connected.length}</span></h2>
-              {over === "system" && <span className="zone__drop">Drop to connect</span>}
-            </div>
-            {connected.length === 0 && <p className="zone__hint">Nothing connected yet. Drag a plugin here, or press Add.</p>}
-            {connected.length > 0 && (
-              <div className="grid grid--rows zone__cards">
-                {connected.map((plugin) => {
-                  const h = health[plugin.id];
-                  const failed = h && !h.ok;
-                  const Icon = PLUGIN_ICON[plugin.id] ?? Plug;
-                  return (
-                    <article key={plugin.id} data-plugin-id={plugin.id} ref={cardRef} aria-label={plugin.name} {...dragProps(plugin)} className={`plugin plugin--on ${failed ? "plugin--failed" : ""} ${dragging === plugin.id ? "plugin--dragging" : ""}`}>
-                      <div className="plugin__row">
-                        <span className="plugin__icon" aria-hidden="true"><Icon size={16} /></span>
-                        <strong className="plugin__name">{plugin.name}</strong>
-                        <span className="plugin__category">{plugin.category}</span>
-                        <span className={`plugin__badge ${failed ? "plugin__badge--off" : "plugin__badge--on"}`}>
-                          {failed ? "Test failed" : "Connected"}
-                        </span>
-                        <div className="plugin__actions">
-                          <button type="button" className="btn btn--sm" onClick={() => openDrawer(plugin)}>Settings</button>
-                          <button type="button" className="btn btn--sm" onClick={() => test(plugin)}>Test</button>
-                          <button type="button" className="btn btn--sm" onClick={() => remove(plugin)}><Unplug size={12} aria-hidden="true" />Remove</button>
+        <>
+          <BookingMeter live={liveIds} compact />
+          {GROUPS.map((group) => {
+            const items = FEATURES.filter((feature) => feature.group === group.title);
+            return (
+              <section key={group.title} className="feature-group" aria-labelledby={`group-${group.title}`}>
+                <div className="feature-group__head">
+                  <h2 className="feature-group__title" id={`group-${group.title}`}>{group.title}</h2>
+                  <p className="feature-group__purpose">{group.purpose}</p>
+                </div>
+                <div className="features">
+                  {items.map((feature, index) => {
+                    const plugin = plugins.find((p) => p.id === feature.id);
+                    if (!plugin) return null;
+                    const h = health[plugin.id];
+                    const state = stateOf(plugin, h);
+                    const Icon = PLUGIN_ICON[plugin.id] ?? Plug;
+                    const on = plugin.enabled;
+                    return (
+                      <article key={plugin.id} aria-label={feature.name} style={{ animationDelay: `${index * 55}ms` }} className={`feature feature--${state}`}>
+                        <div className="feature__top">
+                          <span className="feature__icon" aria-hidden="true"><Icon size={16} /></span>
+                          <h3 className="feature__name">{feature.name}</h3>
+                          <span className={`state state--${state}`}>{STATE_LABEL[state]}</span>
                         </div>
-                      </div>
-                      {h && <span role={failed ? "alert" : "status"} className={`plugin__status ${failed ? "plugin__status--failed" : ""}`}>{h.text}</span>}
-                      {plugin.status && <span className={`plugin__status ${plugin.status.warning ? "plugin__status--failed" : ""}`}>{plugin.status.text}</span>}
-                      {flash?.id === plugin.id && <span className={`plugin__flash ${flash.on ? "plugin__flash--on" : ""}`} role="status">{flash.text}</span>}
-                      {plugin.id === "n8n" && <DeliveryLog />}
-                      {plugin.id === "twilio" && <CallLog />}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
+                        <p className="feature__kind">{feature.kind === "custom" ? "Custom workflow" : "Built-in"}</p>
+                        <p className="feature__benefit">{feature.benefit}</p>
+                        {plugin.id === "twilio" && <p className="feature__note">{phoneNote(runsOn)}</p>}
+                        <details className="feature__more">
+                          <summary>What changes when this is on</summary>
+                          <p>{feature.changes}</p>
+                        </details>
+                        {h && <p role={h.ok ? "status" : "alert"} className={`feature__status ${h.ok ? "" : "feature__status--failed"}`}>{h.text}</p>}
+                        {plugin.status && <p className={`feature__status ${plugin.status.warning ? "feature__status--failed" : ""}`}>{plugin.status.text}</p>}
+                        {flash?.id === plugin.id && <p className="feature__flash" role="status">{flash.text}</p>}
+                        <div className="feature__actions">
+                          {on ? (
+                            <>
+                              <button type="button" className="btn btn--sm" onClick={() => setDrawer(plugin)}>Settings</button>
+                              <button type="button" className="btn btn--sm" onClick={() => test(plugin)}>Test</button>
+                              <button type="button" className="btn btn--sm" onClick={() => remove(plugin)}><Unplug size={12} aria-hidden="true" />Switch off</button>
+                            </>
+                          ) : (
+                            <button type="button" className="btn btn--primary btn--sm" onClick={() => setDrawer(plugin)}>Add</button>
+                          )}
+                        </div>
+                        {on && plugin.id === "n8n" && <DeliveryLog />}
+                        {on && plugin.id === "twilio" && <CallLog />}
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+          <section className="explainer" aria-labelledby="else-title">
+            <h2 className="explainer__title" id="else-title">Need something else?</h2>
+            <ol className="explainer__steps">
+              <li><strong>Built-in features.</strong> Switch one on above. Nothing to write.</li>
+              <li><strong>Custom workflow.</strong> Connect n8n to send each booking to Sheets, WhatsApp, a CRM or anything n8n can reach. Host n8n on your cloud server or use n8n Cloud.</li>
+              <li><strong>Your own code.</strong> A developer API is not part of this version.</li>
+            </ol>
           </section>
-        </div>
+        </>
       )}
       {drawer && (
         <PluginDrawer
           plugin={drawer}
           onClose={() => { setDrawer(null); void load(); }}
-          onDone={(result) => { setHealth((current) => ({ ...current, [drawer.id]: result })); setFlash({ id: drawer.id, text: `${drawer.name} connected`, on: true }); setDrawer(null); void load(); }}
+          onDone={(result) => { setHealth((current) => ({ ...current, [drawer.id]: result })); setFlash({ id: drawer.id, text: `${drawer.name} is on` }); setDrawer(null); void load(); }}
         />
       )}
     </section>

@@ -4,13 +4,13 @@ type Hours = Record<Day, { open: string; close: string } | null>;
 type Day = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 type Service = { id: string; name: string };
 type Staff = { id?: string; name: string; skills: string[] };
-type Props = { onDone: () => void; onBack: () => void };
+type Props = { onDone: () => void; onBack: () => void; finishLabel?: string };
 
 const DAYS: [Day, string][] = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
 const idOf = (name: string) => name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
 // Onboarding step 3: what you offer, when you are open, and who works. Saving generates bookable slots.
-export function ScheduleSetup({ onDone, onBack }: Props) {
+export function ScheduleSetup({ onDone, onBack, finishLabel = "Finish setup" }: Props) {
   const [services, setServices] = useState<Service[]>([]);
   const [hours, setHours] = useState<Hours | null>(null);
   const [slotMinutes, setSlotMinutes] = useState(60);
@@ -127,7 +127,7 @@ export function ScheduleSetup({ onDone, onBack }: Props) {
       <div className="wizard__actions">
         <button type="button" className="btn" onClick={onBack}>Back</button>
         <button type="button" className="btn btn--primary" onClick={save} disabled={saving}>
-          {saving ? "Saving…" : "Finish setup"}
+          {saving ? "Saving…" : finishLabel}
         </button>
       </div>
     </div>

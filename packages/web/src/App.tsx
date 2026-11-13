@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Navbar } from "./components/Navbar.js";
 import { StatsBar } from "./components/StatsBar.js";
+import { TodaySummary } from "./components/TodaySummary.js";
 import { JobsTable } from "./components/JobsTable.js";
 import { WorkOrderDrawer } from "./components/WorkOrderDrawer.js";
 import { AgentChat } from "./components/AgentChat.js";
@@ -24,7 +25,15 @@ export const App: React.FC = () => {
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((body) => setIsOwner(body?.data?.role !== "staff")).catch(() => undefined);
   }, []);
-  const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox">("dispatch");
+  // Onboarding can ask to land on Features once, when there is something left to connect.
+  const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox">(() => {
+    try {
+      const wanted = sessionStorage.getItem("dispatch.view");
+      sessionStorage.removeItem("dispatch.view");
+      if (wanted === "plugins") return "plugins";
+    } catch { /* storage can be blocked */ }
+    return "dispatch";
+  });
   const [notifications, setNotifications] = useState<LocalNotification[]>([]);
   const [selectedJob, setSelectedJob] = useState<WorkOrder | null>(null);
   const [agentState, setAgentState] = useState(api.getAgent().getState());
@@ -157,6 +166,7 @@ export const App: React.FC = () => {
                     <div className="split">
                       <div className="split__main board">
                         <StatsBar jobs={jobs} companyName={directory?.company.name} />
+                        <TodaySummary jobs={jobs} />
                         <JobsTable
                           jobs={jobs}
                           selectedJobId={selectedJob?.id || null}

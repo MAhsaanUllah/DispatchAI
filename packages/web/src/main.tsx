@@ -4,6 +4,7 @@ import { SetupPage } from "./SetupPage.js";
 import { LoginPage } from "./LoginPage.js";
 import { BusinessWizard } from "./BusinessWizard.js";
 import "./index.css";
+import "./ux.css";
 
 const App = React.lazy(() => import("./App.js").then((module) => ({ default: module.App })));
 
