@@ -154,6 +154,10 @@ Honest list, so nobody trusts what has not been tried:
 - Windows installer signing, auto-update and macOS/Linux desktop builds.
 - Calendar sync: slots come from the opening hours and staff you enter, not from a live calendar. SMS and Google Calendar are planned.
 
+## AI assistance
+
+DispatchAI is designed and directed by Ahsaan Ullah and built with AI assistance (Claude Code). The product decisions, priorities and testing on real machines are the maintainer's; the code is checked by the test suite, the end-to-end run and the container smoke test described above.
+
 ## Contributing
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Please keep changes small and include a test.
