@@ -104,9 +104,13 @@ export function DirectoryPanel({ view, directory, loading, onEdit, onEditHours }
         </article>
         <article className="record">
           <div className="record__head">
-            <h2 className="record__name">What the agent says first</h2>
-            {onEdit && <button type="button" className="btn btn--sm" onClick={onEdit}>Change greeting</button>}
+            <h2 className="record__name">Your agent</h2>
+            {onEdit && <button type="button" className="btn btn--sm" onClick={onEdit}>Edit agent</button>}
           </div>
+          <dl className="record__list">
+            <div className="record__row"><dt>Name</dt><dd>{directory.company.agentName || "Not set"}</dd></div>
+            <div className="record__row"><dt>Tone</dt><dd>{directory.company.tone[0].toUpperCase() + directory.company.tone.slice(1)}</dd></div>
+          </dl>
           <p className="drawer__text">{directory.company.greeting}</p>
         </article>
       </div>

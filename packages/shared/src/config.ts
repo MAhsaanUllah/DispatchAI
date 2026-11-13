@@ -46,7 +46,10 @@ export const BusinessConfigSchema = z.object({
   hours: WeekHoursSchema.default(DEFAULT_HOURS),
   slotMinutes: z.number().int().min(15).max(480).default(60),
   // Where this install runs; only the dashboard copy adapts (phone calls need a public address on a desktop install).
-  runsOn: z.enum(["desktop", "cloud"]).default("desktop")
+  runsOn: z.enum(["desktop", "cloud"]).default("desktop"),
+  // How the agent introduces itself and sounds. The tone only rewords a few framing lines; the booking rules do not change.
+  agentName: z.string().trim().max(40).default(""),
+  tone: z.enum(["friendly", "formal", "brief"]).default("friendly")
 });
 export type BusinessConfig = z.infer<typeof BusinessConfigSchema>;
 export type BusinessConfigInput = z.input<typeof BusinessConfigSchema>;

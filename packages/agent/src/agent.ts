@@ -11,6 +11,7 @@ import {
 } from "@dispatchai/shared";
 import { detectService, getBusinessConfig, serviceZoneFor } from "@dispatchai/domain";
 import { N8nClient } from "./client.js";
+import { answerAbout, confirmationLine, handoffLine } from "./persona.js";
 import { addressMatches, nameMatches } from "./verify.js";
 import { AgentState, ConversationMessage, createInitialAgentState, PendingConfirmationAction, SuccessfulCreateRecord } from "./state.js";
 
@@ -487,13 +488,8 @@ export class DispatchAgent {
 
   private confirmationSuccessReply(actionType: PendingConfirmationAction["type"], workOrder: WorkOrder): string {
     const note = "The demo confirmation was logged; no real message was sent.";
-    if (actionType === "RESCHEDULE_WORK_ORDER") {
-      return `I have confirmed the reschedule: Work order #${workOrder.id} has been rescheduled to ${workOrder.scheduledStart} with technician ${workOrder.technicianId}. ${note}`;
-    }
-    if (actionType === "CANCEL_WORK_ORDER") {
-      return `I have confirmed the cancellation: Work order #${workOrder.id} has been cancelled. ${note}`;
-    }
-    return `I have confirmed your appointment! Work order #${workOrder.id} is booked with technician ${workOrder.technicianId} for ${workOrder.scheduledStart}. ${note}`;
+    const kind = actionType === "RESCHEDULE_WORK_ORDER" ? "RESCHEDULE" : actionType === "CANCEL_WORK_ORDER" ? "CANCEL" : "BOOK";
+    return confirmationLine(getBusinessConfig().tone, kind, workOrder, note);
   }
 
   private pushAgentReply(reply: string): string {
@@ -527,7 +523,7 @@ export class DispatchAgent {
     }
     if (WANTS_HUMAN.test(lower)) {
       this.emit("HANDOFF_REQUESTED", correlationId, undefined, { reason: "human", text: cleanText });
-      return this.pushAgentReply("I have asked a team member to call you back. Is there anything I can note for them?");
+      return this.pushAgentReply(handoffLine(getBusinessConfig().tone));
     }
 
     if (this.state.newCaller) return this.continueNewCaller(cleanText, correlationId);
@@ -797,8 +793,8 @@ export class DispatchAgent {
       if (canonical) return this.processMessage(canonical, true);
     }
 
-    // Default conversational reply
-    const reply = getBusinessConfig().greeting;
+    // Nothing above understood the message: answer a plain question about the business, or fall back to the greeting.
+    const reply = answerAbout(cleanText, getBusinessConfig()) ?? getBusinessConfig().greeting;
     this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
     return reply;
   }

@@ -463,7 +463,7 @@ async function routeRequest(req: Request): Promise<Response> {
     } }, 200, corsHeaders);
   }
   if (businessRoute && method === "PUT") {
-    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown; services?: unknown; hours?: unknown; slotMinutes?: unknown; runsOn?: unknown; greeting?: unknown };
+    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown; services?: unknown; hours?: unknown; slotMinutes?: unknown; runsOn?: unknown; greeting?: unknown; agentName?: unknown; tone?: unknown };
     const current = getBusinessConfig();
     const templateId = typeof body.templateId === "string" ? body.templateId : current.templateId;
     const switching = templateId !== current.templateId;
@@ -484,7 +484,9 @@ async function routeRequest(req: Request): Promise<Response> {
       hours: body.hours ?? base.hours,
       slotMinutes: body.slotMinutes ?? base.slotMinutes,
       runsOn: body.runsOn ?? current.runsOn,
-      greeting: text(body.greeting) || base.greeting
+      greeting: text(body.greeting) || base.greeting,
+      agentName: text(body.agentName) ?? current.agentName,
+      tone: body.tone ?? current.tone
     });
     if (!parsed.success) {
       const issue = parsed.error.issues[0];

@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { ScheduleSetup } from "./ScheduleSetup.js";
 import { TestCall } from "./TestCall.js";
 import { BookingMeter } from "./BookingMeter.js";
+import { suggestGreeting, TONES, type Tone } from "./persona.js";
 import { FEATURES, featureById, phoneNote, recommendedFor, RUNS_ON, type RunsOn } from "./features.js";
 
 type Template = { templateId: string; name: string; kind: "onsite" | "instore"; services: string[] };
-type Config = { templateId: string; name: string; market: string; timeZone: string; kind: "onsite" | "instore"; serviceZones: string[]; runsOn: RunsOn; greeting?: string };
+type Config = { templateId: string; name: string; market: string; timeZone: string; kind: "onsite" | "instore"; serviceZones: string[]; runsOn: RunsOn; greeting?: string; agentName?: string; tone?: Tone };
 type Business = { config: Config; configured: boolean; canSwitchTemplate: boolean; templates: Template[] };
 type Props = { onDone: () => void; onCancel?: () => void; startAt?: "details" | "schedule" };
 type StepId = "where" | "type" | "details" | "schedule" | "features" | "test";
@@ -45,6 +46,8 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
   const [areas, setAreas] = useState<string[]>([]);
   const [newArea, setNewArea] = useState("");
   const [greeting, setGreeting] = useState("");
+  const [agentName, setAgentName] = useState("");
+  const [tone, setTone] = useState<Tone>("friendly");
   // Only a greeting the owner edited is sent, so a new business type keeps its own default.
   const [greetingTouched, setGreetingTouched] = useState(false);
   const [runsOn, setRunsOn] = useState<RunsOn>("desktop");
@@ -68,6 +71,8 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
       setTimeZone(data.config.timeZone);
       setAreas(data.config.serviceZones);
       setGreeting(data.config.greeting ?? "");
+      setAgentName(data.config.agentName ?? "");
+      setTone(data.config.tone ?? "friendly");
       setRunsOn(data.config.runsOn ?? "desktop");
       setTicked(recommendedFor(data.config.templateId));
     }).catch(() => setError("Cannot load business settings."));
@@ -109,7 +114,7 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
       const response = await fetch("/api/business", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId, name, market, timeZone, serviceZones, runsOn, ...(greetingTouched ? { greeting } : {}) })
+        body: JSON.stringify({ templateId, name, market, timeZone, serviceZones, runsOn, agentName, tone, ...(greetingTouched ? { greeting } : {}) })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -251,11 +256,28 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
                 </div>
               </fieldset>
             )}
-            <label className="field">
-              <span className="field__label">What the agent says first</span>
-              <textarea className="input input--tall" aria-label="Agent greeting" value={greeting} placeholder="Leave empty to use the standard greeting for this business type" maxLength={400} onChange={(e) => { setGreeting(e.target.value); setGreetingTouched(true); }} />
-              <span className="field__hint">The agent opens every call and chat with this. Say your business name and what people can book.</span>
-            </label>
+            <fieldset className="fieldset">
+              <legend>Your agent</legend>
+              <label className="field">
+                <span className="field__label">Agent name (optional)</span>
+                <input className="input" aria-label="Agent name" value={agentName} maxLength={40} placeholder="For example Aisha" onChange={(e) => setAgentName(e.target.value)} />
+              </label>
+              <div role="radiogroup" aria-label="Tone" className="wizard__choices">
+                {TONES.map((option) => (
+                  <button key={option.id} type="button" role="radio" aria-checked={tone === option.id} onClick={() => setTone(option.id)} className={`choice ${tone === option.id ? "choice--on" : ""}`}>
+                    <span className="choice__name">{option.title}</span>
+                    <span className="choice__meta">{option.sample}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="field__hint">The tone rewords the agent's replies when it confirms a booking or passes a caller to your team. The booking rules and the yes-confirmation never change.</p>
+              <label className="field">
+                <span className="field__label">What the agent says first</span>
+                <textarea className="input input--tall" aria-label="Agent greeting" value={greeting} placeholder="Leave empty to use the standard greeting for this business type" maxLength={400} onChange={(e) => { setGreeting(e.target.value); setGreetingTouched(true); }} />
+                <span className="field__hint">The agent opens every call and chat with this. Say your business name and what people can book.</span>
+              </label>
+              <div><button type="button" className="btn btn--sm" onClick={() => { setGreeting(suggestGreeting(name, agentName, tone)); setGreetingTouched(true); }}>Use a suggested greeting</button></div>
+            </fieldset>
             {error && <p role="alert" className="field__error">{error}</p>}
             <div className="wizard__actions">
               <button type="button" className="btn" onClick={back}>Back</button>

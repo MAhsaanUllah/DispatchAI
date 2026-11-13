@@ -130,3 +130,16 @@ describe("staff hours and the greeting", () => {
     expect((await call("/api/directory")).body.data.company.greeting).toBe("Salam! Noor Salon here. How can I help?");
   });
 });
+
+describe("agent name and tone", () => {
+  it("saves a name and tone, rejects an unknown tone, and the tone changes the handoff line", async () => {
+    expect((await put({ agentName: "Aisha", tone: "brief" })).status).toBe(200);
+    const config = (await call("/api/business")).body.data.config;
+    expect(config).toMatchObject({ agentName: "Aisha", tone: "brief" });
+    expect((await call("/api/directory")).body.data.company).toMatchObject({ agentName: "Aisha", tone: "brief" });
+    expect((await put({ tone: "shouty" })).status).toBe(400);
+    const reply = (await call("/api/chat", { method: "POST", body: JSON.stringify({ message: "I want to speak to a real person" }) })).body.reply as string;
+    expect(reply).toBe("A team member will call you back. Anything to pass on?");
+    expect((await put({ tone: "friendly" })).status).toBe(200);
+  });
+});
