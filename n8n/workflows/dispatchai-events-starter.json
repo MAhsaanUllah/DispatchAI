@@ -11,7 +11,8 @@
       "name": "Webhook: DispatchAI Event",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 300]
+      "position": [0, 300],
+      "webhookId": "dispatchai-events"
     },
     {
       "parameters": {
@@ -37,7 +38,7 @@
       },
       "name": "Route by Event Type",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
+      "typeVersion": 1,
       "position": [480, 300]
     },
     {
