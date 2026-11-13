@@ -20,6 +20,7 @@ import { extract, setUsageSink, toCanonical } from "./llm.js";
 import { estimateCostUsd, UsageLog } from "./usage-store.js";
 import { ApiKeyStore, type ApiKeyScope } from "./api-keys.js";
 import { handleApiV1 } from "./api-v1.js";
+import { handleMcp } from "./mcp.js";
 import { dialTwiml, fetchTwilioAccount, gatherTwiml, hangupTwiml, isOpenNow, maskPhone, verifyTwilioSignature } from "./twilio.js";
 
 // shortcut: recent phone calls kept in memory (last 20) for the Twilio card; persist if owners need a call history.
@@ -270,7 +271,7 @@ async function routeRequest(req: Request): Promise<Response> {
 
   // Once an owner exists, every other API call needs an owner session. The Twilio phone line
   // keeps its own signature check instead.
-  const selfAuthenticated = pathname === "/api/twilio/voice" || pathname.startsWith("/api/v1/");
+  const selfAuthenticated = pathname === "/api/twilio/voice" || pathname.startsWith("/api/v1/") || pathname === "/api/mcp";
   if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !user) {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
   }
@@ -280,8 +281,9 @@ async function routeRequest(req: Request): Promise<Response> {
     return json(toolFailure("SETUP_REQUIRED", "Finish first-run setup first", false, `auth_${Date.now()}`), 403, corsHeaders);
   }
   // Developer API: a Bearer key replaces the dashboard login (see api-v1.ts).
-  if (pathname.startsWith("/api/v1/")) {
-    return handleApiV1(req, { keys: apiKeys, client: n8nClient, bookings: jobRows, inbox, allow: (key) => rateLimiter.check(key), cors: corsHeaders });
+  if (pathname.startsWith("/api/v1/") || pathname === "/api/mcp") {
+    const deps = { keys: apiKeys, client: n8nClient, bookings: jobRows, inbox, allow: (key: string) => rateLimiter.check(key), cors: corsHeaders };
+    return pathname === "/api/mcp" ? handleMcp(req, deps) : handleApiV1(req, deps);
   }
   // Twilio phone line: every caller turn arrives here. Twilio's signature replaces the dashboard login.
   if (pathname === "/api/twilio/voice" && method === "POST") {
