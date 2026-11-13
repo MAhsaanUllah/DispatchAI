@@ -20,6 +20,13 @@ fn plain(path: std::path::PathBuf) -> String {
 
 fn main() {
     let app = tauri::Builder::default()
+        // A second copy would start a second server on the same database; bring the first window forward instead.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(|app| {
             let res = app.path().resource_dir()?;
             let data = app.path().app_data_dir()?;
@@ -39,6 +46,8 @@ fn main() {
                 .env("WEB_DIST", plain(res.join("web")))
                 .env("WEB_ORIGIN", format!("http://127.0.0.1:{port}"))
                 .env("SETUP_TOKEN", &code)
+                // The server exits by itself if this app dies without a clean shutdown (crash, Task Manager).
+                .env("PARENT_PID", std::process::id().to_string())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .creation_flags(CREATE_NO_WINDOW)
