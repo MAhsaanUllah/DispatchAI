@@ -1,169 +1,157 @@
 <p align="center">
-  <img src="assets/DispatchAI-logo.png" alt="DispatchAI" width="420" />
+  <img src="assets/DispatchAI-logo.png" alt="DispatchAI" width="360" />
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Status-Work%20in%20Progress-amber?style=flat-square" alt="Status: Work in Progress" />
-  <img src="https://img.shields.io/badge/Tests-149%20passing-brightgreen?style=flat-square" alt="Tests: 149 passing" />
-</p>
+# DispatchAI
 
-<p align="center">
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React" />
-  <img src="https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite" />
-  <img src="https://img.shields.io/badge/Node.js-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" />
-  <img src="https://img.shields.io/badge/Cloudflare%20Workers-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare Workers" />
-  <img src="https://img.shields.io/badge/ElevenLabs-000000?style=flat-square&logo=elevenlabs&logoColor=white" alt="ElevenLabs" />
-  <img src="https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white" alt="n8n" />
-  <img src="https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white" alt="Vitest" />
-</p>
+**An open-source AI booking agent you run yourself.** It answers a small business's phone (or chat), books, moves and cancels appointments, and hands anything it cannot handle to a person. One install per business, on your own PC or server. No monthly SaaS fee, and the customer data stays on your machine.
 
-**Voice-assisted dispatch for HVAC and plumbing operations.** DispatchAI brings customer intake, technician availability, work-order scheduling, and dispatcher review into one system. It is a portfolio project built around a realistic Austin, Texas field-service workflow.
+Built for appointment businesses: field service (HVAC, plumbing), salons, auto repair and home cleaning. Missed calls are lost jobs; this answers them 24/7.
 
-The application combines a React operations dashboard, an ElevenLabs conversational voice interface, authenticated n8n workflows, and TypeScript booking rules. The local server uses SQLite; the deployed Cloudflare Worker now has a separate SQLite-backed Durable Object for demo bookings.
+> **Status: early, pilot-ready, not battle-tested.** The booking engine, security model and install paths are covered by automated tests. Real phone calls, real email and real AI providers have **not** been exercised with live accounts yet. See [Not verified yet](#not-verified-yet).
 
-**The hosted Cloudflare demo is invite-only** — access links are shared privately with reviewers. The demo uses synthetic Austin customers, properties, technicians, and schedules; Google sign-in is required before a voice call or opening the cloud dashboard. The selected demo location binds an existing synthetic customer/property on the server; the recruiter's name is conversational context only.
+## What it does
 
-> **Mock data notice:** Everything in the demo and in every screenshot is fictional synthetic sample data. Customers, properties, addresses, phone numbers, technicians, and work orders are invented for the mockup — no real customer or business records are used, and no real dispatch operation is connected.
+- **Books on the phone or in chat.** A rule-based agent collects the job, the customer and a slot, using the questions of your business type. An optional AI brain understands callers who phrase things in their own words.
+- **Never books without a yes.** Every booking, reschedule and cancellation is proposed first and written only after the caller clearly confirms. The AI only reads what the caller wants; it cannot confirm anything.
+- **Does not leak customer data.** A phone number is not identity: the caller must state their address (or full name) before anything is read out or changed. Wrong and unknown details get the same answer.
+- **Hands over to people.** Emergencies, "let me talk to someone" and failed deliveries become tasks in the **Inbox** for your staff.
+- **Plugins you switch on from the dashboard:** phone line, AI brain, email, reminders, and signed events to your own [n8n](https://n8n.io) workflows.
+- **Owner and staff logins** with a PIN. Staff run the day; only the owner changes settings.
 
-![DispatchAI — voice-first field service dispatch](assets/DispatchAI-Cover.png)
+## Install
 
-## Product preview
+Pick one. All three give you the same dashboard.
 
-### Operations dashboard
+### Windows desktop app
 
-![DispatchAI operations dashboard](assets/screenshots/dashboard.png)
+Runs on your PC, private, while the app is open. Build the installer (needs [Node 24+](https://nodejs.org), Rust and a C++ toolchain):
 
-### Workflow orchestration
+```bash
+cd desktop
+npm install
+npm run build        # installer: src-tauri/target/release/bundle/nsis/DispatchAI_*_x64-setup.exe
+```
 
-![DispatchAI n8n workflow canvas](assets/screenshots/all-n8n-operations.png)
+Only one copy runs at a time, and the server stops when the app closes. Phone calls from outside need a public address (a tunnel); the in-browser **Test call** works without one. The installer is not code-signed, so Windows SmartScreen may warn.
 
-The merged n8n canvas contains seven flows: create work order, check availability, find customer, get work order, reschedule, cancel, and booking-created automation. Open the image at full size to inspect the connections.
+### Docker, on your PC
+
+```bash
+cp .env.example .env        # optional: set SETUP_TOKEN
+docker compose up -d --build
+docker compose logs app     # shows the one-time setup code if SETUP_TOKEN is empty
+```
+
+Open <http://localhost:8080/app>, enter the setup code, choose a name and PIN, then follow the onboarding wizard.
+
+### Docker, on a server (24/7)
+
+```bash
+# .env: SETUP_TOKEN, MASTER_KEY (long random value), PUBLIC_URL, PUBLIC_DOMAIN (DNS points here)
+docker compose --profile vps up -d --build
+```
+
+Caddy gets an HTTPS certificate for `PUBLIC_DOMAIN`. Phone calls reach the server directly.
+
+| Profile | Adds | Use it for |
+| --- | --- | --- |
+| *(none)* | the app, on `127.0.0.1:8080` | home PC |
+| `automation` | n8n at `http://localhost:5678` | your own workflows |
+| `tunnel` | a Cloudflare Tunnel | phone calls to a PC (set `TUNNEL_TOKEN`) |
+| `vps` | Caddy with automatic HTTPS | a public server |
+
+Data lives in one SQLite file in the `app-data` volume, next to `master.key`.
+
+## Plugins
+
+Each plugin is a card on the **Plugins** page: paste the key, press **Test**, switch it on. Keys are encrypted with `MASTER_KEY` (or an auto-created `master.key`) and are never shown again.
+
+| Plugin | Does | You need |
+| --- | --- | --- |
+| Phone line (Twilio) | Answers calls to your number with the same agent; forwards to staff while open, otherwise creates a call-back task | Twilio account and a public HTTPS address |
+| AI brain | Understands free-form speech | A key for OpenAI, Anthropic, Gemini, xAI Grok, Groq or Cloudflare Workers AI, or [Ollama](https://ollama.com) running locally (no key) |
+| Email | Booking, change and cancel emails | A [Resend](https://resend.com) key and a verified sender |
+| Reminders | An email before each appointment (2, 12, 24 or 48 hours); catches up after downtime, at most once | The Email plugin |
+| n8n events | A signed event per booking change to your n8n workflow | An n8n webhook URL and a shared secret |
+
+If a plugin fails, the booking still happens: email and n8n are retried in the background and a delivery that gives up appears in the Inbox. If the AI brain is down or out of quota, the built-in rules keep answering.
+
+### n8n, for anything custom
+
+n8n is optional. Booking works without it. Use it when you want something no plugin does (a Google Sheet row, a WhatsApp message, your CRM). DispatchAI POSTs a small JSON event with IDs only, no names or addresses, signed with HMAC-SHA256 over `timestamp.body`:
+
+```
+x-dispatchai-event: booking.created | booking.rescheduled | booking.cancelled
+x-dispatchai-timestamp: <unix seconds>
+x-dispatchai-signature: <hex hmac>
+```
+
+`n8n/workflows/dispatchai-events-starter.json` verifies the signature and routes by event. With `--profile automation` it is imported into n8n on first start. In the dashboard, add the webhook URL (inside Docker: `http://n8n:5678/webhook/dispatchai-events`) and the shared secret, then press **Test**.
+
+## Back up your data
+
+The owner can download one backup file from the dashboard (System page) or `GET /api/backup`. It contains a consistent database snapshot and the `master.key` that decrypts your plugin keys, so **keep it private**. A `MASTER_KEY` set in the environment is never put in the file; store it in your secret manager.
+
+Restore is offline, on purpose: stop the server, then
+
+```bash
+node ./node_modules/vite-node/dist/cli.mjs packages/agent/src/bin/restore-backup.ts backup.json /data/dispatchai.sqlite [--force]
+```
+
+It never deletes anything: with `--force` the old database and key are moved aside as `*.before-restore-<time>`.
+
+## Security
+
+- First-run setup needs a one-time code (`SETUP_TOKEN`, or one printed in the server log). PINs are hashed with PBKDF2-SHA256 (600k iterations). Sessions use an HttpOnly, SameSite=Strict cookie (Secure behind HTTPS). Five wrong PINs lock a login for 15 minutes.
+- Roles are enforced on the server: staff get `403` when they try to change plugins, logins, business settings or staff, download a backup, or reset data.
+- Twilio webhooks are verified by signature; n8n events are signed. Plugin keys are AES-GCM encrypted at rest.
+- The dashboard sends a strict Content-Security-Policy.
+- Synthetic demo data (`SEED_DEMO_DATA=true`) is fictional; a real install starts empty.
 
 ## How it works
 
-```text
-React / Cloudflare web Worker
-  → ElevenLabs Conversational AI (signed browser call, six client tools)
-  → Cloudflare Agents SDK Worker (stateful conversation and confirmation gate)
-  → n8n Cloud operational webhooks
-  → Cloudflare SQLite-backed Durable Object business store
-  → authenticated, read-only operations dashboard
+```
+caller / dashboard ──► one Node server ──► SQLite file
+   (Test call, Twilio)   ├─ rule-based agent + confirmation gate
+                         ├─ optional AI brain (reads intent only)
+                         └─ plugins: email · reminders · n8n events · phone
 ```
 
-The deployed dashboard reads the Cloudflare business store, not a static preview. Customer lookup and technician availability have been verified through the deployed Agent → n8n Cloud → business-store path. Booking requires an explicit confirmation tool round trip; duplicate-create replay protection returns the original work order. Only the current demo browser session highlights its created work order; the remaining synthetic queue stays visible. No real email is sent.
+One process owns the database (a single writer). TypeScript monorepo: `packages/shared` (schemas), `packages/domain` (bookings, slots, templates), `packages/agent` (agent, plugins, server), `packages/web` (React dashboard), `desktop` (Tauri shell).
 
-## Engineering highlights
+## Develop
 
-- **Grounded operations:** Customer and schedule answers come from tool results rather than generated records.
-- **Booking safeguards:** Confirmation before mutations, idempotency keys for repeated requests, slot-conflict checks, and protection against duplicate voice-tool booking replays.
-- **Multi-turn work-order handling:** Create, look up, reschedule, and cancel a work order across turns while retaining the correct job context; ambiguous references prompt for clarification instead of guessing.
-- **Truthful UI and failures:** Dashboard counts, activity, technician details, and connection status reflect available data. Backend outages are reported differently from genuine not-found results.
-- **Persistent local state:** SQLite retains work orders and outbox entries across domain-service restarts.
-- **Voice integration:** ElevenLabs browser sessions use a server-issued signed URL; the API key remains server-side. The recruiter supplies a display name and synthetic service location, never a fake customer phone or address.
-- **Company directory and notifications:** Read-only company, technician, and service views accompany the work-order dashboard. Confirmed bookings enter a persistent notification outbox; optional email delivery requires a configured sender and real recipient.
-- **Workflow security:** Shared-secret authentication between the agent and n8n, plus signature verification for incoming ElevenLabs webhooks.
-- **Cloudflare integration:** A deployed Agents SDK Worker stores session state in a Durable Object. A second SQLite-backed Durable Object holds shared synthetic booking state behind secret-protected Worker endpoints. A separate Worker hosts the landing page, private invite/Google entry, and live read-only dashboard.
-- **Automated checks:** 149 passing tests across 22 files cover contracts, domain rules, workflow topology, agent tools, multi-turn routing, voice-tool replay, pre-call intake, UI states, and failure paths. All four package typechecks pass.
-
-## Stack
-
-| Component | Technology |
-| --- | --- |
-| Dashboard | React, TypeScript, Vite |
-| Agent API | TypeScript, Node.js |
-| Voice | ElevenLabs Conversational AI |
-| Orchestration | n8n |
-| Domain and persistence | TypeScript, Zod, SQLite |
-| Cloud agent runtime | Cloudflare Agents SDK, Durable Objects, Tunnel/VPC Service |
-| Recruiter web app | Cloudflare Workers Static Assets, React dashboard |
-| Tests | Vitest |
-
-### n8n Cloud cutover checklist
-
-The canvas does not need a Cloudflare-branded node: n8n's built-in Cloudflare action is for zone certificates, not this Worker's booking API. The existing HTTP Request nodes are the real integration and can be renamed to make the path visible. Do not add an ElevenLabs node just for a logo: the conversational agent initiates calls outside n8n, and its operational tools must be wired to this flow and voice-tested separately.
-
-In the published merged n8n Cloud workflow, the URL in these six HTTP Request nodes was changed from `http://host.docker.internal:3100` to the deployed Cloudflare agent Worker's public origin, keeping each `/api/internal/...` suffix:
-
-| Canvas node | Worker endpoint |
-| --- | --- |
-| `Create: Create Work Order in DB` | `/api/internal/create-work-order` |
-| `Check: Query Availability` | `/api/internal/check-availability` |
-| `CustLookup: Database Lookup` | `/api/internal/find-customer` |
-| `GetWO: Lookup Work Order` | `/api/internal/get-work-order` |
-| `Reschedule: Reschedule in DB` | `/api/internal/reschedule-work-order` |
-| `Cancel: Cancel in DB` | `/api/internal/cancel-work-order` |
-
-Keep the existing Header Auth credential (`x-dispatch-secret`) and JSON body mapping. `Create: Trigger Showcase Automation` uses the **production** webhook URL of `Showcase: Webhook: Work Order Created` on the same n8n Cloud canvas. Customer lookup previously returned a bare `200`; its `Respond Success` node now sends the structured JSON contract. Cloud availability and signed ElevenLabs session checks pass; the final human-spoken voice-to-dashboard journey still needs observation.
-
-## Run locally
-
-Requires Node.js 24+, npm, Docker Desktop, and a local n8n instance. SQLite uses Node's built-in module; no separate database server is required.
+Needs Node 24+.
 
 ```bash
-git clone https://github.com/MAhsaanUllah/DispatchAI.git
-cd DispatchAI
 npm install
 cp .env.example .env
-npm run build
+npm run dev:agent            # API on :8787, prints the setup code
+npm run dev                  # dashboard on :5173, proxies /api
+npm test                     # unit tests (agent, domain, shared, web)
+npm run typecheck
+npx playwright install chromium                            # once
+npm run build --workspace=@dispatchai/web && npm run e2e   # Playwright: setup, login, onboarding, booking
+node scripts/docker-smoke.mjs http://localhost:8080        # smoke test of a running install
 ```
 
-Set the required values in `.env`, especially `N8N_WEBHOOK_SECRET`. Add `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` to enable real voice calls. Never commit `.env`.
+Add a business type in `packages/domain/src/templates.ts`; add a plugin in `packages/agent/src/plugins.ts` (fields, validation, test).
 
-Import `n8n/workflows/_merged_all_operations.json` into n8n. Create a Header Auth credential named `x-dispatch-secret` with the value from `.env`'s `N8N_WEBHOOK_SECRET`, attach it to the imported webhook and HTTP nodes, and publish the workflow. The HTTP nodes target `host.docker.internal:3100` when n8n runs in Docker.
+## Not verified yet
 
-Start each service in a separate terminal:
+Honest list, so nobody trusts what has not been tried:
 
-```bash
-npm run dev:domain
-npm run dev:agent
-npm run dev
-```
+- A **real phone call** through Twilio: speech recognition quality, delays and timeouts. Only recorded fixtures were used.
+- **Real email** through Resend and **real AI providers**. Provider request formats are tested against fixtures; model names in the form are examples, check your provider's docs.
+- The `vps` and `tunnel` Docker profiles were configuration-checked but not run on a real server.
+- Windows installer signing, auto-update and macOS/Linux desktop builds.
+- Calendar sync: slots come from the opening hours and staff you enter, not from a live calendar. SMS and Google Calendar are planned.
 
-Open the local landing page at [http://localhost:5173](http://localhost:5173) and the staff dashboard at `/app`. The agent API runs on port `8787`, the domain service on `3100`, and n8n on `5678`. Use `npm test` and `npm run typecheck` to verify the codebase.
+## Contributing
 
-### Cloudflare agent path
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Please keep changes small and include a test.
 
-The deployed `dispatchai-agent` Worker calls the public authenticated n8n Cloud webhooks and stores conversation state in an Agents SDK Durable Object. The n8n workflows call its secret-protected business endpoints backed by a separate SQLite Durable Object. The browser never receives the n8n secret or ElevenLabs API key.
+## License
 
-### Private recruiter flow
-
-The `dispatchai-web` Worker serves the landing page, private Google invite flow, signed ElevenLabs session proxy, and live dashboard. After opening the private invite link, choose a display name and one of three synthetic locations, then continue with Google. The voice session uses six existing ElevenLabs client tools through the Cloudflare Agent and n8n Cloud. Once a confirmed booking succeeds, the current browser session retains its work-order ID and `/app` highlights the real cloud record. The dashboard remains read-only; this is not a production SaaS or real dispatch service.
-
-## Self-host with Docker
-
-One business per install. Everything runs in one container; data stays in a Docker volume on your machine.
-
-```bash
-cp .env.example .env        # set SETUP_TOKEN (and MASTER_KEY on a VPS)
-docker compose up -d --build
-docker compose logs app     # shows the setup code if SETUP_TOKEN is empty
-```
-
-Open `http://localhost:8080/app`, enter the setup code, choose your PIN, then follow the onboarding wizard.
-
-| Where it runs | Command | Notes |
-| --- | --- | --- |
-| Home PC | `docker compose up -d` | Dashboard on this computer only. Phone calls stop when the PC is off or asleep. |
-| Home PC + n8n | `docker compose --profile automation up -d` | n8n editor at `http://localhost:5678`; in the n8n plugin use `http://n8n:5678/webhook/...`. |
-| Home PC + phone line | `docker compose --profile tunnel up -d` | Cloudflare Tunnel gives Twilio a public HTTPS address; route the tunnel to `http://app:8080`. |
-| VPS | `docker compose --profile vps up -d` | Caddy serves `https://PUBLIC_DOMAIN` with an automatic certificate. Set `MASTER_KEY`. |
-
-Check an install end to end: `SETUP_TOKEN=... node scripts/docker-smoke.mjs http://localhost:8080`.
-Back up the `app-data` volume (it holds the database and `master.key`).
-
-## Roadmap
-
-The demo intentionally stops at the invite-only, read-only boundary. Beyond it, the next concrete steps are:
-
-- **Deliver the notification outbox.** Confirmed bookings already queue customer and technician messages; connecting a real email sender completes the loop the demo leaves off.
-- **Dispatcher actions from the dashboard.** Today the cloud dashboard is read-only; authenticated dispatchers would reschedule or cancel straight from the work-order queue.
-- **Scripted voice-scenario checks.** Just as the codebase has regression tests, scripted conversation scenarios for interruption, outage, and recovery would keep the agent's dialogue verified as the prompt evolves.
-- **Agent-ended calls.** Calls currently end from the UI or the duration cap; enabling the agent's end-call tool lets the agent close the line itself once a booking is confirmed.
-- **Grow beyond one market.** Customers, zones, and crews are seed data, so additional trades or metros extend the same flow instead of requiring new architecture.
-
-## Project scope and next steps
-
-Email delivery is intentionally off for the synthetic recruiter demo. The final human-spoken voice-to-dashboard journey should be considered unverified until a real browser call, booking, and dashboard readback are observed together.
-
-All names, contact details, technicians, and addresses shown in sample data or screenshots are fictional.
+[MIT](LICENSE)

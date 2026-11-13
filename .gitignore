@@ -60,6 +60,7 @@ packages/web/worker-configuration.d.ts
 .hallmark/
 AGENTS.md
 *.md
+!/CONTRIBUTING.md
 !/README.md
 dispatchai-docs/
 docs/
