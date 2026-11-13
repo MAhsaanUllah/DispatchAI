@@ -17,6 +17,8 @@ services:
       DATABASE_URL: /data/dispatchai.sqlite
       AGENT_PORT: "8080"
       WEB_ORIGIN: ${PUBLIC_URL:-http://localhost:8080}
+      # true when Caddy or a tunnel is in front: the rate limiter then reads the visitor address it forwards.
+      TRUST_PROXY: ${TRUST_PROXY:-}
     volumes:
       - app-data:/data
     ports:

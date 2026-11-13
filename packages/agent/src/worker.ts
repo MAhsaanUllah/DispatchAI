@@ -205,7 +205,8 @@ async function routeRequest(req: Request): Promise<Response> {
   const sessionId = sessionIdOf(req);
 
   const agent = getOrCreateAgent(sessionId);
-  const clientKey = req.headers.get("cf-connecting-ip") || "local";
+  // x-client-ip is set by agent-server.ts from the connection itself, never taken from the caller.
+  const clientKey = req.headers.get("x-client-ip") || "local";
   if (!rateLimiter.check(clientKey)) {
     return new Response(
       JSON.stringify(toolFailure("RATE_LIMIT_EXCEEDED", "Too many requests. Please wait before retrying.", false, `rate_${Date.now()}`)),
@@ -260,6 +261,11 @@ async function routeRequest(req: Request): Promise<Response> {
   const selfAuthenticated = pathname === "/api/twilio/voice";
   if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !user) {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
+  }
+  // On a fresh install nobody has logged in yet, but a server on the internet must not let strangers read or change
+  // anything before the owner finishes setup. Only the setup and login routes above are open. (Tests run open.)
+  if (pathname.startsWith("/api/") && !selfAuthenticated && !auth.hasOwner() && (process.env.NODE_ENV !== "test" || process.env.DISPATCH_LOCK_BEFORE_SETUP === "1")) {
+    return json(toolFailure("SETUP_REQUIRED", "Finish first-run setup first", false, `auth_${Date.now()}`), 403, corsHeaders);
   }
   // Twilio phone line: every caller turn arrives here. Twilio's signature replaces the dashboard login.
   if (pathname === "/api/twilio/voice" && method === "POST") {
