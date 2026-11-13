@@ -21,7 +21,7 @@ const VIEWS = [
   ["team", "Team"],
   ["services", "Services"],
   ["company", "Company"],
-  ["plugins", "Plugins"],
+  ["plugins", "Features"],
   ["system", "System"]
 ] as const;
 

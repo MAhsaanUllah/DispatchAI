@@ -24,7 +24,7 @@ const KIND_PREFIX: Record<Task["kind"], RegExp> = {
 const subjectOf = (task: Task): string => task.title.replace(KIND_PREFIX[task.kind], "").trim() || task.title;
 
 // Staff work from a phone: when the task holds a caller's number, one tap dials it (tel: link).
-const phoneOf = (task: Task): string | undefined => {
+export const phoneOf = (task: Pick<Task, "kind" | "title" | "detail">): string | undefined => {
   if (task.kind !== "human" && task.kind !== "emergency") return undefined;
   const found = /\+?\d[\d\s().-]{6,}\d/.exec(`${task.title} ${task.detail}`)?.[0];
   return found ? found.replace(/[^\d+]/g, "") : undefined;

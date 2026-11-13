@@ -234,6 +234,7 @@ export function PluginsPage() {
       {plugins && (
         <>
           <BookingMeter live={liveIds} compact />
+          <div className="feature-groups">
           {GROUPS.map((group) => {
             const items = FEATURES.filter((feature) => feature.group === group.title);
             return (
@@ -287,6 +288,7 @@ export function PluginsPage() {
               </section>
             );
           })}
+          </div>
           <section className="explainer" aria-labelledby="else-title">
             <h2 className="explainer__title" id="else-title">Need something else?</h2>
             <ol className="explainer__steps">

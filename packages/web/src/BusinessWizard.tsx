@@ -278,7 +278,7 @@ function FirstBooking({ ticked, runsOn, onBack, onDone }: { ticked: string[]; ru
             return (
               <li key={id} className={done ? "checklist__item checklist__item--done" : "checklist__item"}>
                 <span className="checklist__name">{feature.name}</span>
-                <span className="checklist__state">{done ? "Connected" : id === "twilio" ? phoneNote(runsOn) : id === "email" ? "Add your Resend key, then press Test to send yourself a test email." : "Add it in Features."}</span>
+                <span className="checklist__state">{done ? "Connected" : id === "twilio" ? `Add your Twilio details in Features. ${phoneNote(runsOn)}` : id === "email" ? "Add your Resend key, then press Test to send yourself a test email." : "Add it in Features."}</span>
               </li>
             );
           })}
