@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DispatchService, getBusinessConfig } from "@dispatchai/domain";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
-import { extract, toCanonical, usage, type LlmConfig } from "./llm.js";
+import { chat, extract, toCanonical, usage, type LlmConfig } from "./llm.js";
 import { handleRequest } from "./worker.js";
 
 const GROQ: LlmConfig = { provider: "groq", model: "llama-3.1-8b-instant", apiKey: "gsk_test_key_123456" };
@@ -11,13 +11,13 @@ const services = () => getBusinessConfig("salon").services;
 // Recorded-style fixture: the provider answers with this text (or status) instead of a real network call.
 function fakeLlm(answer: string | number) {
   const realFetch = globalThis.fetch;
-  const calls: { url: string; body: any }[] = [];
+  const calls: { url: string; body: any; headers: Record<string, string> }[] = [];
   vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const url = String(input);
-    if (!/groq|cloudflare|googleapis|11434/.test(url)) return realFetch(input, init);
-    calls.push({ url, body: JSON.parse(String(init?.body)) });
+    if (!/groq|cloudflare|googleapis|11434|openai.com|x.ai|anthropic/.test(url)) return realFetch(input, init);
+    calls.push({ url, body: JSON.parse(String(init?.body)), headers: init?.headers as Record<string, string> });
     if (typeof answer === "number") return new Response("{}", { status: answer });
-    return Response.json(url.includes("cloudflare") ? { result: { response: answer } } : { choices: [{ message: { content: answer } }] });
+    return Response.json(url.includes("cloudflare") ? { result: { response: answer } } : url.includes("anthropic") ? { content: [{ type: "text", text: answer }] } : { choices: [{ message: { content: answer } }] });
   });
   return calls;
 }
@@ -128,5 +128,33 @@ describe("AI brain plugin", () => {
     const card = (await call("/api/plugins")).body.data.plugins.find((p: { id: string }) => p.id === "ai");
     expect(card.status).toMatchObject({ warning: true });
     expect(JSON.stringify(card)).not.toContain("gsk_test_key_123456");
+  });
+});
+
+describe("OpenAI, Anthropic and xAI providers", () => {
+  const ask = [{ role: "system" as const, content: "Reply OK" }, { role: "user" as const, content: "ping" }];
+
+  it("OpenAI and xAI use the OpenAI chat format with a bearer key", async () => {
+    const calls = fakeLlm("OK");
+    await chat({ provider: "openai", model: "gpt-4o-mini", apiKey: "sk-test-123456" }, ask);
+    await chat({ provider: "xai", model: "grok-3-mini", apiKey: "xai-test-123456" }, ask);
+    expect(calls.map((c) => c.url)).toEqual(["https://api.openai.com/v1/chat/completions", "https://api.x.ai/v1/chat/completions"]);
+    expect(calls[0].headers.Authorization).toBe("Bearer sk-test-123456");
+    expect(calls[1].body.messages).toHaveLength(2);
+  });
+
+  it("Anthropic uses the Messages API: x-api-key, system split out, text read from content", async () => {
+    const calls = fakeLlm("OK");
+    expect(await chat({ provider: "anthropic", model: "claude-haiku-5-5", apiKey: "sk-ant-test-123456" }, ask)).toBe("OK");
+    expect(calls[0].url).toBe("https://api.anthropic.com/v1/messages");
+    expect(calls[0].headers["x-api-key"]).toBe("sk-ant-test-123456");
+    expect(calls[0].headers.Authorization).toBeUndefined();
+    expect(calls[0].body.system).toBe("Reply OK");
+    expect(calls[0].body.messages).toEqual([{ role: "user", content: "ping" }]);
+  });
+
+  it("a rejected key surfaces its status so the card can explain it", async () => {
+    fakeLlm(401);
+    await expect(chat({ provider: "anthropic", model: "claude-haiku-5-5", apiKey: "bad-key-123456" }, ask)).rejects.toMatchObject({ status: 401 });
   });
 });
