@@ -87,7 +87,13 @@ x-dispatchai-timestamp: <unix seconds>
 x-dispatchai-signature: <hex hmac>
 ```
 
-`n8n/workflows/dispatchai-events-starter.json` verifies the signature and routes by event. With `--profile automation` it is imported into n8n on first start. In the dashboard, add the webhook URL (inside Docker: `http://n8n:5678/webhook/dispatchai-events`) and the shared secret, then press **Test**.
+`n8n/workflows/dispatchai-events-starter.json` verifies the signature and routes by event. With `--profile automation` it is imported into n8n on first start. Then:
+
+1. Put the same long random value in `N8N_EVENTS_SECRET` in `.env` (n8n reads it as `DISPATCHAI_EVENTS_SECRET`) and restart the stack.
+2. Open n8n (<http://localhost:5678>), open **DispatchAI Events Starter** and **publish** it. Until it is published the webhook answers 404.
+3. In the dashboard, add the webhook URL (inside Docker: `http://n8n:5678/webhook/dispatchai-events`) and the same secret, then press **Test**. A wrong secret is reported as "n8n rejected the signature".
+
+Replace the three "(replace me)" nodes with your own steps (a Google Sheet row, a WhatsApp message, your CRM).
 
 ## Back up your data
 
