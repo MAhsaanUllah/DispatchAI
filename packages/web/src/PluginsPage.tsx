@@ -194,7 +194,7 @@ const STATE_LABEL: Record<State, string> = { live: "Live", failing: "Failing", "
 // What the owner sees at a glance: is it doing its job right now?
 const stateOf = (plugin: Plugin, health?: Health): State => {
   if (plugin.enabled) return (health && !health.ok) || plugin.status?.warning ? "failing" : "live";
-  return plugin.fields.some((field) => field.secret && !field.saved) ? "needs-key" : "off";
+  return plugin.id !== "tunnel" && plugin.fields.some((field) => field.secret && !field.saved) ? "needs-key" : "off";
 };
 
 // Features page: grouped by what the owner wants done. Each card says what it does, whether it works now,
