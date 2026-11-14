@@ -293,7 +293,7 @@ export function BusinessWizard({ onDone, onCancel, startAt }: Props) {
         {step === "features" && (
           <>
             <ul className="picks">
-              {FEATURES.map((feature) => (
+              {FEATURES.filter((feature) => feature.id !== "tunnel" || runsOn === "desktop").map((feature) => (
                 <li key={feature.id}>
                   <label className="pick">
                     <input type="checkbox" checked={ticked.includes(feature.id)} onChange={() => toggle(feature.id)} aria-label={feature.name} aria-describedby={`benefit-${feature.id}`} />

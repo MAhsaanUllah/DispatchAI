@@ -229,6 +229,12 @@ export function PluginsPage() {
     setHealth((current) => ({ ...current, [plugin.id]: result }));
   };
 
+  // The tunnel is for desktop and home installs; a cloud server already has a public address. Any plugin the server has but
+  // this page has no copy for still gets a card (under "More"), so a new plugin can never be invisible.
+  const known = new Set(FEATURES.map((feature) => feature.id));
+  const extras = (plugins ?? []).filter((p) => !known.has(p.id)).map((p) => ({ id: p.id, group: "More", name: p.name, kind: "custom" as const, benefit: p.description, changes: p.limits }));
+  const shown = [...FEATURES, ...extras].filter((feature) => !(feature.id === "tunnel" && runsOn === "cloud"));
+  const groups = [...GROUPS, ...(extras.length ? [{ title: "More", purpose: "Other features in this version." }] : [])].filter((group) => shown.some((feature) => feature.group === group.title));
   const liveIds = plugins?.filter((p) => stateOf(p, health[p.id]) === "live").map((p) => p.id) ?? [];
   return (
     <section className="page" aria-labelledby="features-title">
@@ -244,8 +250,8 @@ export function PluginsPage() {
         <>
           <BookingMeter live={liveIds} compact />
           <div className="feature-groups">
-          {GROUPS.map((group) => {
-            const items = FEATURES.filter((feature) => feature.group === group.title);
+          {groups.map((group) => {
+            const items = shown.filter((feature) => feature.group === group.title);
             return (
               <section key={group.title} className="feature-group" aria-labelledby={`group-${group.title}`}>
                 <div className="feature-group__head">
