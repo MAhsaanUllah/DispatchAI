@@ -158,6 +158,21 @@ docker compose up -d app
 
 Log in with your usual name and PIN. Then switch the PC install off: two installs must never share one customer base (each keeps its own database).
 
+## Forgot your PIN
+
+PINs are stored only as hashes, so nobody can read one back. Whoever runs the server sets a new one (6-8 digits), then restarts the app so any lockout clears.
+
+```bash
+docker compose exec app node ./node_modules/vite-node/dist/cli.mjs packages/agent/src/bin/reset-pin.ts /data/dispatchai.sqlite 482915
+docker compose restart app
+```
+
+Desktop app: run the same `reset-pin.ts` against its database file with the app closed. The login name is the owner's name, or empty for the owner; a staff member who forgot theirs is removed and re-added in Team.
+
+## Privacy
+
+The project collects nothing: no accounts, tracking or analytics. Data stays on the computer or server running DispatchAI. It leaves only when you turn a feature on: a cloud AI provider (caller's words; none with Ollama), Resend (email), Twilio (calls), your own n8n (booking events), Cloudflare (public address), an MCP assistant's provider (what it reads), and the browser vendor's speech service for the Test call microphone. The login screen lists the same. Fonts are bundled, so the page asks no third party for anything.
+
 ## Security
 
 - First-run setup needs a one-time code (`SETUP_TOKEN`, or one printed in the server log). PINs are hashed with PBKDF2-SHA256 (600k iterations). Sessions use an HttpOnly, SameSite=Strict cookie (Secure behind HTTPS). Five wrong PINs lock a login for 15 minutes.

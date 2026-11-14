@@ -16,13 +16,13 @@ const TYPES: Record<string, string> = {
 // Built dashboard (npm run build --workspace=@dispatchai/web). WEB_DIST overrides it, e.g. in the Docker image.
 const defaultRoot = fileURLToPath(new URL("../../web/dist", import.meta.url));
 
-// Inline styles are used across the React UI; scripts only from this origin. Fonts come from Google Fonts (index.html).
+// Inline styles are used across the React UI; scripts only from this origin.  Fonts are self-hosted (public/fonts).
 const SECURITY_HEADERS = {
   "Content-Security-Policy": [
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
     "img-src 'self' data:",
     "connect-src 'self'",
     "frame-ancestors 'none'",

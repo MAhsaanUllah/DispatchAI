@@ -101,6 +101,15 @@ export class AuthStore {
     return Number(result.changes) === 1;
   }
 
+  // Offline recovery (reset-pin CLI): new PIN for the owner, every open session ends. Returns false when there is no owner.
+  async resetOwnerPin(pin: string): Promise<boolean> {
+    if (!this.db || !this.hasOwner()) return false;
+    const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+    this.db.prepare("UPDATE owners SET pin_hash = ?, salt = ?, iterations = ? WHERE id = 1").run(await hashPin(pin, salt, ITERATIONS), salt, ITERATIONS);
+    this.db.prepare("DELETE FROM owner_sessions WHERE user_id = 'owner'").run();
+    return true;
+  }
+
   async verifyPin(pin: string): Promise<boolean> {
     const owner = this.load();
     if (!owner) return false;

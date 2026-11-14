@@ -22,7 +22,8 @@ export function LoginPage({ onDone }: Props) {
       const body = await response.json().catch(() => ({}));
       if (response.ok) return onDone();
       setPin("");
-      setError(body?.error?.code === "WRONG_PIN" ? "PIN is wrong. After 5 wrong tries, login locks for 15 minutes."
+      // The server never says which half was wrong (that would reveal who has a login), so with a name typed we say both.
+      setError(body?.error?.code === "WRONG_PIN" ? `${name.trim() ? "Name or PIN is wrong" : "PIN is wrong"}. After 5 wrong tries, login locks for 15 minutes.`
         : body?.error?.message || "Could not log in. Try again.");
     } catch {
       setError("Cannot reach the DispatchAI server. Is it running?");
@@ -43,7 +44,7 @@ export function LoginPage({ onDone }: Props) {
           <label className="field">
             <span className="field__label">Your name</span>
             <input className="input" aria-label="Your name" autoComplete="username" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
-            <span className="field__hint">Owner can leave this empty.</span>
+            <span className="field__hint">Owner: leave this empty. Staff: the name the owner gave you.</span>
           </label>
           <label className="field">
             <span className="field__label">PIN</span>
@@ -54,7 +55,20 @@ export function LoginPage({ onDone }: Props) {
           <button type="submit" className="btn btn--primary" disabled={busy || pin.length === 0}>
             {busy ? "Checking…" : "Log in"}
           </button>
+          <p className="field__hint">Forgot the PIN? Whoever runs this server resets it (README, "Forgot your PIN").</p>
         </div>
+        <details className="auth__privacy">
+          <summary>Privacy: what leaves this computer</summary>
+          <p>The DispatchAI project collects nothing. No account, no tracking, no analytics. Your data stays on the computer or server where this app runs.</p>
+          <p>It goes elsewhere only when you turn something on:</p>
+          <ul>
+            <li><strong>AI brain</strong>: with a cloud provider (OpenAI, Anthropic, Gemini, Grok, Groq, Workers AI) the caller's words go to that provider. With Ollama they stay here.</li>
+            <li><strong>Email</strong>: booking mails go through Resend. <strong>Phone line</strong>: calls go through Twilio.</li>
+            <li><strong>Custom workflow</strong>: your n8n gets booking events. <strong>Public address</strong>: traffic passes through Cloudflare.</li>
+            <li><strong>Test call</strong> with the microphone: your browser's vendor turns speech into text.</li>
+            <li><strong>AI assistant over MCP</strong>: what it reads goes to that assistant's provider.</li>
+          </ul>
+        </details>
       </form>
     </main>
   );
