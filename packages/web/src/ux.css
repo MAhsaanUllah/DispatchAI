@@ -236,3 +236,11 @@
 
 /* at laptop widths the company name pushed the last tab under the Test call button */
 @media (min-width: 721px) and (max-width: 1300px) { .app-nav__company { display: none; } }
+
+/* below 1200 px the tab strip scrolls inside its own space instead of running under the tools */
+@media (min-width: 721px) and (max-width: 1200px) {
+  .app-nav__links { overflow-x: auto; scrollbar-width: none; }
+  .app-nav__links::-webkit-scrollbar { display: none; }
+  .app-nav__links .nav-cell { flex: none; }
+  .app-clock { display: none; }
+}
