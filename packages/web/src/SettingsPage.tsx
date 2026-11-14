@@ -63,8 +63,9 @@ export function SettingsPage({ onOpenTeam }: { onOpenTeam: () => void }) {
         <p className="page__lede">Opening hours, free slots and the clock use this zone. Changing it moves open slots to the new local time.</p>
         <form onSubmit={saveZone} className="login-form">
           <label className="field"><span className="field__label">Time zone</span>
-            <input className="input" aria-label="Time zone" list="settings-zones" value={zone} onChange={(e) => setZone(e.target.value)} required placeholder="Asia/Karachi" />
-            <datalist id="settings-zones">{zones.map((z) => <option key={z} value={z} />)}</datalist></label>
+            <select className="input" aria-label="Time zone" value={zone} onChange={(e) => setZone(e.target.value)} required>
+              {[...new Set([zone, ...zones].filter(Boolean))].map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
+            </select></label>
           {thisComputer && thisComputer !== zone && <button type="button" className="btn" onClick={() => setZone(thisComputer)}>Use this computer's ({thisComputer})</button>}
           <button type="submit" className="btn btn--primary">Save time zone</button>
         </form>
