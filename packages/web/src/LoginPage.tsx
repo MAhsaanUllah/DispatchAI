@@ -8,6 +8,7 @@ export function LoginPage({ onDone }: Props) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -48,8 +49,9 @@ export function LoginPage({ onDone }: Props) {
           </label>
           <label className="field">
             <span className="field__label">PIN</span>
-            <input className="input input--pin" aria-label="PIN" type="password" inputMode="numeric" autoComplete="current-password" autoFocus required
-              value={pin} onChange={(e) => setPin(e.target.value)} />
+            <input className="input input--pin" aria-label="PIN" type={show ? "text" : "password"} inputMode="numeric" autoComplete="off" autoFocus required
+              value={pin} onChange={(e) => setPin(e.target.value.trim())} />
+            <label className="field__hint"><input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Show PIN</label>
           </label>
           {error && <p role="alert" className="auth__error">{error}</p>}
           <button type="submit" className="btn btn--primary" disabled={busy || pin.length === 0}>
