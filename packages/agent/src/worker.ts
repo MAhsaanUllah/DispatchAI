@@ -138,11 +138,11 @@ class RateLimiter {
   private limit = 120; // Dashboard polling and voice tools share this local API.
   private windowMs = 60 * 1000;
 
-  public check(key: string): boolean {
+  public check(key: string, limit = this.limit): boolean {
     const now = Date.now();
     let timestamps = this.requests.get(key) || [];
     timestamps = timestamps.filter((t) => now - t < this.windowMs);
-    if (timestamps.length >= this.limit) {
+    if (timestamps.length >= limit) {
       return false;
     }
     timestamps.push(now);
@@ -228,7 +228,11 @@ async function routeRequest(req: Request): Promise<Response> {
   const agent = getOrCreateAgent(sessionId);
   // x-client-ip is set by agent-server.ts from the connection itself, never taken from the caller.
   const clientKey = req.headers.get("x-client-ip") || "local";
-  if (!rateLimiter.check(clientKey)) {
+  // An open dashboard tab polls about 45 times a minute and a whole shop can sit behind one public address, so a valid
+  // login gets its own, larger allowance. Everyone else is limited per address.
+  const ownerToken = cookieValue(req, OWNER_COOKIE);
+  const user = await auth.session(ownerToken);
+  if (!(user ? rateLimiter.check(`session:${ownerToken}`, 600) : rateLimiter.check(clientKey))) {
     return new Response(
       JSON.stringify(toolFailure("RATE_LIMIT_EXCEEDED", "Too many requests. Please wait before retrying.", false, `rate_${Date.now()}`)),
       { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -257,8 +261,6 @@ async function routeRequest(req: Request): Promise<Response> {
   const businessRoute = pathname === "/api/business";
 
   // Owner login with PIN. Session token lives only in an HttpOnly cookie.
-  const ownerToken = cookieValue(req, OWNER_COOKIE);
-  const user = await auth.session(ownerToken);
   if (pathname === "/api/auth/me" && method === "GET") {
     return json({ ok: true, data: { authenticated: !!user, owner: user?.name, role: user?.role } }, 200, corsHeaders);
   }
