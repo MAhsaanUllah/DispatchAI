@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { BackupPanel } from "./components/BackupPanel.js";
 
 type Note = { error: boolean; text: string } | null;
@@ -19,6 +19,17 @@ export function SettingsPage({ onOpenTeam }: { onOpenTeam: () => void }) {
   const [confirm, setConfirm] = useState("");
   const [eraseNote, setEraseNote] = useState<Note>(null);
 
+  const [zone, setZone] = useState("");
+  const [zoneNote, setZoneNote] = useState<Note>(null);
+  const zones = (() => { try { return (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.("timeZone") ?? []; } catch { return []; } })();
+  const thisComputer = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return ""; } })();
+  useEffect(() => { fetch("/api/business").then((r) => r.json()).then((b) => setZone(b?.data?.config?.timeZone ?? "")).catch(() => undefined); }, []);
+  const saveZone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const note = await send("/api/business", "PUT", { timeZone: zone.trim() });
+    if (!note.error) return window.location.reload();
+    setZoneNote(note.text.startsWith("timeZone") ? { error: true, text: "Time zone not recognised. Pick one from the list, for example Asia/Karachi." } : note);
+  };
   const changePin = async (e: React.FormEvent) => {
     e.preventDefault();
     const note = await send("/api/users/owner/pin", "PUT", { current: current.trim(), pin: next.trim() });
@@ -45,6 +56,19 @@ export function SettingsPage({ onOpenTeam }: { onOpenTeam: () => void }) {
           <button type="submit" className="btn btn--primary">Change PIN</button>
         </form>
         {pinNote && <p role={pinNote.error ? "alert" : "status"} className={pinNote.error ? "field__error" : "field__hint"}>{pinNote.text}</p>}
+      </section>
+
+      <section className="record" aria-labelledby="set-zone">
+        <h2 className="record__name" id="set-zone">Time zone</h2>
+        <p className="page__lede">Opening hours, free slots and the clock use this zone. Changing it moves open slots to the new local time.</p>
+        <form onSubmit={saveZone} className="login-form">
+          <label className="field"><span className="field__label">Time zone</span>
+            <input className="input" aria-label="Time zone" list="settings-zones" value={zone} onChange={(e) => setZone(e.target.value)} required placeholder="Asia/Karachi" />
+            <datalist id="settings-zones">{zones.map((z) => <option key={z} value={z} />)}</datalist></label>
+          {thisComputer && thisComputer !== zone && <button type="button" className="btn" onClick={() => setZone(thisComputer)}>Use this computer's ({thisComputer})</button>}
+          <button type="submit" className="btn btn--primary">Save time zone</button>
+        </form>
+        {zoneNote && <p role="alert" className="field__error">{zoneNote.text}</p>}
       </section>
 
       <section className="record" aria-labelledby="set-logins">

@@ -35,6 +35,9 @@ describe("erase data", () => {
     const login = await handleRequest(new Request("http://localhost/api/auth/login", { method: "POST", headers: ip, body: JSON.stringify({ pin: "246810" }) }));
     const cookie = (login.headers.get("Set-Cookie") ?? "").split(";")[0];
     const erase = (body: unknown) => handleRequest(new Request("http://localhost/api/erase-data", { method: "POST", headers: { ...ip, Cookie: cookie }, body: JSON.stringify(body) })).then((r) => r.status);
+    const zone = (timeZone: string) => handleRequest(new Request("http://localhost/api/business", { method: "PUT", headers: { ...ip, Cookie: cookie }, body: JSON.stringify({ timeZone }) })).then((r) => r.status);
+    expect(await zone("Asia/Karachi")).toBe(200);
+    expect(await zone("Mars/Base")).toBe(400);
     expect(await erase({ pin: "246810" })).toBe(400);
     expect(await erase({ pin: "000000", confirm: "ERASE_ALL_DATA" })).toBe(403);
     expect(await erase({ pin: "246810", confirm: "ERASE_ALL_DATA" })).toBe(200);
