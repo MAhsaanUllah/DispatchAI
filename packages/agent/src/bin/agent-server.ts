@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import http from "node:http";
-import { clientIp } from "../client-ip.js";
+import { clientIp, isLoopback } from "../client-ip.js";
+import { tunnel } from "../tunnel.js";
 
 // A real install starts empty; set SEED_DEMO_DATA=true in .env for the fictional demo. Set before the worker loads.
 process.env.SEED_DEMO_DATA ??= "false";
@@ -20,7 +21,7 @@ const server = http.createServer(async (req, res) => {
     else if (value !== undefined) headers.set(name, value);
   }
   // Whatever the caller sent as x-client-ip is replaced: the rate limiter must see the real connection.
-  headers.set("x-client-ip", clientIp(req.socket.remoteAddress, headers.get("x-forwarded-for") ?? undefined, process.env.TRUST_PROXY === "true"));
+  headers.set("x-client-ip", clientIp(req.socket.remoteAddress, headers.get("x-forwarded-for") ?? undefined, process.env.TRUST_PROXY === "true" || (tunnel.status.state === "running" && isLoopback(req.socket.remoteAddress))));
   const request = new Request(`http://${req.headers.host || `localhost:${port}`}${req.url || "/"}`, {
     method: req.method,
     headers,
