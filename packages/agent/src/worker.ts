@@ -266,7 +266,7 @@ async function routeRequest(req: Request): Promise<Response> {
   }
   if (pathname === "/api/auth/login" && method === "POST") {
     const body = await req.json().catch(() => ({})) as { pin?: unknown; name?: unknown };
-    const result = await auth.login(typeof body.pin === "string" ? body.pin : "", typeof body.name === "string" ? body.name : "");
+    const result = await auth.login(typeof body.pin === "string" ? body.pin : "", typeof body.name === "string" ? body.name : "", clientKey);
     if ("error" in result) {
       return result.error === "LOCKED"
         ? json(toolFailure("LOCKED", `Too many wrong PINs. Try again in ${Math.ceil((result.retryAfterMs ?? 0) / 60000)} minutes.`, true, `login_${Date.now()}`), 429, corsHeaders)
