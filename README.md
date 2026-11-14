@@ -47,12 +47,20 @@ Open <http://localhost:8080/app>, enter the setup code, choose a name and PIN, t
 
 ### Docker, on a server (24/7)
 
+On a Linux server with Docker and the compose plugin, with your domain's DNS already pointing at it:
+
 ```bash
-# .env: SETUP_TOKEN, MASTER_KEY (long random value), PUBLIC_URL, PUBLIC_DOMAIN (DNS points here)
+curl -fsSL https://raw.githubusercontent.com/MAhsaanUllah/DispatchAI/main/scripts/install-vps.sh | bash -s -- --domain bookings.example.com
+```
+
+The script clones the project to `/opt/dispatchai`, writes a `.env` with fresh secrets (never over an existing one), starts the stack with the `vps` profile, waits until it is healthy and prints the URL and the one-time setup code. Add `--with-n8n` to run n8n on the same server, `--dir PATH` to install elsewhere, and `--dry-run` to see what it would do. Do it by hand instead:
+
+```bash
+# .env: SETUP_TOKEN, MASTER_KEY (long random value), PUBLIC_URL, PUBLIC_DOMAIN (DNS points here), TRUST_PROXY=true
 docker compose --profile vps up -d --build
 ```
 
-Caddy gets an HTTPS certificate for `PUBLIC_DOMAIN`. Phone calls reach the server directly.
+Caddy gets an HTTPS certificate for `PUBLIC_DOMAIN`. Phone calls reach the server directly. Keep `.env` safe: it holds `MASTER_KEY`.
 
 | Profile | Adds | Use it for |
 | --- | --- | --- |
@@ -131,6 +139,23 @@ node ./node_modules/vite-node/dist/cli.mjs packages/agent/src/bin/restore-backup
 ```
 
 It never deletes anything: with `--force` the old database and key are moved aside as `*.before-restore-<time>`.
+
+### Move from your PC to a server
+
+1. On the PC, download the backup (System page) and copy `backup.json` to the server.
+2. Install on the server with the script above, but do **not** finish the setup page.
+3. The server's `.env` has its own `MASTER_KEY`; your saved plugin keys were encrypted with the PC's key. Make the PC's key the server's key, then restore over the empty server database:
+
+```bash
+cd /opt/dispatchai
+KEY=$(grep -o '"masterKey":"[^"]*"' backup.json | cut -d'"' -f4)
+sed -i "s|^MASTER_KEY=.*|MASTER_KEY=$KEY|" .env
+docker compose stop app
+docker compose run --rm --no-deps -v "$PWD/backup.json:/in/backup.json:ro" app node ./node_modules/vite-node/dist/cli.mjs packages/agent/src/bin/restore-backup.ts /in/backup.json /data/dispatchai.sqlite --force
+docker compose up -d app
+```
+
+Log in with your usual name and PIN. Then switch the PC install off: two installs must never share one customer base (each keeps its own database).
 
 ## Security
 
