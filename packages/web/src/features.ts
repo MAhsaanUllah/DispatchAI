@@ -79,3 +79,15 @@ export const RUNS_ON: { id: RunsOn; title: string; summary: string; points: stri
   { id: "cloud", title: "A cloud server", summary: "Always on, with a public https address.",
     points: ["Answers calls day and night.", "Phone calls and n8n work.", "You rent a small server (a VPS) and run the Docker install."] }
 ];
+
+// Keys-based connections. They have no switch: they are live while at least one key exists.
+export type ConnectionInfo = { id: "api" | "mcp"; group: string; name: string; kind: string; benefit: string; changes: string };
+
+export const CONNECTIONS: ConnectionInfo[] = [
+  { id: "api", group: "Tell my team and my tools", name: "Developer API", kind: "Keys",
+    benefit: "Let your own software or a developer read bookings and create them.",
+    changes: "Anyone holding a key can call this business's API. A look-up key cannot change anything. Revoke a key and it stops working at once." },
+  { id: "mcp", group: "Tell my team and my tools", name: "AI assistant (MCP)", kind: "Keys",
+    benefit: "Ask your own AI assistant about your bookings, or have it book for you.",
+    changes: "Your assistant can see names and addresses, so connect only assistants you trust. A change it proposes is applied only after you clearly say yes." }
+];

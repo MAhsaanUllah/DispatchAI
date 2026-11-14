@@ -218,3 +218,18 @@
 .usage__row dt { font-weight: 500; }
 .usage__row dd { margin: 0; color: var(--color-ink-2); overflow-wrap: break-word; }
 .usage__note { display: block; font-size: var(--text-xs); color: var(--color-muted); }
+
+/* keys drawer (Developer API / AI assistant) */
+.keybox { display: grid; gap: var(--space-sm); padding: var(--space-md); border: 1px solid var(--color-focus); border-radius: var(--radius-card); }
+.keybox__warn { font-weight: 600; font-size: var(--text-sm); }
+.keybox__key { word-break: break-all; font-size: var(--text-xs); }
+.scope { border: 0; padding: 0; display: grid; gap: var(--space-sm); }
+.scope__option { display: flex; gap: var(--space-sm); align-items: flex-start; }
+.keylist__title { font-size: var(--text-sm); margin: var(--space-md) 0 var(--space-sm); }
+.keylist__rows, .howto__list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-sm); }
+.keylist__row { display: grid; gap: var(--space-xs); padding: var(--space-sm); border: 1px solid var(--color-rule); border-radius: var(--radius-card); }
+.keylist__row--revoked { opacity: 0.6; }
+.keylist__name { font-weight: 600; }
+.keylist__meta, .keylist__state { font-size: var(--text-xs); color: var(--color-muted); }
+.howto__steps { padding-left: var(--space-lg); display: grid; gap: var(--space-xs); font-size: var(--text-sm); }
+.howto code, .howto__list code { word-break: break-all; font-size: var(--text-xs); }
