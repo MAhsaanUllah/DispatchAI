@@ -136,6 +136,32 @@ export class AuthStore {
     return { id: user.id };
   }
 
+  // Owner sets a new PIN for a staff login; that person is logged out. Memory mode keeps the hash in the map.
+  async setStaffPin(id: string, pin: string): Promise<boolean> {
+    const staff = this.staff().find((s) => s.id === id);
+    if (!staff) return false;
+    const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+    const pinHash = await hashPin(pin, salt, ITERATIONS);
+    if (this.db) {
+      this.db.prepare("UPDATE staff_users SET pin_hash = ?, salt = ?, iterations = ? WHERE id = ?").run(pinHash, salt, ITERATIONS, id);
+      this.db.prepare("DELETE FROM owner_sessions WHERE user_id = ?").run(id);
+    } else {
+      Object.assign(staff, { pinHash, salt, iterations: ITERATIONS });
+      for (const [hash, session] of this.memSessions) if (session.userId === id) this.memSessions.delete(hash);
+    }
+    return true;
+  }
+
+  // Owner changes their own PIN; needs the current one. Open sessions stay (the owner is using one).
+  async changeOwnerPin(current: string, pin: string): Promise<boolean> {
+    if (!(await this.verifyPin(current))) return false;
+    const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+    const pinHash = await hashPin(pin, salt, ITERATIONS);
+    if (this.db) this.db.prepare("UPDATE owners SET pin_hash = ?, salt = ?, iterations = ? WHERE id = 1").run(pinHash, salt, ITERATIONS);
+    else if (this.owner) Object.assign(this.owner, { pinHash, salt, iterations: ITERATIONS });
+    return true;
+  }
+
   // Removing a login also ends every open session of that person.
   removeStaff(id: string): boolean {
     if (!this.staff().some((s) => s.id === id)) return false;

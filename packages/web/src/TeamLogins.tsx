@@ -27,6 +27,17 @@ export function TeamLogins() {
     void load();
   };
 
+  // Owner: asks for the current PIN too. Staff: the owner just sets a new one (the person is logged out).
+  const changePin = async (id: string, who: string) => {
+    const current = id === "owner" ? window.prompt("Your current PIN") : "";
+    if (current === null) return;
+    const next = window.prompt(`New PIN for ${who} (6 to 8 numbers)`);
+    if (next === null) return;
+    const response = await fetch(`/api/users/${id}/pin`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current, pin: next.trim() }) });
+    const body = await response.json().catch(() => ({}));
+    setMessage(response.ok ? { error: false, text: `New PIN saved for ${who}.${id === "owner" ? "" : " They must log in again."}` } : { error: true, text: body?.error?.message || "Could not change the PIN." });
+  };
+
   return (
     <section aria-labelledby="logins-title" className="record">
       <div>
@@ -34,12 +45,13 @@ export function TeamLogins() {
         <p className="page__lede">Staff can see bookings and the inbox. Only you can change settings, plugins and logins.</p>
       </div>
       <ul className="record__list plain-list">
-        {data?.owner && <li className="record__row"><dt>Owner</dt><dd>{data.owner}</dd></li>}
+        {data?.owner && <li className="record__row"><dt>Owner</dt><dd>{data.owner}<button type="button" onClick={() => changePin("owner", data.owner ?? "you")} className="btn btn--sm">Change PIN</button></dd></li>}
         {data?.staff.map((login) => (
           <li key={login.id} className="record__row">
             <dt>Staff</dt>
             <dd>
               {login.name}
+              <button type="button" onClick={() => changePin(login.id, login.name)} className="btn btn--sm" aria-label={`New PIN for ${login.name}`}>New PIN</button>
               <button type="button" onClick={() => remove(login)} className="btn btn--sm" aria-label={`Remove ${login.name}`}>Remove</button>
             </dd>
           </li>

@@ -393,6 +393,15 @@ async function routeRequest(req: Request): Promise<Response> {
     if ("error" in created) return json(toolFailure("NAME_TAKEN", "Someone already logs in with that name", false, `users_${Date.now()}`), 409, corsHeaders);
     return json(toolSuccess({ id: created.id, name }, `users_${Date.now()}`), 201, corsHeaders);
   }
+  const pinMatch = /^\/api\/users\/([\w-]+)\/pin$/.exec(pathname);
+  if (pinMatch && method === "PUT") {
+    const body = await req.json().catch(() => ({})) as { pin?: unknown; current?: unknown };
+    const pin = typeof body.pin === "string" ? body.pin : "";
+    if (!/^\d{6,8}$/.test(pin)) return json(toolFailure("INVALID_INPUT", "PIN must be 6-8 digits", false, `users_${Date.now()}`), 400, corsHeaders);
+    const done = pinMatch[1] === "owner" ? await auth.changeOwnerPin(typeof body.current === "string" ? body.current : "", pin) : await auth.setStaffPin(pinMatch[1], pin);
+    if (!done) return json(toolFailure(pinMatch[1] === "owner" ? "WRONG_PIN" : "NOT_FOUND", pinMatch[1] === "owner" ? "Current PIN is wrong" : "No staff login with that id", false, `users_${Date.now()}`), pinMatch[1] === "owner" ? 403 : 404, corsHeaders);
+    return json(toolSuccess({ changed: pinMatch[1] }, `users_${Date.now()}`), 200, corsHeaders);
+  }
   const userMatch = /^\/api\/users\/([\w-]+)$/.exec(pathname);
   if (userMatch && method === "DELETE") {
     if (!auth.removeStaff(userMatch[1])) return json(toolFailure("NOT_FOUND", "No staff login with that id", false, `users_${Date.now()}`), 404, corsHeaders);
