@@ -27,3 +27,16 @@ describe("change PIN from the dashboard", () => {
     expect((await call(`/api/users/${id}/pin`, "PUT", { pin: "111222" }, again.cookie)).status).toBe(403);
   });
 });
+
+describe("erase data", () => {
+  it("needs the confirmation and the PIN", async () => {
+    const { handleRequest } = await import("./worker.js");
+    const ip = { "Content-Type": "application/json", "x-client-ip": "198.51.100.88" };
+    const login = await handleRequest(new Request("http://localhost/api/auth/login", { method: "POST", headers: ip, body: JSON.stringify({ pin: "246810" }) }));
+    const cookie = (login.headers.get("Set-Cookie") ?? "").split(";")[0];
+    const erase = (body: unknown) => handleRequest(new Request("http://localhost/api/erase-data", { method: "POST", headers: { ...ip, Cookie: cookie }, body: JSON.stringify(body) })).then((r) => r.status);
+    expect(await erase({ pin: "246810" })).toBe(400);
+    expect(await erase({ pin: "000000", confirm: "ERASE_ALL_DATA" })).toBe(403);
+    expect(await erase({ pin: "246810", confirm: "ERASE_ALL_DATA" })).toBe(200);
+  });
+});

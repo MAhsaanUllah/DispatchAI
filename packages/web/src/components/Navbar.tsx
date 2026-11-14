@@ -5,8 +5,8 @@ interface NavbarProps {
   onReset: () => void;
   austinTime: string;
   onOpenVoiceModal?: () => void;
-  activeView?: "dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox";
-  onViewChange?: (view: "dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox") => void;
+  activeView?: "dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox" | "settings";
+  onViewChange?: (view: "dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox" | "settings") => void;
   onLogout?: () => void;
   companyName?: string;
   // Staff see a reduced navbar; the server enforces the same rules.
@@ -22,7 +22,8 @@ const VIEWS = [
   ["services", "Services"],
   ["company", "Company"],
   ["plugins", "Features"],
-  ["system", "System"]
+  ["system", "System"],
+  ["settings", "Settings"]
 ] as const;
 
 export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange, onLogout, companyName, isOwner = true, demo = false }) => {
@@ -43,7 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
       </div>
 
       <nav className="app-nav__links" aria-label="Main">
-        {VIEWS.filter(([view]) => isOwner || view !== "plugins").map(([view, label]) => (
+        {VIEWS.filter(([view]) => isOwner || (view !== "plugins" && view !== "settings")).map(([view, label]) => (
           <button type="button" key={view} className="nav-cell" aria-current={activeView === view ? "page" : undefined} onClick={() => onViewChange?.(view)}>{label}</button>
         ))}
       </nav>

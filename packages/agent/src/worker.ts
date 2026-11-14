@@ -345,7 +345,7 @@ async function routeRequest(req: Request): Promise<Response> {
   }
 
   // Staff run the day (bookings, inbox, chat); only the owner changes settings, plugins, logins or resets data.
-  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset" || pathname === "/api/backup" || pathname === "/api/usage" || pathname.startsWith("/api/api-keys")
+  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset" || pathname === "/api/erase-data" || pathname === "/api/backup" || pathname === "/api/usage" || pathname.startsWith("/api/api-keys")
     || (method !== "GET" && (pathname === "/api/business" || pathname === "/api/staff"));
   if (ownerOnly && user?.role === "staff") {
     return json(toolFailure("FORBIDDEN", "Only the owner can change this", false, `auth_${Date.now()}`), 403, corsHeaders);
@@ -648,6 +648,15 @@ async function routeRequest(req: Request): Promise<Response> {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
+  }
+
+  // Real installs: the owner can erase bookings, customers and schedules, but only with the PIN. Logins, plugin keys and settings stay.
+  if (method === "POST" && pathname === "/api/erase-data") {
+    const body = await req.json().catch(() => ({})) as { confirm?: unknown; pin?: unknown };
+    if (body.confirm !== "ERASE_ALL_DATA") return json(toolFailure("CONFIRMATION_REQUIRED", "Type the confirmation to erase", false, `erase_${Date.now()}`), 400, corsHeaders);
+    if (typeof body.pin !== "string" || !(await auth.verifyPin(body.pin))) return json(toolFailure("WRONG_PIN", "PIN is wrong", false, `erase_${Date.now()}`), 403, corsHeaders);
+    domainService.getStore().reset();
+    return json(toolSuccess({ erased: true }, `erase_${Date.now()}`), 200, corsHeaders);
   }
 
   if (method === "POST" && pathname === "/api/reset") {
