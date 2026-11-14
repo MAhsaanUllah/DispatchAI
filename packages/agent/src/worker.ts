@@ -19,6 +19,7 @@ import { llmConfig, pluginById, plugins } from "./plugins.js";
 import { extract, setUsageSink, toCanonical } from "./llm.js";
 import { estimateCostUsd, UsageLog } from "./usage-store.js";
 import { ApiKeyStore, type ApiKeyScope } from "./api-keys.js";
+import { tunnel } from "./tunnel.js";
 import { handleApiV1 } from "./api-v1.js";
 import { handleMcp } from "./mcp.js";
 import { dialTwiml, fetchTwilioAccount, gatherTwiml, hangupTwiml, isOpenNow, maskPhone, verifyTwilioSignature } from "./twilio.js";
@@ -31,6 +32,13 @@ const settings = new SettingsStore(process.env.DATABASE_URL);
 const pluginStore = new PluginStore(process.env.DATABASE_URL);
 const usageLog = new UsageLog(process.env.DATABASE_URL);
 const apiKeys = new ApiKeyStore(process.env.DATABASE_URL);
+// Starts, restarts or stops cloudflared to match the "tunnel" plugin: at boot, and every time the plugin is saved.
+async function syncTunnel() {
+  const record = await pluginStore.get("tunnel");
+  if (!record?.enabled) return tunnel.stop();
+  tunnel.start({ mode: record.config.mode === "token" ? "token" : "quick", token: record.secrets.token, publicUrl: record.config.publicUrl, port: Number(process.env.AGENT_PORT || 8787) });
+}
+void syncTunnel();
 setUsageSink((row) => usageLog.add({ at: new Date().toISOString(), ...row }));
 // n8n plugin settings from the dashboard win; .env values stay as a fallback for scripted installs.
 async function eventTarget(): Promise<{ url: string; secret: string } | undefined> {
@@ -495,6 +503,7 @@ async function routeRequest(req: Request): Promise<Response> {
       const problem = next.enabled ? plugin.validate({ ...next.config, ...next.secrets }) : null;
       if (problem) return json(toolFailure("INVALID_INPUT", problem, false, `plugin_${Date.now()}`), 400, corsHeaders);
       await pluginStore.save(plugin.id, next);
+      if (plugin.id === "tunnel") await syncTunnel();
       return json(toolSuccess({ enabled: next.enabled }, `plugin_${Date.now()}`), 200, corsHeaders);
     }
   }
