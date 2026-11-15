@@ -1,3 +1,4 @@
+import { existsSync, statSync } from "node:fs";
 import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
 import { BusinessConfigSchema, type BusinessService } from "@dispatchai/shared";
 import { toolFailure, toolSuccess } from "@dispatchai/shared";
@@ -355,6 +356,21 @@ async function routeRequest(req: Request): Promise<Response> {
       slaMinutes: SLA_MINUTES[task.kind]
     }));
     return json({ ok: true, data: { tasks } }, 200, corsHeaders);
+  }
+  // System page health: counts and sizes only, no customer data.
+  if (pathname === "/api/system" && method === "GET") {
+    const now = Date.now();
+    const dbPath = process.env.DATABASE_URL;
+    const open = inbox.list().filter((task) => !task.closedAt);
+    const deliveries = outbox.recent(100);
+    const bookings = [...domainService.getStore().workOrders.values()];
+    return json({ ok: true, data: {
+      uptimeSeconds: Math.round(process.uptime()),
+      database: { kind: dbPath ? "file" : "memory", sizeBytes: dbPath && existsSync(dbPath) ? statSync(dbPath).size : 0 },
+      inbox: { open: open.length, overdue: open.filter((task) => now - Date.parse(task.createdAt) > SLA_MINUTES[task.kind] * 60_000).length },
+      events: { pending: deliveries.filter((d) => d.status === "pending").length, dead: deliveries.filter((d) => d.status === "dead").length },
+      bookings: { total: bookings.length, lastCreatedAt: bookings.map((b) => b.createdAt).sort().at(-1) ?? null }
+    } }, 200, corsHeaders);
   }
   const closeMatch = /^\/api\/inbox\/([\w-]+)\/close$/.exec(pathname);
   if (closeMatch && method === "POST") {
