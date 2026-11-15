@@ -8,9 +8,10 @@ interface NavbarProps {
   activeView?: "dispatch" | "team" | "services" | "company" | "system";
   onViewChange?: (view: "dispatch" | "team" | "services" | "company" | "system") => void;
   onLogout?: () => void;
+  companyName?: string;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange, onLogout }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange, onLogout, companyName }) => {
   const [isResetting, setIsResetting] = useState(false);
 
   const handleResetClick = () => {
@@ -51,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
               DispatchAI
             </span>
             <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: 400 }}>
-              Austin Operations
+              {companyName ?? ""}
             </span>
           </div>
         </div>
@@ -96,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
           fontFamily: "var(--font-mono)",
           letterSpacing: "0.01em"
         }}>
-          {austinTime || "Austin Local Time"}
+          {austinTime || "Local time"}
         </div>
 
         {/* Reset Demo Data (Secondary Button per Section 22) */}

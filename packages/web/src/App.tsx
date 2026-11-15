@@ -9,6 +9,7 @@ import { VoiceAgentControl } from "./components/VoiceAgentControl.js";
 import { api, type Directory } from "./api.js";
 import { DirectoryPanel } from "./components/DirectoryPanel.js";
 import { SystemPanel } from "./components/SystemPanel.js";
+import { BusinessWizard } from "./BusinessWizard.js";
 import { LocalNotification, WorkOrder } from "@dispatchai/shared";
 import { MessageSquare, Activity, Briefcase } from "lucide-react";
 
@@ -16,6 +17,7 @@ export const App: React.FC = () => {
   const [jobs, setJobs] = useState<WorkOrder[]>([]);
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [directoryLoading, setDirectoryLoading] = useState(true);
+  const [editingBusiness, setEditingBusiness] = useState(false);
   const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system">("dispatch");
   const [notifications, setNotifications] = useState<LocalNotification[]>([]);
   const [selectedJob, setSelectedJob] = useState<WorkOrder | null>(null);
@@ -27,23 +29,25 @@ export const App: React.FC = () => {
   const [agentConnected, setAgentConnected] = useState<boolean | null>(null);
   const [austinTime, setAustinTime] = useState("");
 
-  // Update Austin Local Clock (CDT)
+  // Local clock in the business time zone (from onboarding).
+  const businessTimeZone = directory?.company.timeZone ?? "America/Chicago";
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       setAustinTime(
         now.toLocaleTimeString("en-US", {
-          timeZone: "America/Chicago",
+          timeZone: businessTimeZone,
           hour: "2-digit",
           minute: "2-digit",
-          second: "2-digit"
-        }) + " CDT"
+          second: "2-digit",
+          timeZoneName: "short"
+        })
       );
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [businessTimeZone]);
 
   // Initialize jobs and subscribe to agent events
   useEffect(() => {
@@ -118,12 +122,20 @@ export const App: React.FC = () => {
   return (
     <div style={{ height: "100vh", maxHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--background)", overflow: "hidden" }}>
       {/* Shell Header */}
-      <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={austinTime} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
+      <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={austinTime} companyName={directory?.company.name} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
 
       <main style={{ padding: "14px 24px 16px", maxWidth: "1680px", margin: "0 auto", width: "100%", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: activeView === "dispatch" ? "hidden" : "auto" }}>
-        {activeView === "system" ? <SystemPanel /> : activeView !== "dispatch" ? <DirectoryPanel view={activeView} directory={directory} loading={directoryLoading} /> : <>
+        {activeView === "company" && editingBusiness ? <BusinessWizard onDone={() => window.location.reload()} onCancel={() => setEditingBusiness(false)} />
+          : activeView === "system" ? <SystemPanel /> : activeView !== "dispatch" ? <>
+            {activeView === "company" && (
+              <button onClick={() => setEditingBusiness(true)} style={{ alignSelf: "flex-end", marginBottom: 12, padding: "7px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--accent)", background: "var(--accent)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
+                Edit business
+              </button>
+            )}
+            <DirectoryPanel view={activeView} directory={directory} loading={directoryLoading} />
+          </> : <>
         {/* Compact Operational Summary (Section 15) */}
-        <StatsBar jobs={jobs} companyName={directory?.company.name} />
+        <StatsBar jobs={jobs} companyName={directory?.company.name} timeZone={businessTimeZone} />
 
         {/* Tablet / Mobile Segmented Switcher (Section 38 & 39) */}
         <div style={{
