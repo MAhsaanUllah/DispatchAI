@@ -87,7 +87,7 @@ describe("setup API", () => {
 
     expect((await call("/api/jobs", { headers: { Cookie: cookie } })).status).toBe(200);
     const me = (await (await call("/api/auth/me", { headers: { Cookie: cookie } })).json()) as { data: { authenticated: boolean; owner: string } };
-    expect(me.data).toEqual({ authenticated: true, owner: "Ayesha" });
+    expect(me.data).toEqual({ authenticated: true, owner: "Ayesha", role: "owner" });
 
     expect((await call("/api/auth/logout", { method: "POST", headers: { Cookie: cookie } })).status).toBe(200);
     expect((await call("/api/jobs", { headers: { Cookie: cookie } })).status).toBe(401);

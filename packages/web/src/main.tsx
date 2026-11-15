@@ -21,6 +21,8 @@ function Dashboard() {
         if (body?.data?.needsSetup === true) return setGate("setup");
         const me = await fetch("/api/auth/me").then((response) => response.json());
         if (me?.data?.authenticated !== true) return setGate("login");
+        // Onboarding is the owner's job; staff go straight to the dashboard.
+        if (me?.data?.role === "staff") return setGate("dashboard");
         const [business, directory] = await Promise.all([fetch("/api/business"), fetch("/api/directory")].map((p) => p.then((response) => response.json())));
         // Onboarding is finished once the business is saved and at least one staff member exists (step 3).
         const done = business?.data?.configured === true && (directory?.data?.technicians?.length ?? 0) > 0;

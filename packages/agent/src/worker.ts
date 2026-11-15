@@ -160,7 +160,7 @@ async function routeRequest(req: Request): Promise<Response> {
   const allowedOrigin = process.env.WEB_ORIGIN || "http://localhost:5173";
   const corsHeaders = {
     "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, x-session-id, x-dispatch-secret, x-voice-session-token, x-correlation-id"
   };
 
@@ -204,13 +204,13 @@ async function routeRequest(req: Request): Promise<Response> {
 
   // Owner login with PIN. Session token lives only in an HttpOnly cookie.
   const ownerToken = cookieValue(req, OWNER_COOKIE);
+  const user = await auth.session(ownerToken);
   if (pathname === "/api/auth/me" && method === "GET") {
-    const authenticated = await auth.isValidSession(ownerToken);
-    return json({ ok: true, data: { authenticated, owner: authenticated ? auth.ownerName() : undefined } }, 200, corsHeaders);
+    return json({ ok: true, data: { authenticated: !!user, owner: user?.name, role: user?.role } }, 200, corsHeaders);
   }
   if (pathname === "/api/auth/login" && method === "POST") {
-    const body = await req.json().catch(() => ({})) as { pin?: unknown };
-    const result = await auth.login(typeof body.pin === "string" ? body.pin : "");
+    const body = await req.json().catch(() => ({})) as { pin?: unknown; name?: unknown };
+    const result = await auth.login(typeof body.pin === "string" ? body.pin : "", typeof body.name === "string" ? body.name : "");
     if ("error" in result) {
       return result.error === "LOCKED"
         ? json(toolFailure("LOCKED", `Too many wrong PINs. Try again in ${Math.ceil((result.retryAfterMs ?? 0) / 60000)} minutes.`, true, `login_${Date.now()}`), 429, corsHeaders)
@@ -225,8 +225,34 @@ async function routeRequest(req: Request): Promise<Response> {
 
   // Once an owner exists, every other API call needs an owner session. Voice tool and webhook routes keep their own secret/signature checks.
   const selfAuthenticated = pathname.startsWith("/api/voice/tools/") || pathname === "/api/voice/webhook";
-  if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !(await auth.isValidSession(ownerToken))) {
+  if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !user) {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
+  }
+  // Staff run the day (bookings, inbox, chat); only the owner changes settings, plugins, logins or resets data.
+  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset"
+    || (method !== "GET" && (pathname === "/api/business" || pathname === "/api/staff"));
+  if (ownerOnly && user?.role === "staff") {
+    return json(toolFailure("FORBIDDEN", "Only the owner can change this", false, `auth_${Date.now()}`), 403, corsHeaders);
+  }
+
+  // Team logins (owner only): name + starting PIN; removing a login ends that person's sessions.
+  if (pathname === "/api/users" && method === "GET") {
+    return json({ ok: true, data: { owner: auth.ownerName(), staff: auth.listStaff() } }, 200, corsHeaders);
+  }
+  if (pathname === "/api/users" && method === "POST") {
+    const body = await req.json().catch(() => ({})) as { name?: unknown; pin?: unknown };
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const pin = typeof body.pin === "string" ? body.pin : "";
+    if (!name || name.length > 80) return json(toolFailure("INVALID_INPUT", "Name must be 1-80 characters", false, `users_${Date.now()}`), 400, corsHeaders);
+    if (!/^\d{6,8}$/.test(pin)) return json(toolFailure("INVALID_INPUT", "PIN must be 6-8 digits", false, `users_${Date.now()}`), 400, corsHeaders);
+    const created = await auth.createStaff(name, pin);
+    if ("error" in created) return json(toolFailure("NAME_TAKEN", "Someone already logs in with that name", false, `users_${Date.now()}`), 409, corsHeaders);
+    return json(toolSuccess({ id: created.id, name }, `users_${Date.now()}`), 201, corsHeaders);
+  }
+  const userMatch = /^\/api\/users\/([\w-]+)$/.exec(pathname);
+  if (userMatch && method === "DELETE") {
+    if (!auth.removeStaff(userMatch[1])) return json(toolFailure("NOT_FOUND", "No staff login with that id", false, `users_${Date.now()}`), 404, corsHeaders);
+    return json(toolSuccess({ removed: userMatch[1] }, `users_${Date.now()}`), 200, corsHeaders);
   }
 
   // Plugins page. Secrets are write-only: the API says whether one is saved, never what it is.
@@ -254,7 +280,7 @@ async function routeRequest(req: Request): Promise<Response> {
   }
   const closeMatch = /^\/api\/inbox\/([\w-]+)\/close$/.exec(pathname);
   if (closeMatch && method === "POST") {
-    if (!inbox.close(closeMatch[1], auth.ownerName() ?? "owner")) return json(toolFailure("NOT_FOUND", "No open task with that id", false, `inbox_${Date.now()}`), 404, corsHeaders);
+    if (!inbox.close(closeMatch[1], user?.name ?? auth.ownerName() ?? "owner")) return json(toolFailure("NOT_FOUND", "No open task with that id", false, `inbox_${Date.now()}`), 404, corsHeaders);
     return json(toolSuccess({ closed: closeMatch[1] }, `inbox_${Date.now()}`), 200, corsHeaders);
   }
 

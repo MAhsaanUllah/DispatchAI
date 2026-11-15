@@ -9,9 +9,11 @@ interface NavbarProps {
   onViewChange?: (view: "dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox") => void;
   onLogout?: () => void;
   companyName?: string;
+  // Staff see a reduced navbar; the server enforces the same rules.
+  isOwner?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange, onLogout, companyName }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange, onLogout, companyName, isOwner = true }) => {
   const [isResetting, setIsResetting] = useState(false);
 
   const handleResetClick = () => {
@@ -60,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
       </div>
 
       <nav className="app-nav-links" aria-label="Main navigation">
-        {([ ["dispatch", "Dispatch"], ["inbox", "Inbox"], ["team", "Team"], ["services", "Services"], ["company", "Company"], ["plugins", "Plugins"], ["system", "System"] ] as const).map(([view, label]) =>
+        {([ ["dispatch", "Dispatch"], ["inbox", "Inbox"], ["team", "Team"], ["services", "Services"], ["company", "Company"], ["plugins", "Plugins"], ["system", "System"] ] as const).filter(([view]) => isOwner || view !== "plugins").map(([view, label]) =>
           <button type="button" key={view} className={activeView === view ? "app-nav-link active" : "app-nav-link"} aria-current={activeView === view ? "page" : undefined} onClick={() => onViewChange?.(view)}>{label}</button>
         )}
       </nav>
@@ -100,8 +102,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
           {austinTime || "Local time"}
         </div>
 
-        {/* Reset Demo Data (Secondary Button per Section 22) */}
-        <button
+        {/* Reset Demo Data (owner only) */}
+        {isOwner && <button
           onClick={handleResetClick}
           disabled={isResetting}
           style={{
@@ -123,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
         >
           <RotateCcw size={12} className={isResetting ? "animate-spin" : ""} color="var(--text-secondary)" />
           <span>Reset Demo</span>
-        </button>
+        </button>}
         {onLogout && (
           <button
             onClick={onLogout}
