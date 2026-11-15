@@ -118,7 +118,7 @@ export const plugins: Plugin[] = [
         { value: "xai", label: "xAI Grok (your key)" },
         { value: "ollama", label: "Ollama on this computer (no key)" }
       ] },
-      { key: "model", label: "Model", secret: false, placeholder: "@cf/meta/llama-3.1-8b-instruct", help: "Workers AI: @cf/meta/llama-3.1-8b-instruct · Groq: llama-3.1-8b-instant · Gemini: gemini-2.0-flash · OpenAI: gpt-4o-mini · Anthropic: claude-haiku-5-5 · xAI: grok-3-mini · Ollama: llama3.1. Check your provider's docs for current model names." },
+      { key: "model", label: "Model", secret: false, placeholder: "@cf/meta/llama-3.1-8b-instruct", help: "Workers AI: @cf/meta/llama-3.1-8b-instruct · Groq: llama-3.1-8b-instant · Gemini: gemini-2.5-flash-lite (free tier) · OpenAI: gpt-4o-mini · Anthropic: claude-haiku-5-5 · xAI: grok-3-mini · Ollama: llama3.1. Check your provider's docs for current model names." },
       { key: "accountId", label: "Cloudflare account ID", secret: false, help: "Workers AI only. Cloudflare dashboard → Workers AI → Use REST API." },
       { key: "apiKey", label: "API key / token", secret: true, help: "Not needed for Ollama." },
       { key: "baseUrl", label: "Ollama URL", secret: false, placeholder: "http://localhost:11434", help: "Ollama only." },
