@@ -73,7 +73,7 @@ export function DirectoryPanel({ view, directory, loading, onEdit, onEditHours }
       <div className="grid grid--auto">
         <article className="record">
           <div className="record__head"><h2 className="record__name">{directory.company.name}</h2></div>
-          <p className="drawer__text">{directory.company.note}</p>
+          {directory.demo && <p className="drawer__text">{directory.company.note}</p>}
         </article>
         <article className="record">
           <div className="record__head"><h2 className="record__name">Market</h2></div>

@@ -119,7 +119,7 @@ export const api = {
         // A later poll restores current state after a temporary disconnect.
         onConnectionChange?.(false);
       }
-    }, 1500);
+    }, 3000);
     return () => window.clearInterval(timer);
   }
 };

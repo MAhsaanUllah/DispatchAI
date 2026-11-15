@@ -103,4 +103,12 @@ describe("setup API", () => {
     expect((await login("000000")).status).toBe(429);
     expect((await login("482915")).status).toBe(429);
   });
+
+  it("keeps a stranger's wrong PINs from locking the owner out from another address", async () => {
+    const stranger = { "x-client-ip": "203.0.113.9" };
+    for (let i = 0; i < 4; i++) expect((await login("000000", stranger)).status).toBe(401);
+    expect((await login("000000", stranger)).status).toBe(429);
+    expect((await login("482915", stranger)).status).toBe(429);
+    expect((await login("482915", { "x-client-ip": "198.51.100.7" })).status).toBe(200);
+  });
 });

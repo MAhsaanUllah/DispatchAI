@@ -108,7 +108,7 @@ Replace the three "(replace me)" nodes with your own steps (a Google Sheet row, 
 
 For your own software, or for an AI assistant you trust. Both use keys that only the owner can create, so a key never exposes anything beyond this one business.
 
-Create a key (owner session; a dashboard screen for this is planned). The key is shown **once**, only a hash is stored, and revoking it stops it at once:
+Create a key on the Features page (Developer API or AI assistant card), or through the owner session. The key is shown **once**, only a hash is stored, and revoking it stops it at once:
 
 ```bash
 curl -b cookies.txt -X POST http://localhost:8080/api/api-keys -H "Content-Type: application/json" -d '{"name":"Website form","scope":"read"}'   # scope: read | write

@@ -47,7 +47,9 @@ export async function serveStatic(request: Request, root = process.env.WEB_DIST 
   const { pathname } = new URL(request.url);
   if (request.method !== "GET" || pathname.startsWith("/api/") || pathname === "/health") return null;
   const base = resolve(root);
-  const target = resolve(base, "." + decodeURIComponent(pathname));
+  let decoded: string;
+  try { decoded = decodeURIComponent(pathname); } catch { return new Response("Bad Request", { status: 400 }); } // a stray % must not throw
+  const target = resolve(base, "." + decoded);
   if (target !== base && !target.startsWith(base + sep)) return new Response("Not Found", { status: 404 });
   if (extname(target)) return (await file(target)) ?? new Response("Not Found", { status: 404 });
   // SPA route such as /app: send index.html.

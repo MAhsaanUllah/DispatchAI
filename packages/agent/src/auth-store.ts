@@ -11,6 +11,9 @@ export type SessionUser = { userId: string; role: Role; name: string };
 const ITERATIONS = 600_000;
 const MAX_FAILURES = 5;
 const LOCK_MS = 15 * 60 * 1000;
+// Across all addresses one account may see this many wrong PINs per window before it locks for everyone: a ceiling against
+// guessing from many addresses, high enough that a single stranger cannot reach it quickly (each address is capped at 5).
+const MAX_FAILURES_ALL_ADDRESSES = 50;
 const SESSION_MS = 24 * 60 * 60 * 1000;
 const sha256 = async (value: string) => toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
 const toHex = (bytes: Uint8Array) => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -44,7 +47,7 @@ export class AuthStore {
   private memStaff = new Map<string, StaffUser>();
   private memSessions = new Map<string, { expiresAt: number; userId: string }>();
   // shortcut: lockout counters live in memory (single process), per login name; a restart needs server access anyway.
-  private lockouts = new Map<string, { failures: number; lockedUntil: number }>();
+  private lockouts = new Map<string, { failures: number; lockedUntil: number; at: number }>();
 
   constructor(databasePath?: string) {
     if (!databasePath) return;
@@ -137,27 +140,33 @@ export class AuthStore {
     return true;
   }
 
-  // Login by name + PIN (empty name = owner). 5 wrong PINs for a name lock that name for 15 minutes.
-  async login(pin: string, name = "", now = Date.now()): Promise<{ token: string } | { error: "LOCKED" | "WRONG_PIN"; retryAfterMs?: number }> {
+  // Login by name + PIN (empty name = owner). 5 wrong PINs from one address lock that name for that address for 15 minutes,
+  // so a stranger cannot lock the owner out of their own shop. A much higher count across all addresses locks it for everyone.
+  async login(pin: string, name = "", address = "local", now = Date.now()): Promise<{ token: string } | { error: "LOCKED" | "WRONG_PIN"; retryAfterMs?: number }> {
     const wanted = name.trim().toLowerCase();
     const owner = this.load();
     const user = !wanted || wanted === owner?.name.toLowerCase()
       ? owner && { id: "owner", pinHash: owner.pinHash, salt: owner.salt, iterations: owner.iterations }
       : this.staff().find((s) => s.name.toLowerCase() === wanted);
-    const key = user?.id ?? `unknown:${wanted}`;
-    const lock = this.lockouts.get(key) ?? { failures: 0, lockedUntil: 0 };
-    if (now < lock.lockedUntil) return { error: "LOCKED", retryAfterMs: lock.lockedUntil - now };
-    const ok = user ? await safeEqual(await hashPin(pin, user.salt, user.iterations), user.pinHash) : false;
+    const account = user?.id ?? "unknown"; // every unknown name shares one entry, so the table cannot be grown with made-up names
+    const keys = [`${account}|${address}`, `${account}|*`];
+    const locks = keys.map((key) => this.lockouts.get(key) ?? { failures: 0, lockedUntil: 0, at: now });
+    const locked = Math.max(...locks.map((lock) => lock.lockedUntil));
+    if (now < locked) return { error: "LOCKED", retryAfterMs: locked - now };
+    // An unknown name costs the same time as a wrong PIN, so response time does not reveal which names exist.
+    const ok = await safeEqual(await hashPin(pin, user?.salt ?? "00", user?.iterations ?? ITERATIONS), user?.pinHash ?? "");
     if (!ok || !user) {
-      lock.failures += 1;
-      if (lock.failures >= MAX_FAILURES) {
-        this.lockouts.set(key, { failures: 0, lockedUntil: now + LOCK_MS });
-        return { error: "LOCKED", retryAfterMs: LOCK_MS };
+      for (const [i, key] of keys.entries()) {
+        const lock = locks[i];
+        lock.failures += 1;
+        lock.at = now;
+        if (lock.failures >= (i === 0 ? MAX_FAILURES : MAX_FAILURES_ALL_ADDRESSES)) { lock.failures = 0; lock.lockedUntil = now + LOCK_MS; }
+        this.lockouts.set(key, lock);
       }
-      this.lockouts.set(key, lock);
-      return { error: "WRONG_PIN" };
+      for (const [key, lock] of this.lockouts) if (now - lock.at > LOCK_MS && now >= lock.lockedUntil) this.lockouts.delete(key);
+      return locks[0].lockedUntil > now ? { error: "LOCKED", retryAfterMs: LOCK_MS } : { error: "WRONG_PIN" };
     }
-    this.lockouts.delete(key);
+    for (const key of keys) this.lockouts.delete(key);
     const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
     const tokenHash = await sha256(token);
     const expiresAt = now + SESSION_MS;

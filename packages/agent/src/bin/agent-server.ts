@@ -11,26 +11,41 @@ const { serveStatic } = await import("../static.js");
 const port = Number(process.env.AGENT_PORT || 8787);
 const host = process.env.HOST || "0.0.0.0";
 
+// Nothing this app receives is large (the biggest body is a settings form), and the whole body is read before any login check.
+const MAX_BODY = 1_000_000;
+
 const server = http.createServer(async (req, res) => {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const body = Buffer.concat(chunks);
-  const headers = new Headers();
-  for (const [name, value] of Object.entries(req.headers)) {
-    if (Array.isArray(value)) value.forEach((item) => headers.append(name, item));
-    else if (value !== undefined) headers.set(name, value);
+  try {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.length;
+      if (size > MAX_BODY) { res.writeHead(413, { Connection: "close" }); res.end("Request too large"); req.destroy(); return; }
+      chunks.push(chunk);
+    }
+    const body = Buffer.concat(chunks);
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(req.headers)) {
+      if (Array.isArray(value)) value.forEach((item) => headers.append(name, item));
+      else if (value !== undefined) headers.set(name, value);
+    }
+    // Whatever the caller sent as x-client-ip is replaced: the rate limiter must see the real connection.
+    const tunnelVisitor = tunnel.status.state === "running" ? tunnelVisitorIp(req.socket.remoteAddress, headers.get("cf-connecting-ip") ?? undefined) : undefined;
+    headers.set("x-client-ip", tunnelVisitor ?? clientIp(req.socket.remoteAddress, headers.get("x-forwarded-for") ?? undefined, process.env.TRUST_PROXY === "true"));
+    const request = new Request(`http://${req.headers.host || `localhost:${port}`}${req.url || "/"}`, {
+      method: req.method,
+      headers,
+      body: body.length > 0 ? body : undefined
+    });
+    const response = (await serveStatic(request)) ?? (await handleRequest(request));
+    res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
+    res.end(Buffer.from(await response.arrayBuffer()));
+  } catch (error) {
+    // One bad request must never stop the server for everyone.
+    console.error("[agent-server] request failed:", error instanceof Error ? error.message : error);
+    if (!res.headersSent) res.writeHead(500, { "Content-Type": "text/plain" });
+    res.end("Server error");
   }
-  // Whatever the caller sent as x-client-ip is replaced: the rate limiter must see the real connection.
-  const tunnelVisitor = tunnel.status.state === "running" ? tunnelVisitorIp(req.socket.remoteAddress, headers.get("cf-connecting-ip") ?? undefined) : undefined;
-  headers.set("x-client-ip", tunnelVisitor ?? clientIp(req.socket.remoteAddress, headers.get("x-forwarded-for") ?? undefined, process.env.TRUST_PROXY === "true"));
-  const request = new Request(`http://${req.headers.host || `localhost:${port}`}${req.url || "/"}`, {
-    method: req.method,
-    headers,
-    body: body.length > 0 ? body : undefined
-  });
-  const response = (await serveStatic(request)) ?? (await handleRequest(request));
-  res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
-  res.end(Buffer.from(await response.arrayBuffer()));
 });
 
 server.listen(port, host, () => {

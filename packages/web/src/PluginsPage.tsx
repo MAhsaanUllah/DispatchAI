@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Workflow, Mail, Sparkles, BellRing, PhoneCall, Plug, Unplug, type LucideIcon } from "lucide-react";
 import { BookingMeter } from "./BookingMeter.js";
 import { UsagePanel } from "./components/UsagePanel.js";
-import { FEATURES, GROUPS, phoneNote, type RunsOn } from "./features.js";
+import { CONNECTIONS, FEATURES, GROUPS, phoneNote, type RunsOn } from "./features.js";
+import { activeKeys, ConnectionCard, KeysDrawer, tunnelAddress, type ConnectMode, type KeyRow } from "./components/ConnectPanel.js";
 
 type Field = { key: string; label: string; secret: boolean; placeholder?: string; help?: string; value: string; saved?: boolean; options?: { value: string; label: string }[] };
 type Plugin = {
@@ -102,7 +103,7 @@ const runTest = async (plugin: Plugin): Promise<Health> => {
 };
 
 // Settings drawer: fill the fields, then "Save & Test". A failed test disconnects again, so only working plugins sit in "My system".
-function PluginDrawer({ plugin, onClose, onDone }: { plugin: Plugin; onClose: () => void; onDone: (health: Health) => void }) {
+function PluginDrawer({ plugin, tunnelUrl, onClose, onDone }: { plugin: Plugin; tunnelUrl?: string; onClose: () => void; onDone: (health: Health) => void }) {
   const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(plugin.fields.map((f) => [f.key, f.value])));
   const [message, setMessage] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
@@ -159,6 +160,9 @@ function PluginDrawer({ plugin, onClose, onDone }: { plugin: Plugin; onClose: ()
                 />
               )}
               {field.help && <span className="field__hint">{field.help}</span>}
+              {plugin.id === "twilio" && field.key === "publicUrl" && tunnelUrl && values.publicUrl !== tunnelUrl && (
+                <button type="button" className="btn btn--sm" onClick={() => setValues({ ...values, publicUrl: tunnelUrl })}>Use the tunnel address</button>
+              )}
             </label>
           ))}
           {plugin.preview && (
@@ -190,7 +194,7 @@ const STATE_LABEL: Record<State, string> = { live: "Live", failing: "Failing", "
 // What the owner sees at a glance: is it doing its job right now?
 const stateOf = (plugin: Plugin, health?: Health): State => {
   if (plugin.enabled) return (health && !health.ok) || plugin.status?.warning ? "failing" : "live";
-  return plugin.fields.some((field) => field.secret && !field.saved) ? "needs-key" : "off";
+  return plugin.id !== "tunnel" && plugin.fields.some((field) => field.secret && !field.saved) ? "needs-key" : "off";
 };
 
 // Features page: grouped by what the owner wants done. Each card says what it does, whether it works now,
@@ -202,10 +206,14 @@ export function PluginsPage() {
   const [health, setHealth] = useState<Record<string, Health>>({});
   const [flash, setFlash] = useState<{ id: string; text: string } | null>(null);
   const [runsOn, setRunsOn] = useState<RunsOn>("desktop");
+  const [keys, setKeys] = useState<KeyRow[]>([]);
+  const [connect, setConnect] = useState<ConnectMode | null>(null);
 
   const load = () => fetch("/api/plugins").then((r) => r.json()).then((body) => setPlugins(body.data.plugins)).catch(() => setError("Cannot load features."));
+  const loadKeys = () => fetch("/api/api-keys").then((r) => r.json()).then((body) => setKeys(body.data.keys)).catch(() => undefined);
   useEffect(() => {
     void load();
+    void loadKeys();
     fetch("/api/business").then((r) => r.json()).then((body) => setRunsOn(body.data.config.runsOn ?? "desktop")).catch(() => undefined);
   }, []);
 
@@ -233,6 +241,7 @@ export function PluginsPage() {
   // this page has no copy for still gets a card (under "More"), so a new plugin can never be invisible.
   const known = new Set(FEATURES.map((feature) => feature.id));
   const extras = (plugins ?? []).filter((p) => !known.has(p.id)).map((p) => ({ id: p.id, group: "More", name: p.name, kind: "custom" as const, benefit: p.description, changes: p.limits }));
+  const tunnelUrl = tunnelAddress(plugins?.find((p) => p.id === "tunnel")?.status?.text);
   const shown = [...FEATURES, ...extras].filter((feature) => !(feature.id === "tunnel" && runsOn === "cloud"));
   const groups = [...GROUPS, ...(extras.length ? [{ title: "More", purpose: "Other features in this version." }] : [])].filter((group) => shown.some((feature) => feature.group === group.title));
   const liveIds = plugins?.filter((p) => stateOf(p, health[p.id]) === "live").map((p) => p.id) ?? [];
@@ -299,6 +308,9 @@ export function PluginsPage() {
                       </article>
                     );
                   })}
+                  {CONNECTIONS.filter((item) => item.group === group.title).map((item, index) => (
+                    <ConnectionCard key={item.id} info={item} count={activeKeys(keys).length} delay={(items.length + index) * 55} onOpen={() => setConnect(item.id)} />
+                  ))}
                 </div>
               </section>
             );
@@ -310,14 +322,18 @@ export function PluginsPage() {
             <ol className="explainer__steps">
               <li><strong>Built-in features.</strong> Switch one on above. Nothing to write.</li>
               <li><strong>Custom workflow.</strong> Connect n8n to send each booking to Sheets, WhatsApp, a CRM or anything n8n can reach. Host n8n on your cloud server or use n8n Cloud.</li>
-              <li><strong>Your own code.</strong> A developer API is not part of this version.</li>
+              <li><strong>Your own code or assistant.</strong> Create a key under Developer API or AI assistant (MCP) to let a program or your AI assistant read bookings and book.</li>
             </ol>
           </section>
         </>
       )}
+      {connect && (
+        <KeysDrawer mode={connect} address={tunnelUrl ?? window.location.origin} tunnelOn={Boolean(tunnelUrl)} onClose={() => setConnect(null)} onChanged={() => void loadKeys()} />
+      )}
       {drawer && (
         <PluginDrawer
           plugin={drawer}
+          tunnelUrl={tunnelUrl}
           onClose={() => { setDrawer(null); void load(); }}
           onDone={(result) => { setHealth((current) => ({ ...current, [drawer.id]: result })); setFlash({ id: drawer.id, text: `${drawer.name} is on` }); setDrawer(null); void load(); }}
         />

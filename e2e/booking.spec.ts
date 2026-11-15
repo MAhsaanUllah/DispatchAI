@@ -93,4 +93,18 @@ test("first run: setup, login, onboarding, then a caller books and it shows in t
   await page.getByRole("button", { name: "Download backup" }).click();
   expect((await saved).suggestedFilename()).toMatch(/^dispatchai-backup-\d{4}-\d{2}-\d{2}\.json$/);
   await expect(page.getByText(/Last downloaded from this browser/)).toBeVisible();
+
+// 8. The owner creates a developer key on the Features page, it works once, and revoking it ends it at once.
+  await page.getByRole("button", { name: /^Features/ }).click();
+  await page.getByRole("article", { name: "Developer API" }).getByRole("button", { name: "Create a key" }).click();
+  await page.getByLabel("Key name").fill("E2E key");
+  await page.getByRole("button", { name: "Create key" }).click();
+  const key = (await page.locator(".keybox__key").innerText()).trim();
+  expect(key).toMatch(/^dsp_/);
+  const call = () => page.request.get("/api/v1/bookings", { headers: { Authorization: "Bearer " + key } });
+  expect((await call()).status()).toBe(200);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Revoke E2E key" }).click();
+  await expect(page.getByText(/^Revoked /)).toBeVisible();
+  expect((await call()).status()).toBe(401);
 });
