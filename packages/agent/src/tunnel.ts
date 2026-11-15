@@ -6,6 +6,16 @@ export type TunnelOptions = { mode: "quick" | "token"; token?: string; publicUrl
 const QUICK_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
 type Launch = (args: string[]) => [file: string, args: string[]];
 
+// The helper program gets the normal system environment (PATH, proxies, ...) but none of this app's own secrets:
+// MASTER_KEY, SETUP_TOKEN, API keys, the database path. Only the tunnel's own token is added back, in token mode.
+const SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD|DATABASE/i;
+export function childEnv(base: NodeJS.ProcessEnv, token?: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [name, value] of Object.entries(base)) if (!SECRET_NAME.test(name)) env[name] = value;
+  if (token) env.TUNNEL_TOKEN = token;
+  return env;
+}
+
 // Gives this server a public HTTPS address by running Cloudflare's `cloudflared`, for example so a phone line or an
 // AI assistant can reach a desktop install. "quick" needs no account but the address changes on every start (good for
 // trying things); "token" uses your own Cloudflare tunnel and a stable hostname.
@@ -30,7 +40,7 @@ export class Tunnel {
       : ["tunnel", "--no-autoupdate", "run"];
     const [file, fullArgs] = this.launch(args);
     const child = spawn(file, fullArgs, {
-      env: { ...process.env, ...(options.mode === "token" && options.token ? { TUNNEL_TOKEN: options.token } : {}) },
+      env: childEnv(process.env, options.mode === "token" ? options.token : undefined),
       stdio: ["ignore", "pipe", "pipe"], windowsHide: true
     });
     this.child = child;
