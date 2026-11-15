@@ -242,6 +242,28 @@ Honest list, so nobody trusts what has not been tried:
 - Windows installer signing, auto-update and macOS/Linux desktop builds.
 - Calendar sync: slots come from the opening hours and staff you enter, not from a live calendar. SMS and Google Calendar are planned.
 
+## Roadmap
+
+**Before 1.0 is called proven** (needs real accounts and machines, in this order):
+
+- [ ] A real phone call through Twilio: booking, silence re-prompt, "talk to a person".
+- [ ] A real email through Resend (confirmation, cancellation, reminder) and one cloud AI key.
+- [ ] A VPS with a real domain: certificate, reboot, update, move from a PC.
+- [ ] A real MCP assistant and a Vapi or ElevenLabs voice agent against `/api/mcp`.
+- [ ] A pilot with one to three businesses for 30 days: no wrong bookings, no leaked data.
+
+**Next features, smallest first:**
+
+1. **Persistent call history and transcripts**, with a simple list in the Inbox (calls are stored now; transcripts are not).
+2. **Google and Outlook calendar sync**, so slots follow a calendar people already use.
+3. **SMS and WhatsApp** confirmations and reminders.
+4. **Natural voice and realtime calls** through a voice platform (see above), plus Urdu, Hindi and other languages.
+5. **Several locations** under one install, with a per-location view.
+6. **Quality checks for the AI:** a fixed set of sample calls that scores booking accuracy for each provider and model, run in CI.
+7. **Operations:** signed Windows installer, auto-update, spend limits on phone and AI use, and a dashboard screen for API keys and MCP.
+
+Ideas and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## AI assistance
 
 DispatchAI is designed and directed by Ahsaan Ullah and built with AI assistance (Claude Code). The product decisions, priorities and testing on real machines are the maintainer's; the code is checked by the test suite, the end-to-end run and the container smoke test described above.
