@@ -20,7 +20,13 @@ setInterval(() => {}, 1000);
 
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const until = async (check: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!check() && Date.now() < end) await new Promise((r) => setTimeout(r, 25)); };
-const seen = () => JSON.parse(readFileSync(out, "utf8")) as { argv: string[]; token: string | null; pid: number };
+// The fake cloudflared writes this file while the test reads it; an empty or half-written file is retried, not a failure.
+const seen = () => {
+  for (let i = 0; ; i++) {
+    try { return JSON.parse(readFileSync(out, "utf8")) as { argv: string[]; token: string | null; pid: number }; }
+    catch (error) { if (i >= 50) throw error; Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20); }
+  }
+};
 const withMode = (mode: string) => { process.env.FAKE_MODE = mode; return new Tunnel((args) => [process.execPath, [fake, ...args]]); };
 
 let current: Tunnel | undefined;
