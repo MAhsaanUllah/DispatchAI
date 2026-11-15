@@ -19,6 +19,17 @@ Built for appointment businesses: field service (HVAC, plumbing), salons, auto r
 - **Plugins you switch on from the dashboard:** phone line, AI brain, email, reminders, and signed events to your own [n8n](https://n8n.io) workflows.
 - **Owner and staff logins** with a PIN. Staff run the day; only the owner changes settings.
 
+## Screenshots
+
+The demo company below is fictional sample data (`SEED_DEMO_DATA=true`). A real install starts empty and walks you through onboarding.
+
+| | |
+| --- | --- |
+| ![Dispatch board](assets/screenshots/dispatch-board.png)<br>**Dispatch board.** Today's jobs, what the AI did, a chat to test the agent. | ![Features](assets/screenshots/features.png)<br>**Features.** Phone line, AI brain, email, reminders, public address and n8n, each switched on with a key. |
+| ![Inbox](assets/screenshots/inbox.png)<br>**Inbox.** Handoffs and failed deliveries for a person to handle. | ![Team](assets/screenshots/team.png)<br>**Team.** Staff, their hours and their logins. |
+| ![Services](assets/screenshots/services.png)<br>**Services.** What you book and for how long. | ![Company](assets/screenshots/company.png)<br>**Company.** Name, time zone, areas and opening hours. |
+| ![System](assets/screenshots/system.png)<br>**System.** Health, the nine booking steps, where it runs and backup. | |
+
 ## Install
 
 Pick one. All three give you the same dashboard.
@@ -230,6 +241,28 @@ Honest list, so nobody trusts what has not been tried:
 - A real Claude or ChatGPT connector against `/api/mcp` (it needs a public HTTPS address). It was exercised with the official MCP SDK client only.
 - Windows installer signing, auto-update and macOS/Linux desktop builds.
 - Calendar sync: slots come from the opening hours and staff you enter, not from a live calendar. SMS and Google Calendar are planned.
+
+## Roadmap
+
+**Before 1.0 is called proven** (needs real accounts and machines, in this order):
+
+- [ ] A real phone call through Twilio: booking, silence re-prompt, "talk to a person".
+- [ ] A real email through Resend (confirmation, cancellation, reminder) and one cloud AI key.
+- [ ] A VPS with a real domain: certificate, reboot, update, move from a PC.
+- [ ] A real MCP assistant and a Vapi or ElevenLabs voice agent against `/api/mcp`.
+- [ ] A pilot with one to three businesses for 30 days: no wrong bookings, no leaked data.
+
+**Next features, smallest first:**
+
+1. **Persistent call history and transcripts**, with a simple list in the Inbox (calls are stored now; transcripts are not).
+2. **Google and Outlook calendar sync**, so slots follow a calendar people already use.
+3. **SMS and WhatsApp** confirmations and reminders.
+4. **Natural voice and realtime calls** through a voice platform (see above), plus Urdu, Hindi and other languages.
+5. **Several locations** under one install, with a per-location view.
+6. **Quality checks for the AI:** a fixed set of sample calls that scores booking accuracy for each provider and model, run in CI.
+7. **Operations:** signed Windows installer, auto-update, spend limits on phone and AI use, and a dashboard screen for API keys and MCP.
+
+Ideas and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## AI assistance
 
