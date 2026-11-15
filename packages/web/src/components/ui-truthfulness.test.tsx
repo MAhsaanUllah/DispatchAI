@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Navbar } from "./Navbar.js";
 import { StatsBar } from "./StatsBar.js";
+import { JobsTable } from "./JobsTable.js";
 import { WorkOrderDrawer } from "./WorkOrderDrawer.js";
 import { AgentChat } from "./AgentChat.js";
 import type { AgentState } from "@dispatchai/agent";
@@ -39,31 +40,52 @@ const visibleText = (html: string): string =>
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ");
 
-describe("StatsBar: the Today metrics use real work-order schedule data", () => {
+describe("JobsTable: an empty board says which kind of empty it is", () => {
+  const renderTable = (jobs: WorkOrder[], loading?: boolean) =>
+    visibleText(
+      renderToStaticMarkup(
+        <JobsTable jobs={jobs} selectedJobId={null} onSelectJob={() => {}} loading={loading} onTestCall={() => {}} />
+      )
+    );
+
+  it("says it is still loading before the first answer arrives", () => {
+    const text = renderTable([], true);
+
+    expect(text).toContain("Loading work orders");
+    expect(text).not.toContain("No bookings yet");
+  });
+
+  it("offers a test call when the business truly has no bookings", () => {
+    const text = renderTable([], false);
+
+    expect(text).toContain("No bookings yet");
+    expect(text).toContain("Test call");
+    expect(text).not.toContain("match the filter");
+  });
+});
+
+describe("StatsBar: the board metrics use real work-order data", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("counts only work orders scheduled for today in the app timezone", () => {
-    vi.useFakeTimers();
-    // 2026-09-29T02:00:00Z is still 2026-09-28 (21:00) in America/Chicago.
-    vi.setSystemTime(new Date("2026-09-29T02:00:00Z"));
-
+  // The band summarises the board, so it counts the same work orders the table below lists.
+  it("counts the work orders the table shows", () => {
     const html = renderToStaticMarkup(
       <StatsBar
         jobs={[
-          makeJob({ id: "wo_today", scheduledStart: "2026-09-29T02:00:00Z", status: "BOOKED" }),
-          makeJob({ id: "wo_past", scheduledStart: "2026-09-20T15:00:00Z", status: "COMPLETED", urgency: "HIGH" }),
-          makeJob({ id: "wo_tomorrow", scheduledStart: "2026-09-29T05:00:00Z", status: "BOOKED", urgency: "HIGH" })
+          makeJob({ id: "wo_a", scheduledStart: "2026-09-29T02:00:00Z", status: "BOOKED" }),
+          makeJob({ id: "wo_b", scheduledStart: "2026-09-20T15:00:00Z", status: "COMPLETED", urgency: "HIGH" }),
+          makeJob({ id: "wo_c", scheduledStart: "2026-09-29T05:00:00Z", status: "BOOKED", urgency: "HIGH" })
         ]}
       />
     );
     const text = visibleText(html);
 
-    expect(text).toMatch(/1\s+Work Orders/);
-    expect(text).toMatch(/1\s+Active/);
-    expect(text).toMatch(/0\s+Completed/);
-    expect(text).not.toContain("Urgent");
+    expect(text).toMatch(/3\s+Work Orders/);
+    expect(text).toMatch(/2\s+Active/);
+    expect(text).toMatch(/1\s+Completed/);
+    expect(text).toMatch(/1\s+Urgent/);
   });
 });
 
@@ -145,7 +167,19 @@ describe("Navbar: no unbacked connectivity claims", () => {
     expect(text).toContain("DispatchAI");
     expect(text).toContain("09:00:00 CDT");
     expect(text).toContain("Test call");
-    expect(text).toContain("Reset Demo");
+  });
+
+  // Reset Demo restores the seeded dataset, so it only appears on a demo install.
+  it("offers Reset Demo only while the install runs on demo data", () => {
+    const demo = visibleText(
+      renderToStaticMarkup(<Navbar onReset={() => {}} austinTime="09:00:00 CDT" onOpenVoiceModal={() => {}} demo />)
+    );
+    const real = visibleText(
+      renderToStaticMarkup(<Navbar onReset={() => {}} austinTime="09:00:00 CDT" onOpenVoiceModal={() => {}} demo={false} />)
+    );
+
+    expect(demo).toContain("Reset Demo");
+    expect(real).not.toContain("Reset Demo");
   });
 });
 
@@ -175,6 +209,7 @@ describe("AgentChat: the engine badge reflects measured polling state", () => {
         state={idleState}
         notifications={[]}
         connected={connected}
+        business={{ name: "Maple Street Salon", services: [{ id: "HAIRCUT", name: "Haircut" }], zones: ["Main Street Studio"] }}
         onSendMessage={async () => {}}
         onConfirm={async () => {}}
         onReject={() => {}}
@@ -191,9 +226,17 @@ describe("AgentChat: the engine badge reflects measured polling state", () => {
     expect(text).toContain("Dispatch Agent Unreachable");
   });
 
-  it("only reports connected after a successful poll", () => {
+  it("names the business the engine runs for once a poll succeeds", () => {
     const text = visibleText(renderChat(true));
 
-    expect(text).toContain("Austin Dispatch Engine Connected");
+    expect(text).toContain("Maple Street Salon engine connected");
+  });
+
+  // The suggestions come from the business config, so they stay true after a template switch.
+  it("builds the suggestions from the business services and zones", () => {
+    const text = visibleText(renderChat(true));
+
+    expect(text).toContain("Check Haircut slots");
+    expect(text).not.toContain("Check HVAC slots");
   });
 });

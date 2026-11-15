@@ -19,7 +19,7 @@ describe("company directory and booking email", () => {
     const store = new DispatchStore();
     const directory = getDirectory(store);
     expect(directory.services.map((service) => service.id)).toEqual(["HVAC", "PLUMBING"]);
-    expect(directory.technicians).toHaveLength(6);
+    expect(directory.technicians).toHaveLength(5);
     expect(directory.technicians.find((tech) => tech.id === "tech_06")?.status).toBe("OFF_DUTY");
     expect(directory.company.serviceZones).toContain("Austin-South");
   });

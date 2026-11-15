@@ -50,7 +50,7 @@ export function PublicDashboard() {
 
   return <div className="public">
     <header className="public__nav">
-      <a href="/" className="public__brand"><span className="app-nav__mark"><img src="/favicon.svg" width="18" height="18" alt="" /></span>Dispatch<span className="public__brand-accent">AI</span></a>
+      <a href="/" className="public__brand"><span className="app-nav__mark"><img src="/favicon.svg" width="18" height="18" alt="" /></span><span>Dispatch<span className="public__brand-accent">AI</span></span></a>
       <a className="btn btn--sm" href="/"><ArrowLeft size={15} aria-hidden="true" /> Back to home</a>
     </header>
     <main className="public__main">

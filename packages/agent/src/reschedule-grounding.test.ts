@@ -87,6 +87,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
     await agent.processMessage("AC broken");
 
     const slot = agent.getState().availableSlots[0];
+    const original = domainService.getStore().workOrders.get("wo_1001")?.scheduledStart;
     agent.proposeReschedule("wo_1001", slot.slotId);
     expect(agent.getState().pendingAction?.type).toBe("RESCHEDULE_WORK_ORDER");
 
@@ -95,9 +96,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
     expect(agent.getState().pendingAction).toBeNull();
     expect(agent.getState().queriedDate).toBe(serviceDate(1));
     expect(emittedEvents.some((e) => e.type === "WORK_ORDER_RESCHEDULED")).toBe(false);
-    expect(domainService.getStore().workOrders.get("wo_1001")?.scheduledStart).toBe(
-      "2026-09-18T08:00:00Z"
-    );
+    expect(domainService.getStore().workOrders.get("wo_1001")?.scheduledStart).toBe(original);
   });
 
   it("asks for clarification instead of inventing a zone when no property is known", async () => {

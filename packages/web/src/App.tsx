@@ -16,6 +16,7 @@ import { LocalNotification, WorkOrder } from "@dispatchai/shared";
 
 export const App: React.FC = () => {
   const [jobs, setJobs] = useState<WorkOrder[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [editingBusiness, setEditingBusiness] = useState(false);
@@ -32,6 +33,14 @@ export const App: React.FC = () => {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [agentConnected, setAgentConnected] = useState<boolean | null>(null);
   const [localTime, setLocalTime] = useState("");
+
+  // A view switch starts at the top of the new screen; the pages are longer than the viewport.
+  // The phone nav strip also rewinds, so the chosen cell leads the row instead of sitting off-screen.
+  useEffect(() => {
+    document.querySelector(".app-main")?.scrollTo({ top: 0 });
+    document.querySelector(".app-nav__links")?.scrollTo({ left: 0 });
+    window.scrollTo({ top: 0 });
+  }, [activeView]);
 
   // Local clock in the business time zone (from onboarding).
   const businessTimeZone = directory?.company.timeZone ?? "America/Chicago";
@@ -61,7 +70,7 @@ export const App: React.FC = () => {
       setJobs(nextJobs);
       setNotifications(nextNotifications);
       setAgentConnected(true);
-    }).catch(() => setAgentConnected(false));
+    }).catch(() => setAgentConnected(false)).finally(() => setJobsLoading(false));
 
     const unsubscribe = api.subscribeEvents((event) => {
       setAgentState({ ...api.getAgent().getState() });
@@ -126,35 +135,47 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-shell">
-      <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={localTime} companyName={directory?.company.name} isOwner={isOwner} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
+      <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={localTime} companyName={directory?.company.name} isOwner={isOwner} demo={directory?.demo} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
 
       <main className="app-main">
         {activeView === "company" && editingBusiness ? <BusinessWizard onDone={() => window.location.reload()} onCancel={() => setEditingBusiness(false)} />
           : activeView === "inbox" ? <InboxPage />
             : activeView === "plugins" ? <PluginsPage />
-              : activeView === "system" ? <SystemPanel />
+              : activeView === "system" ? <SystemPanel onOpenPlugins={() => setActiveView("plugins")} />
                 : !isBoard ? (
                   <div className="app-body">
+                    <DirectoryPanel
+                      view={activeView}
+                      directory={directory}
+                      loading={directoryLoading}
+                      onEdit={activeView === "company" && isOwner ? () => setEditingBusiness(true) : undefined}
+                    />
                     {activeView === "team" && isOwner && <TeamLogins />}
-                    {activeView === "company" && isOwner && (
-                      <div className="page__actions">
-                        <button type="button" className="btn btn--primary btn--sm" onClick={() => setEditingBusiness(true)}>Edit business</button>
-                      </div>
-                    )}
-                    <DirectoryPanel view={activeView} directory={directory} loading={directoryLoading} />
                   </div>
                 ) : (
                   <div className="app-body app-body--flush">
                     <div className="split">
                       <div className="split__main board">
-                        <StatsBar jobs={jobs} companyName={directory?.company.name} timeZone={businessTimeZone} />
-                        <JobsTable jobs={jobs} selectedJobId={selectedJob?.id || null} onSelectJob={(job) => setSelectedJob(job)} />
+                        <StatsBar jobs={jobs} companyName={directory?.company.name} />
+                        <JobsTable
+                          jobs={jobs}
+                          selectedJobId={selectedJob?.id || null}
+                          onSelectJob={(job) => setSelectedJob(job)}
+                          loading={jobsLoading}
+                          onTestCall={() => setIsVoiceModalOpen(true)}
+                        />
                       </div>
                       <div className="split__side">
                         <AgentChat
                           state={agentState}
                           notifications={notifications}
                           connected={agentConnected}
+                          business={{
+                            name: directory?.company.name,
+                            services: directory?.services.map((service) => ({ id: service.id, name: service.name })) ?? [],
+                            zones: directory?.company.serviceZones ?? [],
+                            jobId: jobs[0]?.id
+                          }}
                           onSendMessage={handleSendMessage}
                           onConfirm={handleConfirm}
                           onReject={handleReject}

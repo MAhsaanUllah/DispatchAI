@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { bookingNotice, getBusinessConfig } from "@dispatchai/domain";
 import type { WorkOrder } from "@dispatchai/shared";
 import { dueReminders, reminderKey, ReminderLog } from "./reminders.js";
-import { getOrCreateAgent, handleRequest, runReminders } from "./worker.js";
+import { getOrCreateAgent, handleRequest, runReminders, domainService } from "./worker.js";
 
 const dir = mkdtempSync(join(tmpdir(), "dispatchai-reminders-"));
 afterAll(() => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* Windows file lock */ } });
@@ -58,6 +58,8 @@ describe("reminders plugin", () => {
   };
 
   it("does nothing while off, then reminds each booked appointment once", async () => {
+    // The seeded demo appointments are not under test here; only the one this test books.
+    domainService.getStore().workOrders.clear();
     const chat = (message: string) => api("/api/chat", { method: "POST", body: JSON.stringify({ message }) });
     await chat("5125550101");
     await chat("1402 South Congress Ave");

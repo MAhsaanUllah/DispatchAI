@@ -5,6 +5,8 @@ export type Directory = {
   company: { name: string; market: string; timeZone: string; serviceZones: string[]; note: string };
   services: { id: string; name: string; description: string; priceNote: string }[];
   technicians: { id: string; name: string; skills: string[]; serviceZones: string[]; status: string; upcomingSlots: { id: string; startAt: string; endAt: string; status: string }[] }[];
+  // True while the install still runs on the fictional demo dataset.
+  demo: boolean;
 };
 
 const baseUrl = (((import.meta as any).env?.VITE_AGENT_API_URL) || "").replace(/\/$/, "");

@@ -1,5 +1,5 @@
 /* Hallmark · shape: app screen · genre: modern-minimal · theme: Wayfind (deal 1/3, seed operations-dashboard-small-service-e53e) · redesign: full
- * nav: dense bar, square cells sharing a 2px ink rule, chosen cell ink-filled · signature: the work-order board (amber figures on ink) · states: loading, empty, error, full · wayfind: platform, brand green as the live accent
+ * nav: dense bar, square cells sharing a 2px ink rule, chosen cell ink-filled · signature: the work-order board, one ink band with mono figures, live states in brand green and the job in progress in amber · states: loading, empty, error, full · wayfind: platform, brand green as the live accent
  * axes: light / mono / cool · posture: restrained · contrast: pass · v2.0.0 */
 
 :root {
@@ -43,7 +43,9 @@
   --dur-short: 220ms;
   --dur-long: 420ms;
 
-  /* Layout. */
+  /* Layout. One content measure for the whole console: the owner reads this on a laptop
+     or a phone, not across a wall. Everything sits inside it and centres. */
+  --content-width: 1200px;
   --container: 1440px;
   --gutter: 24px;
   --z-base: 1;

@@ -78,9 +78,10 @@ function templateSeed(config: BusinessConfig) {
   return { customers, properties, technicians, slots: buildSlots(technicians), workOrders: [] as WorkOrder[] };
 }
 
-export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
+export function generateSeedData(config: BusinessConfig = getBusinessConfig(), options: { force?: boolean } = {}) {
   // shortcut: demo data stays on by default until the onboarding wizard (PR 11) can add real staff; then default to off.
-  if (readEnv("SEED_DEMO_DATA") === "false") {
+  // `force` restores the demo dataset for an install that already runs on it, whatever the env says now.
+  if (!options.force && readEnv("SEED_DEMO_DATA") === "false") {
     return { customers: [] as Customer[], properties: [] as Property[], technicians: [] as Technician[], slots: [] as TechnicianSlot[], workOrders: [] as WorkOrder[] };
   }
   if (config.templateId !== "field-service") return templateSeed(config);
@@ -133,7 +134,7 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
     { id: "prop_220", customerId: "cust_120", addressLine1: "4600 Seton Center Pkwy", city: "Austin", state: "TX", zipCode: "78759", serviceZone: "Austin-North" }
   ];
 
-  // 3. 6 Technicians (HVAC, Plumbing, Dual, and one Off-Duty)
+  // 3. 5 Technicians: four on the roster, one off duty so the roster filter has something to hide.
   const technicians: Technician[] = [
     {
       id: "tech_01",
@@ -164,13 +165,6 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
       status: "ACTIVE"
     },
     {
-      id: "tech_05",
-      name: "David Taylor",
-      skills: ["HVAC", "PLUMBING"],
-      serviceZones: ["Austin-Central", "Austin-South", "Austin-North"],
-      status: "ACTIVE"
-    },
-    {
       id: "tech_06",
       name: "Frank Alvarez",
       skills: ["HVAC"],
@@ -181,7 +175,16 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
 
   const slots = buildSlots(technicians);
 
-  // 5. 25 Work Orders (Historical, completed, in-progress, dispatched, and booked)
+  // The demo board must look alive on the day it is opened, so the work orders sit on the
+  // business-local today and the days before it. Anchored to a fixed date they all fell in the
+  // past, and the board read zero while the table listed the same jobs.
+  const timeZone = getBusinessConfig().timeZone;
+  const today = localDate(new Date(), timeZone);
+  const [todayYear, todayMonth, todayDay] = today.split("-").map(Number);
+  const dayBefore = (offset: number) =>
+    new Date(Date.UTC(todayYear, todayMonth - 1, todayDay - offset)).toISOString().slice(0, 10);
+
+  // 5. 9 Work Orders: three live today, six past visits (one cancelled).
   const workOrders: WorkOrder[] = [
     {
       id: "wo_1001",
@@ -191,12 +194,12 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
       serviceType: "HVAC",
       issueSummary: "Central AC blowing warm air in master bedroom",
       urgency: "HIGH",
-      scheduledStart: "2026-09-18T08:00:00Z",
-      scheduledEnd: "2026-09-18T10:00:00Z",
+      scheduledStart: `${today}T08:00:00Z`,
+      scheduledEnd: `${today}T10:00:00Z`,
       status: "IN_PROGRESS",
       createdBy: "VOICE_AGENT",
-      createdAt: "2026-09-18T07:15:00Z",
-      updatedAt: "2026-09-18T08:00:00Z"
+      createdAt: `${today}T07:15:00Z`,
+      updatedAt: `${today}T08:00:00Z`
     },
     {
       id: "wo_1002",
@@ -206,12 +209,12 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
       serviceType: "PLUMBING",
       issueSummary: "Kitchen sink drain clogged and leaking beneath cabinet",
       urgency: "STANDARD",
-      scheduledStart: "2026-09-18T10:00:00Z",
-      scheduledEnd: "2026-09-18T12:00:00Z",
+      scheduledStart: `${today}T10:00:00Z`,
+      scheduledEnd: `${today}T12:00:00Z`,
       status: "DISPATCHED",
       createdBy: "WEB_AGENT",
-      createdAt: "2026-09-17T18:30:00Z",
-      updatedAt: "2026-09-18T09:00:00Z"
+      createdAt: `${dayBefore(1)}T18:30:00Z`,
+      updatedAt: `${today}T09:00:00Z`
     },
     {
       id: "wo_1003",
@@ -221,16 +224,16 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
       serviceType: "PLUMBING",
       issueSummary: "Main water shutoff valve dripping",
       urgency: "STANDARD",
-      scheduledStart: "2026-09-18T13:00:00Z",
-      scheduledEnd: "2026-09-18T15:00:00Z",
+      scheduledStart: `${today}T13:00:00Z`,
+      scheduledEnd: `${today}T15:00:00Z`,
       status: "BOOKED",
       createdBy: "HUMAN",
-      createdAt: "2026-09-17T14:00:00Z",
-      updatedAt: "2026-09-17T14:00:00Z"
+      createdAt: `${dayBefore(1)}T14:00:00Z`,
+      updatedAt: `${dayBefore(1)}T14:00:00Z`
     }
   ];
 
-  // 22 diverse, realistic field-service work orders across Austin metro
+  // Six past visits beside the three live ones: a small shop's board, not a demo dump.
   const historicalProfiles: Array<{
     serviceType: "HVAC" | "PLUMBING";
     issueSummary: string;
@@ -239,30 +242,14 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
     startHour: string;
     endHour: string;
     dayOffset: number;
-    status: "BOOKED" | "DISPATCHED" | "IN_PROGRESS" | "COMPLETED";
+    status: "COMPLETED" | "CANCELLED";
   }> = [
-    { serviceType: "HVAC", issueSummary: "Thermostat unresponsive and AC fan short cycling", techIndex: 1, urgency: "HIGH", startHour: "09:00:00Z", endHour: "11:00:00Z", dayOffset: 0, status: "IN_PROGRESS" },
-    { serviceType: "PLUMBING", issueSummary: "Main sewer line slow drainage and gurgling in downstairs half-bath", techIndex: 2, urgency: "STANDARD", startHour: "10:30:00Z", endHour: "12:30:00Z", dayOffset: 0, status: "DISPATCHED" },
-    { serviceType: "HVAC", issueSummary: "Capacitor failure on outdoor condenser unit with loud humming", techIndex: 0, urgency: "STANDARD", startHour: "11:00:00Z", endHour: "13:00:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "PLUMBING", issueSummary: "Water heater pressure relief valve continuously leaking", techIndex: 3, urgency: "HIGH", startHour: "11:30:00Z", endHour: "13:30:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "HVAC", issueSummary: "Ductwork air leak in attic trunk causing low airflow to south wing", techIndex: 4, urgency: "STANDARD", startHour: "13:00:00Z", endHour: "15:00:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "PLUMBING", issueSummary: "Garbage disposal unit seized and leaking around mounting flange", techIndex: 2, urgency: "STANDARD", startHour: "14:00:00Z", endHour: "16:00:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "HVAC", issueSummary: "Evaporator coil frozen with heavy ice buildup and condensation overflow", techIndex: 1, urgency: "HIGH", startHour: "14:30:00Z", endHour: "16:30:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "PLUMBING", issueSummary: "Master bathroom shower cartridge failure preventing hot water shutoff", techIndex: 3, urgency: "HIGH", startHour: "15:00:00Z", endHour: "17:00:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "HVAC", issueSummary: "Condensate drain line backed up causing safety float switch trip", techIndex: 0, urgency: "STANDARD", startHour: "15:30:00Z", endHour: "17:30:00Z", dayOffset: 0, status: "BOOKED" },
-    { serviceType: "PLUMBING", issueSummary: "Outdoor hose bibb cracked from freeze with active spray", techIndex: 4, urgency: "STANDARD", startHour: "16:00:00Z", endHour: "18:00:00Z", dayOffset: 0, status: "BOOKED" },
     { serviceType: "HVAC", issueSummary: "Blower motor bearing worn out with high-pitched squeal", techIndex: 1, urgency: "STANDARD", startHour: "08:30:00Z", endHour: "10:30:00Z", dayOffset: 1, status: "COMPLETED" },
     { serviceType: "PLUMBING", issueSummary: "Tankless water heater mineral scaling and error code E02 flush", techIndex: 2, urgency: "STANDARD", startHour: "09:00:00Z", endHour: "11:00:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "HVAC", issueSummary: "Zone damper actuator replacement on upstairs HVAC zone", techIndex: 4, urgency: "STANDARD", startHour: "10:00:00Z", endHour: "12:00:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "PLUMBING", issueSummary: "Sump pump check valve failure and basement basin overflow", techIndex: 3, urgency: "STANDARD", startHour: "11:00:00Z", endHour: "13:00:00Z", dayOffset: 1, status: "COMPLETED" },
     { serviceType: "HVAC", issueSummary: "Refrigerant leak detection and system recharge with R-410A", techIndex: 0, urgency: "STANDARD", startHour: "12:30:00Z", endHour: "14:30:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "PLUMBING", issueSummary: "Kitchen island under-sink P-trap cracked and leaking water", techIndex: 2, urgency: "STANDARD", startHour: "13:30:00Z", endHour: "15:30:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "HVAC", issueSummary: "Seasonal AC efficiency tuneup, coil cleaning, and filter swap", techIndex: 1, urgency: "STANDARD", startHour: "14:00:00Z", endHour: "16:00:00Z", dayOffset: 1, status: "COMPLETED" },
     { serviceType: "PLUMBING", issueSummary: "Toilet fill valve continuous running water and flapper replacement", techIndex: 3, urgency: "STANDARD", startHour: "15:00:00Z", endHour: "17:00:00Z", dayOffset: 1, status: "COMPLETED" },
-    { serviceType: "HVAC", issueSummary: "Contactor points pitted causing intermittent heat pump startup", techIndex: 4, urgency: "STANDARD", startHour: "09:00:00Z", endHour: "11:00:00Z", dayOffset: 2, status: "COMPLETED" },
-    { serviceType: "PLUMBING", issueSummary: "Gas water heater pilot thermocouple replacement", techIndex: 2, urgency: "STANDARD", startHour: "11:00:00Z", endHour: "13:00:00Z", dayOffset: 2, status: "COMPLETED" },
-    { serviceType: "HVAC", issueSummary: "Ecobee smart thermostat wiring harness short and power cycle", techIndex: 0, urgency: "STANDARD", startHour: "13:00:00Z", endHour: "15:00:00Z", dayOffset: 2, status: "COMPLETED" },
-    { serviceType: "PLUMBING", issueSummary: "Emergency water main shutoff valve seized and corroded", techIndex: 3, urgency: "HIGH", startHour: "15:30:00Z", endHour: "17:30:00Z", dayOffset: 2, status: "COMPLETED" }
+    { serviceType: "HVAC", issueSummary: "Seasonal AC tuneup, coil cleaning and filter swap", techIndex: 1, urgency: "STANDARD", startHour: "10:00:00Z", endHour: "12:00:00Z", dayOffset: 2, status: "COMPLETED" },
+    { serviceType: "PLUMBING", issueSummary: "Outdoor hose bib replacement, booked by mistake", techIndex: 2, urgency: "STANDARD", startHour: "13:00:00Z", endHour: "15:00:00Z", dayOffset: 2, status: "CANCELLED" }
   ];
 
   historicalProfiles.forEach((prof, idx) => {
@@ -270,8 +257,7 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig()) {
     const cust = customers[(num - 1) % customers.length];
     const prop = properties[(num - 1) % properties.length];
     const tech = technicians[prof.techIndex];
-    const day = 18 - prof.dayOffset;
-    const dateStr = `2026-09-${day < 10 ? "0" + day : day}`;
+    const dateStr = dayBefore(prof.dayOffset);
 
     workOrders.push({
       id: `wo_10${num < 10 ? "0" + num : num}`,

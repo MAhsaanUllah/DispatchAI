@@ -34,7 +34,7 @@ export function LandingPage() {
   return <div className="public">
     <a className="public__skip" href="#main">Skip to content</a>
     <header className="public__nav">
-      <a className="public__brand" href="/" aria-label="DispatchAI home"><span className="app-nav__mark"><img src="/favicon.svg" alt="" width="18" height="18" /></span>Dispatch<span className="public__brand-accent">AI</span></a>
+      <a className="public__brand" href="/" aria-label="DispatchAI home"><span className="app-nav__mark"><img src="/favicon.svg" alt="" width="18" height="18" /></span><span>Dispatch<span className="public__brand-accent">AI</span></span></a>
       <div className="public__nav-right"><span className="public__location"><MapPin size={14} aria-hidden="true" /> Austin, Texas</span><a className="btn btn--sm" href="/app">{publicPreview ? "Access dashboard" : "Staff dashboard"}</a></div>
     </header>
 

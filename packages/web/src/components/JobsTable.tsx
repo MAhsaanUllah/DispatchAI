@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Search, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, X, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight } from "lucide-react";
 import { WorkOrderView as WorkOrder } from "@dispatchai/shared";
 
 interface JobsTableProps {
   jobs: WorkOrder[];
   selectedJobId: string | null;
   onSelectJob: (job: WorkOrder) => void;
+  // True until the first answer arrives, so the board never claims "no bookings" while loading.
+  loading?: boolean;
+  onTestCall?: () => void;
 }
 
 const formatWorkOrderId = (id: string): string => id.replace(/^wo_?/i, "WO-");
@@ -33,7 +36,7 @@ const STATE_OF = (job: WorkOrder): { tone: "live" | "attention" | "closed" | "al
   return { tone: "closed", word: job.status };
 };
 
-export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSelectJob }) => {
+export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSelectJob, loading = false, onTestCall }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [serviceFilter, setServiceFilter] = useState<string>("ALL");
   const [zoneFilter, setZoneFilter] = useState<string>("ALL");
@@ -187,12 +190,12 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
           <caption className="visually-hidden">Work orders, sorted by operational priority</caption>
           <colgroup>
             <col style={{ width: "84px" }} />
-            <col style={{ width: "122px" }} />
+            <col style={{ width: "140px" }} />
             <col style={{ width: "90px" }} />
             <col style={{ width: "128px" }} />
             <col />
-            <col style={{ width: "136px" }} />
-            <col style={{ width: "100px" }} />
+            <col style={{ width: "130px" }} />
+            <col style={{ width: "104px" }} />
           </colgroup>
           <thead>
             <tr>
@@ -225,8 +228,24 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
             {pagedJobs.length === 0 ? (
               <tr>
                 <td colSpan={7} className="board__empty">
-                  <div className="board__empty-title">No work orders match the filter criteria.</div>
-                  <div>Clear the filters to see every work order.</div>
+                  {loading ? (
+                    <div className="board__empty-title">Loading work orders…</div>
+                  ) : jobs.length === 0 ? (
+                    <>
+                      <div className="board__empty-title">No bookings yet.</div>
+                      <div>Run a Test call to take the first one.</div>
+                      {onTestCall && (
+                        <div className="board__empty-actions">
+                          <button type="button" className="btn btn--primary btn--sm" onClick={onTestCall}>Test call</button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="board__empty-title">No work orders match the filter criteria.</div>
+                      <div>Clear the filters to see every work order.</div>
+                    </>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -251,12 +270,16 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
                         <span className={`swatch swatch--${state.tone}`} aria-hidden="true" />
                         <span className="state__word">{state.word}</span>
                       </span>
+                      {isHighUrgency && <span className="state__urg" title="High urgency">URG</span>}
                     </td>
                     <td>{job.serviceType}</td>
                     <td>{zone}</td>
                     <td className="table__issue" title={job.issueSummary}>{job.issueSummary}</td>
                     <td title={techName}>{techName}</td>
-                    <td className="table__num table__time">{formatTimeString(job.scheduledStart)}</td>
+                    <td className="table__num table__time">
+                      {formatTimeString(job.scheduledStart)}
+                      <ChevronRight size={12} className="table__chev" aria-hidden="true" />
+                    </td>
                   </tr>
                 );
               })
@@ -267,8 +290,13 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
 
       <div className="board__foot">
         <span>
-          Showing <strong>{filteredJobs.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> to <strong>{Math.min(currentPage * pageSize, filteredJobs.length)}</strong> of <strong>{filteredJobs.length}</strong>
+          {filteredJobs.length === 0
+            ? "No work orders"
+            : <>Showing <strong>{(currentPage - 1) * pageSize + 1}</strong> to <strong>{Math.min(currentPage * pageSize, filteredJobs.length)}</strong> of <strong>{filteredJobs.length}</strong></>}
         </span>
+        {filteredJobs.some((job) => job.urgency === "HIGH" && job.status !== "COMPLETED" && job.status !== "CANCELLED") && (
+          <span className="board__legend"><span className="state__urg">URG</span> high urgency</span>
+        )}
         <div className="board__foot-controls">
           <span>Page {currentPage} of {totalPages}</span>
           <button type="button" className="btn btn--sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage <= 1}>Previous</button>

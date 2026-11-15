@@ -11,6 +11,8 @@ interface NavbarProps {
   companyName?: string;
   // Staff see a reduced navbar; the server enforces the same rules.
   isOwner?: boolean;
+  // "Reset Demo" only means something while the install still runs on the fictional dataset.
+  demo?: boolean;
 }
 
 const VIEWS = [
@@ -23,7 +25,7 @@ const VIEWS = [
   ["system", "System"]
 ] as const;
 
-export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange, onLogout, companyName, isOwner = true }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoiceModal, activeView = "dispatch", onViewChange, onLogout, companyName, isOwner = true, demo = false }) => {
   const [isResetting, setIsResetting] = useState(false);
 
   const handleResetClick = () => {
@@ -54,7 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
           </button>
         )}
         <span className="app-clock">{austinTime || "Local time"}</span>
-        {isOwner && (
+        {isOwner && demo && (
           <button type="button" className="btn btn--quiet btn--sm" onClick={handleResetClick} disabled={isResetting}>
             <RotateCcw size={12} aria-hidden="true" />
             Reset Demo
