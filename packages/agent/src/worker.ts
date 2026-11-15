@@ -6,11 +6,20 @@ import { ELEVENLABS_AGENT_CONFIG, ELEVENLABS_TOOLS, ELEVENLABS_SYSTEM_PROMPT } f
 import { SQLiteDispatchStore } from "../../domain/src/sqlite-store.js";
 import { deliverBookingEmails } from "../../domain/src/email.js";
 import { SessionStore } from "./session-store.js";
+import { AuthStore, generateSetupCode, safeEqual } from "./auth-store.js";
 import { buildBookingEvent, sendBookingEvent } from "./outbound-events.js";
 
 // Multi-session agent registry: in-memory cache in front of the durable SessionStore.
 const agents: Map<string, DispatchAgent> = new Map();
 const sessions = new SessionStore(process.env.DATABASE_URL);
+const auth = new AuthStore(process.env.DATABASE_URL);
+// One-time setup code. SETUP_TOKEN in .env wins; otherwise a random code is printed once to the server log.
+const setupCode = process.env.SETUP_TOKEN || generateSetupCode();
+if (!auth.hasOwner()) {
+  console.log(process.env.SETUP_TOKEN
+    ? "[setup] No owner yet. Open /app and enter the SETUP_TOKEN from your .env."
+    : `[setup] No owner yet. Open /app and enter setup code: ${setupCode}`);
+}
 // One process owns the business data (single writer). DATABASE_URL = SQLite file path; unset = in-memory.
 const domainService = new DispatchService(process.env.DATABASE_URL ? new SQLiteDispatchStore(process.env.DATABASE_URL) : undefined);
 const isTestRuntime = process.env.NODE_ENV === "test";
@@ -63,6 +72,10 @@ class RateLimiter {
 
 const rateLimiter = new RateLimiter();
 
+function json(body: unknown, status: number, headers: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
+}
+
 function sessionIdOf(req: Request): string {
   return req.headers.get("x-session-id") || new URL(req.url).searchParams.get("sessionId") || "default_session";
 }
@@ -105,6 +118,24 @@ async function routeRequest(req: Request): Promise<Response> {
       JSON.stringify(toolFailure("RATE_LIMIT_EXCEEDED", "Too many requests. Please wait before retrying.", false, `rate_${Date.now()}`)),
       { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+  }
+
+  // First-run owner setup (one-time). Rate limit above also slows code guessing.
+  if (pathname === "/api/setup/status" && method === "GET") {
+    return json({ ok: true, data: { needsSetup: !auth.hasOwner() } }, 200, corsHeaders);
+  }
+  if (pathname === "/api/setup" && method === "POST") {
+    const body = await req.json().catch(() => ({})) as { code?: unknown; name?: unknown; pin?: unknown };
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const pin = typeof body.pin === "string" ? body.pin : "";
+    if (auth.hasOwner()) return json(toolFailure("SETUP_LOCKED", "Setup is already done", false, `setup_${Date.now()}`), 403, corsHeaders);
+    if (typeof body.code !== "string" || !(await safeEqual(body.code.trim().toUpperCase(), setupCode.toUpperCase()))) {
+      return json(toolFailure("INVALID_SETUP_CODE", "Setup code is wrong", false, `setup_${Date.now()}`), 403, corsHeaders);
+    }
+    if (!name || name.length > 80) return json(toolFailure("INVALID_INPUT", "Name must be 1-80 characters", false, `setup_${Date.now()}`), 400, corsHeaders);
+    if (!/^\d{6,8}$/.test(pin)) return json(toolFailure("INVALID_INPUT", "PIN must be 6-8 digits", false, `setup_${Date.now()}`), 400, corsHeaders);
+    if (!(await auth.createOwner(name, pin))) return json(toolFailure("SETUP_LOCKED", "Setup is already done", false, `setup_${Date.now()}`), 403, corsHeaders);
+    return json(toolSuccess({ owner: name }, `setup_${Date.now()}`), 201, corsHeaders);
   }
 
   // 2. Secret Authentication Enforcement for protected endpoints
