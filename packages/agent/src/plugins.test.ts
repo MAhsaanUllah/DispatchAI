@@ -86,6 +86,7 @@ describe("plugins API", () => {
     const chat = (message: string) => call("/api/chat", { method: "POST", body: JSON.stringify({ message }) });
     const before = received.length;
     await chat("5125550101");
+    await chat("1402 South Congress Ave");
     await chat("My AC is blowing warm air, can you send someone tomorrow?");
     await chat(`Please book ${(await call("/api/state")).body.availableSlots[0].slotId}`);
     expect((await chat("yes")).body.reply).toMatch(/confirmed/i);

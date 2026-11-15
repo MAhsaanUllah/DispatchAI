@@ -11,11 +11,14 @@ import {
 } from "@dispatchai/shared";
 import { detectService, getBusinessConfig, serviceZoneFor } from "@dispatchai/domain";
 import { N8nClient } from "./client.js";
+import { addressMatches, nameMatches } from "./verify.js";
 import { AgentState, ConversationMessage, createInitialAgentState, PendingConfirmationAction, SuccessfulCreateRecord } from "./state.js";
 
 export type EventListener = (event: AgentEvent) => void;
 
 const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
+const MAX_LOOKUPS = 5;
+const VERIFY_FIRST = "Before I can look up or change a booking, I need to check it is you. What is the phone number on the account?";
 
 // shortcut: keyword lists; the LLM engine (chunk 11/12) should classify these instead.
 // Danger to people only; leaks and floods are normal plumbing jobs and must still be bookable.
@@ -369,6 +372,52 @@ export class DispatchAgent {
     return this.state.selectedProperty?.addressLine1 ?? getBusinessConfig().serviceZones[0];
   }
 
+  private challengeQuestion(): string {
+    return getBusinessConfig().kind === "onsite"
+      ? "Thanks. To protect your account, please tell me the service address."
+      : "Thanks. To protect your account, please tell me your full name.";
+  }
+
+  // The caller proves the number is theirs by stating the address (onsite) or full name (instore).
+  // Wrong details and unknown numbers get the same answer, so a caller cannot learn whether an account exists.
+  private continueVerification(text: string, correlationId: string): string {
+    const v = this.state.verification!;
+    if (/^\s*(new|new customer|i'?m new|first time)\b/i.test(text)) {
+      this.state.verification = null;
+      if (v.customer) {
+        this.emit("HANDOFF_REQUESTED", correlationId, undefined, { reason: "human", text: "Caller asked for a new account on a number that already has one" });
+        return this.pushAgentReply("To protect existing accounts I cannot set up this number here. A team member will call you back.");
+      }
+      this.state.newCaller = { phone: v.phone, step: "name" };
+      return this.pushAgentReply("Welcome! What is your full name?");
+    }
+    const onsite = getBusinessConfig().kind === "onsite";
+    const property = onsite ? v.properties.find((p) => addressMatches(text, p.addressLine1)) : undefined;
+    const verified = !!v.customer && (onsite ? !!property : nameMatches(text, v.customer.firstName, v.customer.lastName));
+    if (verified) {
+      this.state.verification = null;
+      this.state.customer = v.customer;
+      this.state.selectedProperty = property ?? null;
+      return this.pushAgentReply(`Thanks, ${v.customer!.firstName}, you are verified. How can I help you today?`);
+    }
+    v.attempts += 1;
+    if (v.attempts >= 2) {
+      this.state.verification = null;
+      this.emit("HANDOFF_REQUESTED", correlationId, undefined, { reason: "human", text: "Caller could not be verified" });
+      return this.pushAgentReply("I could not verify those details. A team member will call you back.");
+    }
+    return this.pushAgentReply(`I could not match that. Please say the ${onsite ? "service address" : "full name"} again, or say "new" if you are a new customer.`);
+  }
+
+  // Booking look-ups and changes only for the verified caller's own bookings; anything else reads as "not found".
+  private async ownedWorkOrder(woId: string, correlationId: string): Promise<{ wo: WorkOrder } | { reply: string }> {
+    const result = await this.getWorkOrder(woId, correlationId);
+    if (!result.ok) return { reply: this.backendFailureReply(result.error, correlationId) };
+    const wo = result.data.workOrder;
+    if (!wo || wo.customerId !== this.state.customer?.id) return { reply: `I could not find work order #${woId} on your account. Please check the number.` };
+    return { wo };
+  }
+
   // Steps for a caller with no account: name, then (onsite only) address and, if needed, which service area.
   private async continueNewCaller(text: string, correlationId: string): Promise<string> {
     const pending = this.state.newCaller!;
@@ -488,6 +537,7 @@ export class DispatchAgent {
     }
 
     if (this.state.newCaller) return this.continueNewCaller(cleanText, correlationId);
+    if (this.state.verification) return this.continueVerification(cleanText, correlationId);
 
     const dateChangeMatch = lower.match(/(actually|instead|rather|change).*(today|tomorrow|\d{4}-\d{2}-\d{2})/i) ||
       lower.match(/^(check|how about|what about)\s+(today|tomorrow|\d{4}-\d{2}-\d{2})/i);
@@ -576,23 +626,23 @@ export class DispatchAgent {
       : cleanText.match(/\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/);
     if (phoneMatch) {
       const rawDigits = `${phoneMatch[1]}${phoneMatch[2]}${phoneMatch[3]}`;
+      this.state.lookups = (this.state.lookups ?? 0) + 1;
+      if (this.state.lookups > MAX_LOOKUPS) {
+        this.emit("HANDOFF_REQUESTED", correlationId, undefined, { reason: "human", text: "Too many phone number lookups in one conversation" });
+        return this.pushAgentReply("I cannot look up any more numbers in this conversation. A team member will call you back.");
+      }
       const lookup = await this.findCustomer(rawDigits, correlationId);
       if (!lookup.ok) {
         const reply = this.backendFailureReply(lookup.error, correlationId);
         this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
         return reply;
       }
-      if (lookup.data.customer) {
-        const c = lookup.data.customer;
-        const p = lookup.data.properties[0];
-        const propAddress = p ? ` at ${p.addressLine1}` : "";
-        const reply = `Hello ${c.firstName} ${c.lastName}! I have found your account${propAddress}. How can I help you today?`;
-        this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
-        return reply;
-      }
-      // New caller: collect details and create the account instead of turning them away.
-      this.state.newCaller = { phone: rawDigits, step: "name" };
-      return this.pushAgentReply(`I could not find an existing customer account for ${phoneMatch[0]}, so I will set one up. What is your full name?`);
+      // A phone number is not proof of identity. Say nothing about the account (not even whether it exists)
+      // until the caller states its address or name; findCustomer filled these in, so clear them again.
+      this.state.customer = null;
+      this.state.selectedProperty = null;
+      this.state.verification = { phone: rawDigits, customer: lookup.data.customer, properties: lookup.data.properties, attempts: 0 };
+      return this.pushAgentReply(this.challengeQuestion());
     }
 
     // 4. Slot selection / Booking proposal (e.g. "Book the 10 AM slot", "Slot slot_303")
@@ -610,6 +660,7 @@ export class DispatchAgent {
       }
 
       if (matchedSlot) {
+        if (!this.state.customer) return this.pushAgentReply(VERIFY_FIRST);
         if (this.state.rescheduleContext) {
           const ctx = this.state.rescheduleContext;
           this.proposeReschedule(ctx.workOrderId, matchedSlot.slotId);
@@ -663,6 +714,9 @@ export class DispatchAgent {
       if (!woId) {
         return this.pushAgentReply(this.workOrderNumberRequest("reschedule"));
       }
+      if (!this.state.customer) return this.pushAgentReply(VERIFY_FIRST);
+      const owned = await this.ownedWorkOrder(woId, correlationId);
+      if ("reply" in owned) return this.pushAgentReply(owned.reply);
 
       const targetSlot = this.state.availableSlots.find((s) => lower.includes(s.slotId.toLowerCase()));
       if (targetSlot) {
@@ -672,16 +726,8 @@ export class DispatchAgent {
         return this.pushAgentReply(reply);
       }
 
-      // No slot chosen yet: load the actual work order, then re-query from its own property and the stated date.
-      const woResult = await this.getWorkOrder(woId, correlationId);
-      if (!woResult.ok) {
-        return this.pushAgentReply(this.backendFailureReply(woResult.error, correlationId));
-      }
-      if (!woResult.data.workOrder) {
-        return this.pushAgentReply(`I could not find work order #${woId}. Please verify the order number.`);
-      }
-
-      const wo = woResult.data.workOrder;
+      // No slot chosen yet: re-query from the order's own property and the stated date.
+      const wo = owned.wo;
       const property = this.state.selectedProperty;
       // Onsite: the caller's own property must match the order. Instore: the business location.
       const serviceZone = wo.propertyId ? (property && property.id === wo.propertyId ? property.serviceZone : null) : serviceZoneFor(undefined);
@@ -723,6 +769,9 @@ export class DispatchAgent {
       if (!woId) {
         return this.pushAgentReply(this.workOrderNumberRequest("cancel"));
       }
+      if (!this.state.customer) return this.pushAgentReply(VERIFY_FIRST);
+      const owned = await this.ownedWorkOrder(woId, correlationId);
+      if ("reply" in owned) return this.pushAgentReply(owned.reply);
       const action = this.proposeCancellation(woId, cleanText);
       const reply = `Are you sure you want to cancel Work Order #${woId}? Please reply 'yes' or 'confirm' to execute the cancellation.`;
       this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
@@ -741,21 +790,11 @@ export class DispatchAgent {
       }
     }
     if (woId) {
-      const woResult = await this.getWorkOrder(woId, correlationId);
-      if (!woResult.ok) {
-        const reply = this.backendFailureReply(woResult.error, correlationId);
-        this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
-        return reply;
-      }
-      if (woResult.data.workOrder) {
-        const wo = woResult.data.workOrder;
-        const reply = `Work Order #${wo.id} is currently ${wo.status}. Service: ${wo.serviceType} ("${wo.issueSummary}"), scheduled for ${wo.scheduledStart}.`;
-        this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
-        return reply;
-      }
-      const notFoundReply = `I could not find work order #${woId}. Please verify the order number.`;
-      this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: notFoundReply, timestamp: new Date().toISOString() });
-      return notFoundReply;
+      if (!this.state.customer) return this.pushAgentReply(VERIFY_FIRST);
+      const owned = await this.ownedWorkOrder(woId, correlationId);
+      if ("reply" in owned) return this.pushAgentReply(owned.reply);
+      const wo = owned.wo;
+      return this.pushAgentReply(`Work Order #${wo.id} is currently ${wo.status}. Service: ${wo.serviceType} ("${wo.issueSummary}"), scheduled for ${wo.scheduledStart}.`);
     }
 
     // Not understood by the rules: one AI attempt, then the same rules run on the plain sentence (code still owns every action).

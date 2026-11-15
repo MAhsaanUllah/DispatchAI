@@ -29,6 +29,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
 
   it("queries the work order's own property zone instead of a hardcoded zone", async () => {
     await agent.processMessage("5125550103"); // Maya Lin -> prop_203 (Austin-Central)
+    await agent.processMessage("504 Colorado St");
 
     const wo = domainService.getStore().workOrders.get("wo_1002")!;
     const property = domainService.getStore().properties.get(wo.propertyId!)!;
@@ -47,6 +48,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
 
   it("uses today as the query date when the user says today", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
 
     const reply = await agent.processMessage("Please reschedule wo_1001 for today");
 
@@ -58,6 +60,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
 
   it("uses tomorrow as the query date when the user says tomorrow", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
 
     const reply = await agent.processMessage("Please reschedule wo_1001 for tomorrow");
 
@@ -68,6 +71,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
 
   it("respects an explicitly stated date verbatim and never claims tomorrow", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
 
     const reply = await agent.processMessage("Please reschedule wo_1001 to 2026-10-05");
 
@@ -79,6 +83,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
 
   it("does not reuse a stale pending reschedule after a date constraint change", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("AC broken");
 
     const slot = agent.getState().availableSlots[0];
@@ -124,7 +129,8 @@ describe("P0-2: Reschedule constraint grounding", () => {
         throw new Error("ECONNREFUSED connect ECONNREFUSED 127.0.0.1:5678");
       }
     });
-    const offlineAgent = new DispatchAgent("p0_2_offline", offlineClient);
+    const store = domainService.getStore();
+    const offlineAgent = new DispatchAgent("p0_2_offline", offlineClient, { customer: store.customers.get("cust_101")!, selectedProperty: store.properties.get("prop_201")! });
 
     const reply = await offlineAgent.processMessage("Please reschedule wo_1001");
 
@@ -134,6 +140,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
 
   it("still reports a true work-order not-found during reschedule", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
 
     const reply = await agent.processMessage("Please reschedule wo_9999");
 

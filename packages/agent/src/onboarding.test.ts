@@ -59,6 +59,7 @@ describe("business onboarding API", () => {
   it("locks the business type after the first real booking but still allows renaming", async () => {
     const chat = (message: string) => call("/api/chat", { method: "POST", body: JSON.stringify({ message }) });
     await chat("5555550901");
+    await chat("Jordan Lee");
     await chat("I need a haircut tomorrow");
     const slot = (await call("/api/state")).body.availableSlots[0].slotId;
     await chat(`Please book ${slot}`);

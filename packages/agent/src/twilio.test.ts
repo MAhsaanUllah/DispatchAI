@@ -61,7 +61,9 @@ describe("phone line webhook", () => {
     const call = (SpeechResult?: string) => twilio({ CallSid: "CA_book", From: "+15125550101", ...(SpeechResult === undefined ? {} : { SpeechResult }) });
     const greeting = await call();
     expect(greeting.text).toMatch(/<Gather input="speech".*actionOnEmptyResult="true".*Thanks for calling/);
-    expect((await call("5125550101")).text).toMatch(/found your account/);
+    // Phone number alone reveals nothing; the caller must state the service address.
+    expect((await call("5125550101")).text).toMatch(/please tell me the service address/);
+    expect((await call("1402 South Congress Ave")).text).toMatch(/you are verified/);
     expect((await call("My AC is blowing warm air, can you come tomorrow?")).text).toMatch(/openings/);
     const slot = getOrCreateAgent("call_CA_book").getState().availableSlots[0].slotId;
     expect((await call(`Please book ${slot}`)).text).toMatch(/confirm/i);

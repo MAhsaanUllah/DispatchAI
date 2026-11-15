@@ -24,9 +24,12 @@ describe("Phase 3: Cloudflare DispatchAgent & Text Interaction Path", () => {
 
   it("Scenario 1: Customer identification via phone lookup", async () => {
     const reply = await agent.processMessage("Hi, my phone number is 512-555-0101");
-
-    expect(reply).toContain("Alicia Ramirez");
-    expect(reply).toContain("1402 South Congress Ave");
+    // Security (PII): nothing about the account is said before the caller proves it is theirs.
+    expect(reply).not.toContain("Alicia");
+    expect(reply).not.toContain("Congress");
+    const verified = await agent.processMessage("1402 South Congress Ave");
+    expect(verified).toContain("Alicia");
+    expect(verified).not.toContain("Congress");
 
     const state = agent.getState();
     expect(state.customer).not.toBeNull();
@@ -42,6 +45,7 @@ describe("Phase 3: Cloudflare DispatchAgent & Text Interaction Path", () => {
   it("Scenario 2: Grounded availability query returns only backend slots", async () => {
     // Identify customer first
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
 
     // Ask for availability
     const reply = await agent.processMessage("My AC is blowing hot air and not cooling");
@@ -60,6 +64,7 @@ describe("Phase 3: Cloudflare DispatchAgent & Text Interaction Path", () => {
 
   it("Scenario 3 & 4: Strict confirmation policy - no mutation before affirmative confirmation", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("My AC unit stopped working today");
 
     const stateBefore = agent.getState();
@@ -93,6 +98,7 @@ describe("Phase 3: Cloudflare DispatchAgent & Text Interaction Path", () => {
 
   it("Scenario 5: Interruption & changed constraint forces re-query and discards stale slots", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("AC is broken");
 
     const initialSlots = agent.getState().availableSlots;
@@ -112,7 +118,9 @@ describe("Phase 3: Cloudflare DispatchAgent & Text Interaction Path", () => {
   });
 
   it("Scenario 6: Tool failure is reported accurately without fabricating success", async () => {
-    // Attempting to query an invalid non-existent work order
+    // Attempting to query an invalid non-existent work order (as a verified caller)
+    await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     const reply = await agent.processMessage("Show me work order wo_9999");
     expect(reply).toContain("could not find work order");
     expect(agent.getState().activeWorkOrder).toBeNull();
@@ -120,6 +128,7 @@ describe("Phase 3: Cloudflare DispatchAgent & Text Interaction Path", () => {
 
   it("Scenario 7: Rejection cleanly discards pending mutation without executing tool", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("AC needs repair");
 
     const targetSlot = agent.getState().availableSlots[0];
@@ -157,6 +166,7 @@ describe("Visitor email routing from a public voice call", () => {
     expect(agent.getState().visitorEmail).toBe("ravi.personal@mail.test");
 
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("My AC unit stopped working today");
     const targetSlot = agent.getState().availableSlots[0];
     expect(targetSlot).toBeDefined();
@@ -170,6 +180,7 @@ describe("Visitor email routing from a public voice call", () => {
   it("routes the booking notification to the visitor email after confirmation", async () => {
     agent.setVisitorDetails("Ravi Kumar", "ravi.personal@mail.test");
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("My AC unit stopped working today");
     const targetSlot = agent.getState().availableSlots[0];
 
@@ -186,6 +197,7 @@ describe("Visitor email routing from a public voice call", () => {
 
   it("keeps the seeded customer email when no visitor email was collected", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("My AC unit stopped working today");
     const targetSlot = agent.getState().availableSlots[0];
 

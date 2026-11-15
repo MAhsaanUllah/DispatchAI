@@ -28,6 +28,7 @@ describe("P0-1: Truthful failure messaging (backend outage vs true not-found)", 
     agent.subscribe((evt) => emittedEvents.push(evt));
 
     const reply = await agent.processMessage("My phone number is 512-555-0101");
+    await agent.processMessage("1402 South Congress Ave");
 
     expect(reply).not.toContain("could not find");
     expect(reply.toLowerCase()).toContain("unavailable");
@@ -45,7 +46,9 @@ describe("P0-1: Truthful failure messaging (backend outage vs true not-found)", 
   });
 
   it("does not claim 'not found' when get_work_order fails because n8n is unavailable", async () => {
-    const agent = new DispatchAgent("p0_1_wo_offline", offlineClient);
+    // Already verified as the owner of wo_1001, so the outage path (not the verification step) is what is tested.
+    const store = domainService.getStore();
+    const agent = new DispatchAgent("p0_1_wo_offline", offlineClient, { customer: store.customers.get("cust_101")!, selectedProperty: store.properties.get("prop_201")! });
     agent.subscribe((evt) => emittedEvents.push(evt));
 
     const reply = await agent.processMessage("Show me work order wo_1001");
@@ -72,9 +75,12 @@ describe("P0-1: Truthful failure messaging (backend outage vs true not-found)", 
     });
     const agent = new DispatchAgent("p0_1_find_true_404", onlineClient);
 
-    const reply = await agent.processMessage("My phone number is 512-555-9999");
+    const unknown = await agent.processMessage("My phone number is 512-555-9999");
+    const known = await new DispatchAgent("p0_1_known", onlineClient).processMessage("My phone number is 512-555-0101");
 
-    expect(reply).toContain("could not find an existing customer account");
+    // Same answer whether or not an account exists, so a caller cannot probe numbers.
+    expect(unknown).toBe(known);
+    expect(unknown).toMatch(/service address/);
   });
 
   it("still reports a true work order not-found when the backend responds successfully", async () => {
@@ -84,6 +90,8 @@ describe("P0-1: Truthful failure messaging (backend outage vs true not-found)", 
       directService: domainService
     });
     const agent = new DispatchAgent("p0_1_wo_true_404", onlineClient);
+    await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
 
     const reply = await agent.processMessage("Show me work order wo_9999");
 

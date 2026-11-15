@@ -69,6 +69,7 @@ describe("Phase 6: Interaction Robustness Test Suite", () => {
 
   it("Scenario 3: Interruption clears pending unconfirmed mutation and refreshes slots", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("AC broken");
     const firstSlot = agent.getState().availableSlots[0];
     agent.proposeBooking(firstSlot.slotId, "AC issue");
@@ -102,6 +103,7 @@ describe("Phase 6: Interaction Robustness Test Suite", () => {
 
   it("does not confirm a stale action when affirmation also changes the date", async () => {
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("AC broken");
     agent.proposeBooking(agent.getState().availableSlots[0].slotId, "AC issue");
 

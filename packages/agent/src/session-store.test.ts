@@ -18,6 +18,7 @@ describe("SessionStore", () => {
     const before = new SessionStore(path);
     const agent = new DispatchAgent("caller_1", client, before.loadState("caller_1"));
     await agent.processMessage("5125550101");
+    await agent.processMessage("1402 South Congress Ave");
     await agent.processMessage("My AC is blowing warm air, can you send someone tomorrow?");
     await agent.processMessage(`Please book ${agent.getState().availableSlots[0].slotId}`);
     expect(agent.getState().pendingAction?.type).toBe("CREATE_WORK_ORDER");
