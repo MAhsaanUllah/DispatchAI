@@ -5,7 +5,7 @@ import { JobsTable } from "./components/JobsTable.js";
 import { WorkOrderDrawer } from "./components/WorkOrderDrawer.js";
 import { AgentChat } from "./components/AgentChat.js";
 import { EventTimeline } from "./components/EventTimeline.js";
-import { VoiceAgentControl } from "./components/VoiceAgentControl.js";
+import { TestCall } from "./TestCall.js";
 import { api, type Directory } from "./api.js";
 import { DirectoryPanel } from "./components/DirectoryPanel.js";
 import { SystemPanel } from "./components/SystemPanel.js";
@@ -245,13 +245,11 @@ export const App: React.FC = () => {
         onQuickAction={handleQuickAction}
       />
 
-      {/* ElevenLabs Voice Agent Control Surface */}
-      <VoiceAgentControl
+      {/* Owner Test call: browser speech + the same engine as the phone line (ElevenLabs is not used in v1). */}
+      <TestCall
         isOpen={isVoiceModalOpen}
         onClose={() => setIsVoiceModalOpen(false)}
-        sessionId="austin_dispatch_web_session"
-        onEventEmitted={() => {
-          void api.refreshState().then((nextState) => setAgentState({ ...nextState }));
+        onTurn={() => {
           void api.getJobs().then(setJobs);
           void api.getNotifications().then(setNotifications);
         }}

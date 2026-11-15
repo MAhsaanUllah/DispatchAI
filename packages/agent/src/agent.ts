@@ -15,6 +15,8 @@ import { AgentState, ConversationMessage, createInitialAgentState, PendingConfir
 
 export type EventListener = (event: AgentEvent) => void;
 
+const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
+
 // shortcut: keyword lists; the LLM engine (chunk 11/12) should classify these instead.
 // Danger to people only; leaks and floods are normal plumbing jobs and must still be bookable.
 const EMERGENCY = /\b(gas leak|smell(s|ing)? gas|carbon monoxide|on fire|fire in|smoke (is )?coming|electric(al)? shock|sparks?)\b/i;
@@ -367,6 +369,45 @@ export class DispatchAgent {
     return this.state.selectedProperty?.addressLine1 ?? getBusinessConfig().serviceZones[0];
   }
 
+  // Steps for a caller with no account: name, then (onsite only) address and, if needed, which service area.
+  private async continueNewCaller(text: string, correlationId: string): Promise<string> {
+    const pending = this.state.newCaller!;
+    const config = getBusinessConfig();
+    if (pending.step === "name") {
+      const name = text.replace(/^(my name is|i am|i'm|this is|it's)\s+/i, "").replace(/[^\p{L}\s'.-]/gu, "").trim();
+      if (name.length < 2) return this.pushAgentReply("Sorry, I did not catch your name. What is your full name?");
+      pending.name = name.slice(0, 80);
+      if (config.kind === "onsite") {
+        pending.step = "address";
+        return this.pushAgentReply(`Thanks, ${pending.name.split(" ")[0]}. What is the service address?`);
+      }
+    } else if (pending.step === "address") {
+      if (text.trim().length < 5) return this.pushAgentReply("Please tell me the full service address.");
+      pending.address = text.trim();
+      if (config.serviceZones.length > 1) {
+        pending.step = "zone";
+        return this.pushAgentReply(`Which area is that in: ${config.serviceZones.join(", ")}?`);
+      }
+    }
+    const lower = text.toLowerCase();
+    const zone = config.kind === "onsite"
+      ? (config.serviceZones.length === 1 ? config.serviceZones[0] : config.serviceZones.find((z) => lower.includes(z.toLowerCase())))
+      : undefined;
+    if (config.kind === "onsite" && !zone) return this.pushAgentReply(`Please choose one of these areas: ${config.serviceZones.join(", ")}.`);
+
+    this.emit("TOOL_CALL_STARTED", correlationId, "create_caller", { phone: pending.phone });
+    const result = await this.n8n.createCaller({ name: pending.name!, phone: pending.phone, addressLine1: pending.address, serviceZone: zone }, correlationId);
+    this.state.newCaller = null;
+    if (!result.ok) {
+      this.emit("TOOL_CALL_FAILED", correlationId, "create_caller", result.error);
+      return this.pushAgentReply(this.backendFailureReply(result.error, correlationId));
+    }
+    this.emit("TOOL_CALL_COMPLETED", correlationId, "create_caller", { customerId: result.data.customer.id });
+    this.state.customer = result.data.customer;
+    this.state.selectedProperty = result.data.property;
+    return this.pushAgentReply(`Thanks, ${result.data.customer.firstName}, your account is ready. What would you like to book, and when?`);
+  }
+
   private missingPropertyReply(): string {
     return "I can check new appointment times, but first I need to know which property this is for. Could you share the phone number or service address on the account?";
   }
@@ -443,10 +484,16 @@ export class DispatchAgent {
       return this.pushAgentReply("I have asked a team member to call you back. Is there anything I can note for them?");
     }
 
+    if (this.state.newCaller) return this.continueNewCaller(cleanText, correlationId);
+
     const dateChangeMatch = lower.match(/(actually|instead|rather|change).*(today|tomorrow|\d{4}-\d{2}-\d{2})/i) ||
       lower.match(/^(check|how about|what about)\s+(today|tomorrow|\d{4}-\d{2}-\d{2})/i);
 
-    // 1. Pending confirmation handling
+    // 1. Pending confirmation handling. A confirmation only counts as the very next answer and within 5 minutes (ADR-12).
+    if (this.state.pendingAction && Date.now() - Date.parse(this.state.pendingAction.createdAt) > CONFIRMATION_TTL_MS) {
+      this.rejectPendingAction();
+      return this.pushAgentReply("That offer timed out, so nothing was changed. Shall I check the available times again?");
+    }
     if (this.state.pendingAction) {
       if (!dateChangeMatch && lower.match(/^(yes|confirm|book it|go ahead|proceed|sure|please do|ok|yep)(?:\b|$)/i)) {
         const pendingType = this.state.pendingAction.type;
@@ -467,6 +514,9 @@ export class DispatchAgent {
         const reply = "Understood, I have cancelled that proposed action. What else can I help you with?";
         this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
         return reply;
+      } else {
+        // Neither yes nor no: the offer lapses, so a later "yes" can never confirm a stale proposal.
+        this.rejectPendingAction();
       }
     }
 
@@ -533,13 +583,13 @@ export class DispatchAgent {
         const c = lookup.data.customer;
         const p = lookup.data.properties[0];
         const propAddress = p ? ` at ${p.addressLine1}` : "";
-        const reply = `Hello ${c.firstName} ${c.lastName}! I have found your account${propAddress}. How can I assist with your HVAC or plumbing today?`;
+        const reply = `Hello ${c.firstName} ${c.lastName}! I have found your account${propAddress}. How can I help you today?`;
         this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: reply, timestamp: new Date().toISOString() });
         return reply;
       }
-      const notFoundReply = `I could not find an existing customer account for phone number ${phoneMatch[0]}. Could you verify the number?`;
-      this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: notFoundReply, timestamp: new Date().toISOString() });
-      return notFoundReply;
+      // New caller: collect details and create the account instead of turning them away.
+      this.state.newCaller = { phone: rawDigits, step: "name" };
+      return this.pushAgentReply(`I could not find an existing customer account for ${phoneMatch[0]}, so I will set one up. What is your full name?`);
     }
 
     // 4. Slot selection / Booking proposal (e.g. "Book the 10 AM slot", "Slot slot_303")

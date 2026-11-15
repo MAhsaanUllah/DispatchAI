@@ -19,7 +19,8 @@ export const PropertySchema = z.object({
   customerId: z.string(),
   addressLine1: z.string().min(1),
   city: z.string(),
-  state: z.literal("TX"),
+  // Region/state text; may be empty outside the US.
+  state: z.string(),
   zipCode: z.string(),
   serviceZone: z.string()
 });

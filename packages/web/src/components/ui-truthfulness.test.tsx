@@ -144,7 +144,7 @@ describe("Navbar: no unbacked connectivity claims", () => {
 
     expect(text).toContain("DispatchAI");
     expect(text).toContain("09:00:00 CDT");
-    expect(text).toContain("Voice Dispatcher");
+    expect(text).toContain("Test call");
     expect(text).toContain("Reset Demo");
   });
 });

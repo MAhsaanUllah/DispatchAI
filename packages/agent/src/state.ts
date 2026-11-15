@@ -56,6 +56,8 @@ export interface AgentState {
   lastCreatedWorkOrderId: string | null;
   lastSuccessfulCreate: SuccessfulCreateRecord | null;
   rescheduleContext: RescheduleContext | null;
+  // Collecting details for a caller with no account yet (name, then address/area for onsite businesses).
+  newCaller?: { phone: string; step: "name" | "address" | "zone"; name?: string; address?: string } | null;
   history: ConversationMessage[];
   events: AgentEvent[];
 }

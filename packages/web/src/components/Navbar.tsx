@@ -88,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
             }}
           >
             <Mic size={13} className="animate-pulse" />
-            <span>Voice Dispatcher</span>
+            <span>Test call</span>
           </button>
         )}
 

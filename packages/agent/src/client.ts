@@ -26,7 +26,9 @@ import {
   RescheduleWorkOrderOutputDataSchema,
   toolFailure,
   ToolResult,
-  WorkOrder
+  WorkOrder,
+  Customer,
+  Property
 } from "@dispatchai/shared";
 import { z } from "zod";
 
@@ -173,6 +175,12 @@ export class N8nClient {
   }
 
   // 1. find_customer
+  // shortcut: only the in-process service can create callers; the n8n/HTTP path (Cloudflare, v1.1) returns UNSUPPORTED.
+  public async createCaller(input: { name: string; phone: string; addressLine1?: string; serviceZone?: string }, correlationId: string): Promise<ToolResult<{ customer: Customer; property: Property | null }>> {
+    if (!this.directService) return toolFailure("UNSUPPORTED", "Creating callers needs the local booking service", false, correlationId);
+    return this.directService.createCaller(input, correlationId);
+  }
+
   public async findCustomer(
     input: FindCustomerInput,
     correlationId: string
