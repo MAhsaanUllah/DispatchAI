@@ -25,7 +25,7 @@ import {
   LocalNotification
 } from "@dispatchai/shared";
 import { DispatchStore } from "./store.js";
-import { getBusinessConfig, isKnownService, serviceZoneFor } from "./templates.js";
+import { bookingNotice, getBusinessConfig, isKnownService, serviceZoneFor } from "./templates.js";
 import { localDate } from "./schedule.js";
 
 export class DispatchService {
@@ -67,10 +67,9 @@ export class DispatchService {
         audience,
         recipientId,
         eventType,
-        message: `Your ${workOrder.serviceType.toLowerCase()} appointment ${workOrder.id} is ${eventType.toLowerCase()} for ${workOrder.scheduledStart ?? "an unscheduled time"}. Address and arrival window should be confirmed with dispatch.`,
+        ...bookingNotice(workOrder, eventType),
         channel: isEmail ? "EMAIL" : "INTERNAL",
         recipientAddress: isEmail ? recipientEmail : undefined,
-        subject: `${eventType === "BOOKED" ? "Booking confirmation" : eventType === "RESCHEDULED" ? "Appointment updated" : "Appointment cancelled"} · ${workOrder.id}`,
         status: "PENDING_LOCAL",
         createdAt: now
       });

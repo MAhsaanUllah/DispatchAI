@@ -1,4 +1,5 @@
 import { signEvent } from "@dispatchai/shared";
+import { bookingNotice } from "@dispatchai/domain";
 import type { PluginRecord } from "./plugin-store.js";
 
 export type PluginField = { key: string; label: string; secret: boolean; placeholder?: string; help?: string };
@@ -14,7 +15,12 @@ export type Plugin = {
   limits: string;
   validate: (values: Record<string, string>) => string | null;
   test: (record: PluginRecord) => Promise<TestResult>;
+  // Optional sample output shown on the card (e.g. email texts).
+  preview?: () => { title: string; text: string }[];
 };
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const RESEND_URL = "https://api.resend.com/emails";
 
 const isHttpUrl = (value: string) => {
   try {
@@ -52,6 +58,45 @@ export const plugins: Plugin[] = [
       } catch {
         return { ok: false, message: "Could not reach the webhook URL. Is n8n running and the URL correct?" };
       }
+    }
+  }
+  ,
+  {
+    id: "email",
+    name: "Email (Resend)",
+    category: "Messages",
+    description: "Emails customers when a booking is confirmed, moved or cancelled. Uses your Resend account.",
+    fields: [
+      { key: "apiKey", label: "Resend API key", secret: true, placeholder: "re_...", help: "Create one at resend.com → API Keys (sending access is enough)." },
+      { key: "from", label: "From address", secret: false, placeholder: "Noor Salon <bookings@yourdomain.com>", help: "Must use a domain you verified in Resend (SPF and DKIM records)." },
+      { key: "testTo", label: "Send test emails to", secret: false, placeholder: "you@yourdomain.com", help: "Test emails only ever go to this address." }
+    ],
+    limits: "Customers with no email address on file are skipped. Demo addresses (@example.com) are never emailed. Failed sends are marked FAILED, not retried yet.",
+    validate: (values) => (values.apiKey ?? "").length < 10 ? "Enter your Resend API key"
+      : !/@/.test(values.from ?? "") ? "From address needs an email, e.g. Shop <bookings@yourdomain.com>"
+      : !EMAIL.test(values.testTo ?? "") ? "Enter the email address for test emails" : null,
+    test: async ({ config, secrets }) => {
+      try {
+        const response = await fetch(RESEND_URL, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${secrets.apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: config.from, to: [config.testTo], subject: "DispatchAI test email", text: "Your Email plugin works. Booking emails will be sent from this address." }),
+          signal: AbortSignal.timeout(8000)
+        });
+        if (response.ok) return { ok: true, message: `Test email sent to ${config.testTo}. Check the inbox (and spam).` };
+        const reason = ((await response.json().catch(() => ({}))) as { message?: string }).message ?? "";
+        if (response.status === 401 || response.status === 403 && /api key/i.test(reason)) return { ok: false, message: "Resend rejected the API key." };
+        return { ok: false, message: `Resend refused the email (${response.status})${reason ? `: ${reason.slice(0, 160)}` : ""}. A common cause is an unverified sender domain.` };
+      } catch {
+        return { ok: false, message: "Could not reach Resend. Check the internet connection." };
+      }
+    },
+    preview: () => {
+      const sample = { id: "wo_1001", serviceType: "", scheduledStart: new Date(Date.now() + 86_400_000).toISOString() };
+      return (["BOOKED", "RESCHEDULED", "CANCELLED"] as const).map((event) => {
+        const notice = bookingNotice(sample, event);
+        return { title: notice.subject, text: notice.message };
+      });
     }
   }
 ];

@@ -51,7 +51,7 @@ describe("plugins API", () => {
 
   it("lists built-in plugins, not connected", async () => {
     const { body } = await call("/api/plugins");
-    expect(body.data.plugins.map((p: { id: string }) => p.id)).toEqual(["n8n"]);
+    expect(body.data.plugins.map((p: { id: string }) => p.id)).toEqual(["n8n", "email"]);
     expect(body.data.plugins[0].enabled).toBe(false);
   });
 

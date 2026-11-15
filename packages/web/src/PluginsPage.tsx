@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 type Field = { key: string; label: string; secret: boolean; placeholder?: string; help?: string; value: string; saved?: boolean };
-type Plugin = { id: string; name: string; category: string; description: string; limits: string; enabled: boolean; fields: Field[] };
+type Plugin = { id: string; name: string; category: string; description: string; limits: string; enabled: boolean; fields: Field[]; preview?: { title: string; text: string }[] };
 type Status = { kind: "ok" | "error" | "info"; text: string } | null;
 
 const input: React.CSSProperties = { padding: "9px 11px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)", fontSize: 14 };
@@ -65,6 +65,17 @@ function PluginCard({ plugin, onChanged }: { plugin: Plugin; onChanged: () => vo
           {field.help && <span style={{ fontWeight: 400, fontSize: 12, color: "var(--text-tertiary)" }}>{field.help}</span>}
         </label>
       ))}
+      {plugin.preview && (
+        <details style={{ fontSize: 13 }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600 }}>Preview what customers receive</summary>
+          {plugin.preview.map((sample) => (
+            <div key={sample.title} style={{ marginTop: 8, padding: 10, borderRadius: 8, background: "var(--surface-subtle, #f5f5f4)" }}>
+              <strong style={{ display: "block" }}>{sample.title}</strong>
+              <span style={{ color: "var(--text-secondary)" }}>{sample.text}</span>
+            </div>
+          ))}
+        </details>
+      )}
       <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>Limits: {plugin.limits}</p>
       {status && <p role={status.kind === "error" ? "alert" : "status"} style={{ margin: 0, fontSize: 13, color }}>{status.text}</p>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

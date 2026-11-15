@@ -1,9 +1,10 @@
 import type { DispatchStore } from "./store.js";
 
 // Email is opt-in. Demo addresses are never sent to a provider.
-export async function deliverBookingEmails(store: DispatchStore, workOrderId: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
+// Credentials come from the Email plugin when connected; .env stays as the fallback for scripted installs.
+export async function deliverBookingEmails(store: DispatchStore, workOrderId: string, creds?: { apiKey?: string; from?: string }): Promise<void> {
+  const apiKey = creds?.apiKey ?? process.env.RESEND_API_KEY;
+  const from = creds?.from ?? process.env.EMAIL_FROM;
   if (!apiKey || !from) return;
 
   for (const notice of store.notifications) {
