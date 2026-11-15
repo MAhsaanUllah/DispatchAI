@@ -25,7 +25,8 @@ import {
   RescheduleWorkOrderOutputData,
   RescheduleWorkOrderOutputDataSchema,
   toolFailure,
-  ToolResult
+  ToolResult,
+  WorkOrder
 } from "@dispatchai/shared";
 import { z } from "zod";
 
@@ -34,19 +35,24 @@ export interface N8nClientConfig {
   secret: string;
   request?: typeof fetch;
   directService?: any; // Optional local DispatchService fallback
-  onMutation?: (workOrderId: string) => Promise<void>; // Side effects after a direct create/reschedule/cancel
+  onMutation?: (kind: MutationKind, workOrder: WorkOrder) => Promise<void>; // Side effects after a direct create/reschedule/cancel
   timeoutMs?: number;
   onRetry?: (attempt: number, maxRetries: number, error: string, correlationId: string) => void;
 }
 
-const MUTATION_PATHS = new Set(["/webhook/create-work-order", "/webhook/reschedule-work-order", "/webhook/cancel-work-order"]);
+export type MutationKind = "created" | "rescheduled" | "cancelled";
+const MUTATION_PATHS = new Map<string, MutationKind>([
+  ["/webhook/create-work-order", "created"],
+  ["/webhook/reschedule-work-order", "rescheduled"],
+  ["/webhook/cancel-work-order", "cancelled"]
+]);
 
 export class N8nClient {
   private baseUrl: string;
   private secret: string;
   private request: typeof fetch;
   private directService?: any;
-  private onMutation?: (workOrderId: string) => Promise<void>;
+  private onMutation?: (kind: MutationKind, workOrder: WorkOrder) => Promise<void>;
   private timeoutMs: number;
   private onRetry?: (attempt: number, maxRetries: number, error: string, correlationId: string) => void;
 
@@ -104,8 +110,9 @@ export class N8nClient {
             result = toolFailure("UNKNOWN_ENDPOINT", `Unknown endpoint ${path}`, false, correlationId);
         }
 
-        if (result.ok && MUTATION_PATHS.has(path)) {
-          await this.onMutation?.((result.data as { workOrder: { id: string } }).workOrder.id);
+        const kind = MUTATION_PATHS.get(path);
+        if (result.ok && kind) {
+          await this.onMutation?.(kind, (result.data as { workOrder: WorkOrder }).workOrder);
         }
         if (result.ok) {
           const parsedOutput = outputSchema.safeParse(result.data);
