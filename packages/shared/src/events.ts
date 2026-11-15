@@ -10,6 +10,7 @@ export const AgentEventTypeSchema = z.enum([
   "WORK_ORDER_CANCELLED",
   "CONFIRMATION_REQUIRED",
   "RETRY_STARTED",
+  "HANDOFF_REQUESTED",
   "ERROR"
 ]);
 export type AgentEventType = z.infer<typeof AgentEventTypeSchema>;

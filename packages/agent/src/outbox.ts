@@ -20,7 +20,7 @@ export class Outbox {
   private mem: Delivery[] = [];
   private draining = false;
 
-  constructor(databasePath: string | undefined, private target: () => Promise<Target>) {
+  constructor(databasePath: string | undefined, private target: () => Promise<Target>, private onDead?: (delivery: Delivery) => void) {
     if (!databasePath) return;
     const path = resolve(databasePath.replace(/^file:/, ""));
     mkdirSync(dirname(path), { recursive: true });
@@ -61,9 +61,11 @@ export class Outbox {
       for (const d of due) {
         const result = target ? await postSignedEvent(target.url, target.secret, d.type, d.body) : { ok: false, error: "n8n plugin not connected" };
         const attempts = d.attempts + 1;
-        this.write(result.ok
+        const next: Delivery = result.ok
           ? { ...d, status: "delivered", attempts, lastError: undefined, deliveredAt: new Date(now).toISOString() }
-          : { ...d, status: attempts >= MAX_ATTEMPTS ? "dead" : "pending", attempts, lastError: result.error, nextAttemptAt: now + backoffMs(attempts) });
+          : { ...d, status: attempts >= MAX_ATTEMPTS ? "dead" : "pending", attempts, lastError: result.error, nextAttemptAt: now + backoffMs(attempts) };
+        this.write(next);
+        if (next.status === "dead") this.onDead?.(next);
       }
     } finally {
       this.draining = false;
