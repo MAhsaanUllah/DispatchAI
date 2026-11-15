@@ -2,6 +2,7 @@ import { signEvent } from "@dispatchai/shared";
 import { bookingNotice } from "@dispatchai/domain";
 import type { PluginRecord } from "./plugin-store.js";
 import { chat, LlmError, usage, type LlmConfig } from "./llm.js";
+import { tunnel } from "./tunnel.js";
 
 export type PluginField = { key: string; label: string; secret: boolean; placeholder?: string; help?: string; options?: { value: string; label: string }[] };
 export type TestResult = { ok: boolean; message: string };
@@ -210,6 +211,37 @@ plugins.push({
       return { ok: false, message: "Could not reach Twilio. Check the internet connection." };
     }
   }
+});
+
+// A public HTTPS address for a desktop or home install. The server runs cloudflared itself (see tunnel.ts).
+plugins.push({
+  id: "tunnel",
+  name: "Public address (Cloudflare Tunnel)",
+  category: "Network",
+  description: "Gives this computer a public HTTPS address, so a phone line or an AI assistant can reach it. A server with its own domain does not need this.",
+  fields: [
+    { key: "mode", label: "Address", secret: false, options: [
+      { value: "quick", label: "Temporary address (no account; changes every start)" },
+      { value: "token", label: "My own Cloudflare Tunnel (stable address)" }
+    ] },
+    { key: "token", label: "Tunnel token", secret: true, help: "Own tunnel only. In Cloudflare Zero Trust open Networks, Tunnels, your tunnel, Install and run: the long text after --token." },
+    { key: "publicUrl", label: "Public hostname", secret: false, placeholder: "https://bookings.yourdomain.com", help: "Own tunnel only: the hostname you routed to this app in Cloudflare." }
+  ],
+  limits: "Needs the cloudflared program on this computer. People reach you only while this app is running. A temporary address changes on every start: use it to try things, not for a real phone number.",
+  validate: (values) => !["quick", "token"].includes(values.mode ?? "") ? "Choose which kind of address you want"
+    : values.mode === "token" && (values.token ?? "").length < 20 ? "Paste the tunnel token from Cloudflare"
+    : values.mode === "token" && !/^https:\/\//.test(values.publicUrl ?? "") ? "Public hostname must start with https://" : null,
+  test: async () => {
+    const end = Date.now() + 20_000;
+    while (tunnel.status.state === "starting" && Date.now() < end) await new Promise((resolve) => setTimeout(resolve, 250));
+    const status = tunnel.status;
+    if (status.state === "running") return { ok: true, message: status.url ? `Online at ${status.url}. Use this address for the phone line and for assistants.` : "Online." };
+    if (status.state === "starting") return { ok: false, message: "Still connecting. Try the test again in a few seconds." };
+    if (status.state === "failed") return { ok: false, message: status.message ?? "The tunnel stopped." };
+    return { ok: false, message: "The tunnel is off. Switch the plugin on and save." };
+  },
+  status: () => tunnel.status.state === "running" ? { text: `Online at ${tunnel.status.url ?? "your address"}`, warning: false }
+    : tunnel.status.state === "failed" ? { text: tunnel.status.message ?? "The tunnel stopped", warning: true } : null
 });
 
 export const llmConfig =(config: Record<string, string>, secrets: Record<string, string>): LlmConfig =>

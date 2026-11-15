@@ -82,6 +82,7 @@ Each plugin is a card on the **Plugins** page: paste the key, press **Test**, sw
 | Email | Booking, change and cancel emails | A [Resend](https://resend.com) key and a verified sender |
 | Reminders | An email before each appointment (2, 12, 24 or 48 hours); catches up after downtime, at most once | The Email plugin |
 | n8n events | A signed event per booking change to your n8n workflow | An n8n webhook URL and a shared secret |
+| Public address (Cloudflare Tunnel) | Gives a PC or the desktop app a public HTTPS address for the phone line or an AI assistant. The server runs `cloudflared` for you: a temporary address needs no account (it changes on every start), or use your own tunnel token for a stable hostname | The `cloudflared` program on the computer (on Windows: `winget install Cloudflare.cloudflared`, or set `CLOUDFLARED_PATH`) |
 
 If a plugin fails, the booking still happens: email and n8n are retried in the background and a delivery that gives up appears in the Inbox. If the AI brain is down or out of quota, the built-in rules keep answering.
 
