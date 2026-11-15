@@ -70,14 +70,19 @@ export function detectService(text: string, config: BusinessConfig = getBusiness
   return config.services.filter((service) => service.keywords.some((keyword) => lower.includes(keyword))).at(-1)?.id ?? null;
 }
 
+// Where the job happens: the customer's property (onsite) or the business location (instore).
+export function serviceZoneFor(property: { serviceZone: string } | undefined, config: BusinessConfig = getBusinessConfig()): string | undefined {
+  return property?.serviceZone ?? (config.kind === "instore" ? config.serviceZones[0] : undefined);
+}
+
 export function isKnownService(serviceId: string, config: BusinessConfig = getBusinessConfig()): boolean {
   return config.services.some((service) => service.id === serviceId);
 }
 
 // globalThis lookup keeps this file type-safe in packages without Node types (web, worker).
-const envTemplate = () => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.BUSINESS_TEMPLATE;
+export const readEnv = (name: string) => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env[name];
 
-export function getBusinessConfig(templateId = envTemplate() || "field-service"): BusinessConfig {
+export function getBusinessConfig(templateId = readEnv("BUSINESS_TEMPLATE") || "field-service"): BusinessConfig {
   const config = businessTemplates.find((template) => template.templateId === templateId);
   if (!config) {
     const known = businessTemplates.map((template) => template.templateId).join(", ");

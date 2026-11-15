@@ -25,7 +25,7 @@ import {
   LocalNotification
 } from "@dispatchai/shared";
 import { DispatchStore } from "./store.js";
-import { isKnownService } from "./templates.js";
+import { isKnownService, serviceZoneFor } from "./templates.js";
 
 export class DispatchService {
   private store: DispatchStore;
@@ -227,10 +227,14 @@ export class DispatchService {
       return toolFailure("CUSTOMER_NOT_FOUND", "Customer does not exist", false, correlationId);
     }
 
-    // Validate property
-    const property = this.store.properties.get(input.propertyId);
-    if (!property || property.customerId !== customer.id) {
+    // Validate property: onsite needs the customer's own property; instore books at the business location.
+    const property = input.propertyId ? this.store.properties.get(input.propertyId) : undefined;
+    if (input.propertyId && (!property || property.customerId !== customer.id)) {
       return toolFailure("PROPERTY_NOT_FOUND", "Property does not exist or belong to customer", false, correlationId);
+    }
+    const zone = serviceZoneFor(property);
+    if (!zone) {
+      return toolFailure("INVALID_INPUT", "propertyId is required for onsite services", false, correlationId);
     }
 
     // Validate slot atomically
@@ -250,7 +254,7 @@ export class DispatchService {
 
     // Validate technician qualification and zone
     const tech = this.store.technicians.get(slot.technicianId);
-    if (!tech || tech.status !== "ACTIVE" || !tech.skills.includes(input.serviceType) || !tech.serviceZones.includes(property.serviceZone)) {
+    if (!tech || tech.status !== "ACTIVE" || !tech.skills.includes(input.serviceType) || !tech.serviceZones.includes(zone)) {
       return toolFailure(
         "TECHNICIAN_NOT_QUALIFIED",
         "Assigned technician is not available for this service or zone",
@@ -380,9 +384,10 @@ export class DispatchService {
       );
     }
 
-    const property = this.store.properties.get(workOrder.propertyId);
+    const property = workOrder.propertyId ? this.store.properties.get(workOrder.propertyId) : undefined;
+    const zone = serviceZoneFor(property);
     const tech = this.store.technicians.get(newSlot.technicianId);
-    if (!property || !tech || tech.status !== "ACTIVE" || !tech.skills.includes(workOrder.serviceType) || !tech.serviceZones.includes(property.serviceZone)) {
+    if (!zone || !tech || tech.status !== "ACTIVE" || !tech.skills.includes(workOrder.serviceType) || !tech.serviceZones.includes(zone)) {
       return toolFailure(
         "TECHNICIAN_NOT_QUALIFIED",
         "Target technician does not match service type or zone",

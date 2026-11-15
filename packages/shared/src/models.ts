@@ -68,7 +68,7 @@ export type CreatedBy = z.infer<typeof CreatedBySchema>;
 export const WorkOrderSchema = z.object({
   id: z.string(),
   customerId: z.string(),
-  propertyId: z.string(),
+  propertyId: z.string().optional(),
   technicianId: z.string().optional(),
   serviceType: ServiceTypeSchema,
   issueSummary: z.string().min(1),
@@ -81,6 +81,8 @@ export const WorkOrderSchema = z.object({
   updatedAt: z.string()
 });
 export type WorkOrder = z.infer<typeof WorkOrderSchema>;
+// Dashboard row: the work order plus names the owner sees, resolved on the server.
+export type WorkOrderView = WorkOrder & { zone?: string; technicianName?: string; propertyAddress?: string };
 
 export const CallOutcomeSchema = z.enum([
   "BOOKED",

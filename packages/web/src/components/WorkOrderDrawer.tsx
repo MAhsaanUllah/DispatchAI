@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { X, Calendar, MapPin, User, Wrench, ArrowRightLeft, XCircle, CheckCircle2, Clock, AlertCircle } from "lucide-react";
-import { AgentEvent, WorkOrder } from "@dispatchai/shared";
+import { AgentEvent, WorkOrderView as WorkOrder } from "@dispatchai/shared";
 
 interface WorkOrderDrawerProps {
   job: WorkOrder | null;
@@ -8,28 +8,6 @@ interface WorkOrderDrawerProps {
   onClose: () => void;
   onQuickAction: (actionText: string) => void;
 }
-
-const TECH_NAMES: Record<string, string> = {
-  tech_01: "Carlos Mendoza",
-  tech_02: "Sarah Jenkins",
-  tech_03: "Robert Miller",
-  tech_04: "Emily Chen",
-  tech_05: "David Taylor",
-  tech_06: "Frank Alvarez"
-};
-
-const PROPERTY_DETAILS: Record<string, { address: string; zone: string }> = {
-  prop_201: { address: "1402 South Congress Ave, 78704", zone: "Austin-South" },
-  prop_202: { address: "2201 Barton Springs Rd, 78704", zone: "Austin-South" },
-  prop_203: { address: "504 Colorado St, 78701", zone: "Austin-Central" },
-  prop_204: { address: "11410 Century Oaks Terrace, 78758", zone: "Austin-North" },
-  prop_205: { address: "4208 Manchaca Rd, 78704", zone: "Austin-South" },
-  prop_206: { address: "1905 E 6th St, 78702", zone: "Austin-East" },
-  prop_207: { address: "3810 Speedway, 78751", zone: "Austin-Central" },
-  prop_208: { address: "2600 S Lamar Blvd, 78704", zone: "Austin-South" },
-  prop_209: { address: "4550 Mueller Blvd, 78723", zone: "Austin-East" },
-  prop_210: { address: "9500 Burnet Rd, 78758", zone: "Austin-North" }
-};
 
 const formatWorkOrderId = (id: string): string => {
   return id.replace(/^wo_?/i, "WO-").toUpperCase();
@@ -105,10 +83,9 @@ export const WorkOrderDrawer: React.FC<WorkOrderDrawerProps> = ({ job, events, o
   if (!job) return null;
 
   const statusClass = `badge-${job.status.toLowerCase()}`;
-  const techName = job.technicianId ? TECH_NAMES[job.technicianId] ?? job.technicianId : "Unassigned";
-  const propertyInfo = PROPERTY_DETAILS[job.propertyId] ?? null;
-  const propertyAddress = propertyInfo?.address ?? job.propertyId;
-  const propertyZone = propertyInfo?.zone ?? null;
+  const techName = job.technicianName ?? job.technicianId ?? "Unassigned";
+  const propertyAddress = job.propertyAddress ?? (job.propertyId ? job.propertyId : "At the business location");
+  const propertyZone = job.zone ?? null;
   const activity = events.filter((evt) => workOrderIdOf(evt) === job.id).reverse();
 
   return (

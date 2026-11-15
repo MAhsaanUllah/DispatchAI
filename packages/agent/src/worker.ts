@@ -1,4 +1,4 @@
-import { DispatchService, getBusinessConfig, getDirectory } from "@dispatchai/domain";
+import { DispatchService, getBusinessConfig, getDirectory, serviceZoneFor } from "@dispatchai/domain";
 import { toolFailure, toolSuccess, verifyWebhookSignature } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
@@ -201,7 +201,11 @@ async function routeRequest(req: Request): Promise<Response> {
 
   // 5. Jobs list for dashboard
   if (method === "GET" && pathname === "/api/jobs") {
-    const jobs = Array.from(domainService.getStore().workOrders.values());
+    const store = domainService.getStore();
+    const jobs = Array.from(store.workOrders.values()).map((job) => {
+      const property = job.propertyId ? store.properties.get(job.propertyId) : undefined;
+      return { ...job, zone: serviceZoneFor(property), technicianName: store.technicians.get(job.technicianId ?? "")?.name, propertyAddress: property?.addressLine1 };
+    });
     return new Response(JSON.stringify({ ok: true, data: { jobs } }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
