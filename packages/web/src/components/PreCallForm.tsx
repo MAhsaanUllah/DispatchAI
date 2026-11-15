@@ -9,7 +9,9 @@ export interface VisitorDetails {
 export function validateVisitorDetails(name: string, email: string): string | null {
   const trimmedName = name.trim();
   const trimmedEmail = email.trim();
-  if (!trimmedName) return "Please enter your name so the dispatcher knows who is calling.";
+  if (!trimmedName) {
+    return "Please enter your name so the dispatcher knows who is calling.";
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
     return "Please enter a valid email address for your booking confirmation.";
   }
@@ -41,51 +43,54 @@ export function PreCallForm({ isOpen, initialName = "", initialEmail = "", onCan
   };
 
   return (
-    <div className="voice-backdrop" role="dialog" aria-modal="true" aria-label="Start your DispatchAI voice call">
-      <div className="precall-panel">
-        <div className="precall-head">
-          <span className="precall-eyebrow">BEFORE YOU CALL</span>
-          <button className="voice-close" onClick={onCancel} aria-label="Close" type="button"><X size={18} /></button>
+    <div className="modal" role="dialog" aria-modal="true" aria-label="Start your DispatchAI voice call">
+      <div className="modal__panel">
+        <div className="modal__head">
+          <span className="public__card-label">Before you call</span>
+          <button className="modal__close" onClick={onCancel} aria-label="Close" type="button"><X size={16} aria-hidden="true" /></button>
         </div>
-        <div className="precall-intro">
-          <img src="/dispatch-agent-avatar.png" alt="" width="56" height="56" />
-          <div>
-            <strong>Talk to the dispatcher now.</strong>
-            <p>Two quick details and you're on a call. Your email is saved with a confirmed demo booking; delivery requires a configured sender.</p>
-          </div>
+        <div>
+          <h2 className="modal__title">Talk to the dispatcher now.</h2>
+          <p className="modal__lede">Two quick details and you’re on a call. Your email is saved with a confirmed demo booking; delivery requires a configured sender.</p>
         </div>
-        <form className="precall-form" onSubmit={submit} noValidate>
-          <label className="precall-label" htmlFor="visitorName">Your name</label>
-          <div className="precall-field">
-            <User size={15} aria-hidden="true" />
-            <input
-              id="visitorName"
-              name="visitorName"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="e.g. Ayesha Khan"
-              autoComplete="name"
-            />
-          </div>
-          <label className="precall-label" htmlFor="visitorEmail">Email for your booking confirmation</label>
-          <div className="precall-field">
-            <Mail size={15} aria-hidden="true" />
-            <input
-              id="visitorEmail"
-              name="visitorEmail"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-            />
-          </div>
-          {error && <p className="precall-error" role="alert">{error}</p>}
-          <button type="submit" className="landing-primary-cta precall-cta">
-            <Mic2 size={16} aria-hidden="true" /> Call now <ArrowRight size={15} aria-hidden="true" />
+        <form className="modal__form" onSubmit={submit} noValidate>
+          <label className="field" htmlFor="visitorName">
+            <span className="field__label">Your name</span>
+            <div className="modal__row">
+              <User size={15} aria-hidden="true" />
+              <input
+                id="visitorName"
+                name="visitorName"
+                className="input"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="e.g. Ayesha Khan"
+                autoComplete="name"
+              />
+            </div>
+          </label>
+          <label className="field" htmlFor="visitorEmail">
+            <span className="field__label">Email for your booking confirmation</span>
+            <div className="modal__row">
+              <Mail size={15} aria-hidden="true" />
+              <input
+                id="visitorEmail"
+                name="visitorEmail"
+                type="email"
+                className="input"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+              />
+            </div>
+          </label>
+          {error && <p className="field__error" role="alert">{error}</p>}
+          <button type="submit" className="btn btn--primary">
+            <Mic2 size={16} aria-hidden="true" /> Call now
           </button>
         </form>
-        <p className="precall-footnote">The dispatcher confirms every booking out loud before anything is booked.</p>
+        <p className="field__hint">The dispatcher confirms every booking out loud before anything is booked.</p>
       </div>
     </div>
   );

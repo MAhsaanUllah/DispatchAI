@@ -7,11 +7,6 @@ type Plugin = {
 };
 type Status = { kind: "ok" | "error" | "info"; text: string } | null;
 
-const input: React.CSSProperties = { padding: "9px 11px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)", fontSize: 14 };
-const button = (primary = false): React.CSSProperties => ({
-  ...input, cursor: "pointer", fontWeight: 600, ...(primary ? { background: "var(--accent)", borderColor: "var(--accent)", color: "#fff" } : {})
-});
-
 type Delivery = { id: string; type: string; bookingId: string; status: "pending" | "delivered" | "dead"; attempts: number; lastError?: string; createdAt: string };
 const STATUS_LABEL = { delivered: "Delivered", pending: "Retrying", dead: "Failed" } as const;
 
@@ -26,21 +21,21 @@ function DeliveryLog() {
   };
   if (!rows) return null;
   return (
-    <details style={{ fontSize: 13 }} open={rows.some((row) => row.status !== "delivered")}>
-      <summary style={{ cursor: "pointer", fontWeight: 600 }}>Recent deliveries ({rows.length})</summary>
-      {rows.length === 0 ? <p style={{ color: "var(--text-tertiary)" }}>No events sent yet. They appear here after the next booking.</p> : (
-        <table style={{ width: "100%", marginTop: 8, borderCollapse: "collapse" }}>
-          <thead><tr style={{ textAlign: "left", color: "var(--text-tertiary)" }}><th>When</th><th>Event</th><th>Booking</th><th>Status</th><th /></tr></thead>
+    <details className="log" open={rows.some((row) => row.status !== "delivered")}>
+      <summary>Recent deliveries ({rows.length})</summary>
+      {rows.length === 0 ? <p className="plugin__status">No events sent yet. They appear here after the next booking.</p> : (
+        <table>
+          <thead><tr><th scope="col">When</th><th scope="col">Event</th><th scope="col">Booking</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Retry</span></th></tr></thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} style={{ borderTop: "1px solid var(--border)" }}>
+              <tr key={row.id}>
                 <td>{new Date(row.createdAt).toLocaleString()}</td>
                 <td>{row.type}</td>
                 <td>{row.bookingId.replace(/^wo_/, "WO-")}</td>
-                <td style={{ color: row.status === "dead" ? "var(--danger)" : undefined }}>
+                <td className={row.status === "dead" ? "log__failed" : undefined}>
                   {STATUS_LABEL[row.status]}{row.status !== "delivered" && row.lastError ? ` (${row.lastError}, ${row.attempts} tries)` : ""}
                 </td>
-                <td>{row.status !== "delivered" && <button type="button" onClick={() => retry(row.id)} style={button()}>Retry</button>}</td>
+                <td>{row.status !== "delivered" && <button type="button" className="btn btn--sm" onClick={() => retry(row.id)}>Retry</button>}</td>
               </tr>
             ))}
           </tbody>
@@ -60,13 +55,13 @@ function CallLog() {
   }, []);
   if (!calls) return null;
   return (
-    <details style={{ fontSize: 13 }}>
-      <summary style={{ cursor: "pointer", fontWeight: 600 }}>Recent calls ({calls.length})</summary>
-      {calls.length === 0 ? <p style={{ color: "var(--text-tertiary)" }}>No calls yet since the server started.</p> : (
-        <table style={{ width: "100%", marginTop: 8, borderCollapse: "collapse" }}>
-          <thead><tr style={{ textAlign: "left", color: "var(--text-tertiary)" }}><th>When</th><th>From</th><th>Turns</th><th>Outcome</th></tr></thead>
+    <details className="log">
+      <summary>Recent calls ({calls.length})</summary>
+      {calls.length === 0 ? <p className="plugin__status">No calls yet since the server started.</p> : (
+        <table>
+          <thead><tr><th scope="col">When</th><th scope="col">From</th><th scope="col">Turns</th><th scope="col">Outcome</th></tr></thead>
           <tbody>{calls.map((call) => (
-            <tr key={call.id} style={{ borderTop: "1px solid var(--border)" }}>
+            <tr key={call.id}>
               <td>{new Date(call.startedAt).toLocaleString()}</td><td>{call.from}</td><td>{call.turns}</td><td>{call.outcome}</td>
             </tr>
           ))}</tbody>
@@ -114,54 +109,58 @@ function PluginDrawer({ plugin, onClose, onDone }: { plugin: Plugin; onClose: ()
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby={`drawer-${plugin.id}`} style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", justifyContent: "flex-end", background: "rgba(0,0,0,0.25)" }}>
-      <div style={{ width: "100%", maxWidth: 460, height: "100%", overflowY: "auto", boxSizing: "border-box", display: "grid", alignContent: "start", gap: 12, padding: 20, background: "var(--surface)", borderLeft: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <h2 id={`drawer-${plugin.id}`} style={{ margin: 0, fontSize: 18 }}>{plugin.name}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer" }}>×</button>
+    <div className="overlay" role="dialog" aria-modal="true" aria-labelledby={`drawer-${plugin.id}`}>
+      <div className="drawer drawer--wide">
+        <div className="drawer__head">
+          <h2 className="drawer__id" id={`drawer-${plugin.id}`}>{plugin.name}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="modal__close">×</button>
         </div>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>{plugin.description}</p>
-        {plugin.fields.map((field) => (
-          <label key={field.key} style={{ display: "grid", gap: 5, fontSize: 13, fontWeight: 600 }}>
-            {field.label}
-            {field.options ? (
-              <select aria-label={field.label} style={input} value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}>
-                <option value="">Choose…</option>
-                {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            ) : (
-              <input
-                aria-label={field.label} style={input} type={field.secret ? "password" : "text"} autoComplete="off"
-                placeholder={field.secret && field.saved ? "Saved — leave empty to keep" : field.placeholder}
-                value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-              />
-            )}
-            {field.help && <span style={{ fontWeight: 400, fontSize: 12, color: "var(--text-tertiary)" }}>{field.help}</span>}
-          </label>
-        ))}
-        {plugin.preview && (
-          <details style={{ fontSize: 13 }}>
-            <summary style={{ cursor: "pointer", fontWeight: 600 }}>Preview what customers receive</summary>
-            {plugin.preview.map((sample) => (
-              <div key={sample.title} style={{ marginTop: 8, padding: 10, borderRadius: 8, background: "var(--surface-subtle, #f5f5f4)" }}>
-                <strong style={{ display: "block" }}>{sample.title}</strong>
-                <span style={{ color: "var(--text-secondary)" }}>{sample.text}</span>
-              </div>
-            ))}
-          </details>
-        )}
-        <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>Limits: {plugin.limits}</p>
-        {message && <p role={message.kind === "error" ? "alert" : "status"} style={{ margin: 0, fontSize: 13, color: message.kind === "error" ? "var(--danger)" : "var(--text-secondary)" }}>{message.text}</p>}
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" disabled={busy} onClick={saveAndTest} style={button(true)}>{busy ? "Working…" : "Save & Test"}</button>
-          <button type="button" disabled={busy} onClick={onClose} style={button()}>Cancel</button>
+        <div className="drawer__body">
+          <p className="drawer__text">{plugin.description}</p>
+          {plugin.fields.map((field) => (
+            <label key={field.key} className="field">
+              <span className="field__label">{field.label}</span>
+              {field.options ? (
+                <select className="select" aria-label={field.label} value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}>
+                  <option value="">Choose…</option>
+                  {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              ) : (
+                <input
+                  className="input"
+                  aria-label={field.label}
+                  type={field.secret ? "password" : "text"}
+                  autoComplete="off"
+                  placeholder={field.secret && field.saved ? "Saved, leave empty to keep" : field.placeholder}
+                  value={values[field.key] ?? ""}
+                  onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                />
+              )}
+              {field.help && <span className="field__hint">{field.help}</span>}
+            </label>
+          ))}
+          {plugin.preview && (
+            <details className="log">
+              <summary>Preview what customers receive</summary>
+              {plugin.preview.map((sample) => (
+                <div key={sample.title} className="gate__what">
+                  <strong>{sample.title}</strong>
+                  <span>{sample.text}</span>
+                </div>
+              ))}
+            </details>
+          )}
+          <p className="field__hint">Limits: {plugin.limits}</p>
+          {message && <p role={message.kind === "error" ? "alert" : "status"} className={message.kind === "error" ? "field__error" : "field__hint"}>{message.text}</p>}
+          <div className="gate__actions">
+            <button type="button" disabled={busy} onClick={saveAndTest} className="btn btn--primary">{busy ? "Working…" : "Save & Test"}</button>
+            <button type="button" disabled={busy} onClick={onClose} className="btn">Cancel</button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
-const cardStyle: React.CSSProperties = { display: "grid", gap: 8, padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", cursor: "grab" };
 
 // Plugins page: drag a card from "Available" into "My system" to connect it (or use the Add button);
 // drag it back (or Remove) to disconnect. Buttons give the same actions for keyboard and touch users.
@@ -197,61 +196,62 @@ export function PluginsPage() {
     onDragOver: (event: React.DragEvent) => { event.preventDefault(); setOver(zone); },
     onDragLeave: () => setOver(null),
     onDrop: drop(zone),
-    style: {
-      display: "grid", alignContent: "start", gap: 10, minHeight: 220, padding: 14, borderRadius: 12,
-      border: `2px dashed ${over === zone ? "var(--accent)" : "var(--border)"}`, background: over === zone ? "var(--accent-soft)" : "transparent"
-    } as React.CSSProperties
+    className: `zone ${over === zone ? "zone--over" : ""}`
   });
   const dragProps = (plugin: Plugin) => ({ draggable: true, onDragStart: (event: React.DragEvent) => event.dataTransfer.setData("text/plain", plugin.id) });
 
   const available = plugins?.filter((p) => !p.enabled) ?? [];
   const connected = plugins?.filter((p) => p.enabled) ?? [];
   return (
-    <section aria-labelledby="plugins-title" style={{ display: "grid", gap: 16, maxWidth: 1100 }}>
-      <div>
-        <h1 id="plugins-title" style={{ margin: 0, fontSize: 22 }}>Plugins</h1>
-        <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: 14 }}>
-          Drag a plugin into "My system" (or press Add) to connect it. Keys are encrypted on this server and never shown again.
-        </p>
+    <section className="page" aria-labelledby="plugins-title">
+      <div className="page__head">
+        <div>
+          <h1 className="page__title" id="plugins-title">Plugins</h1>
+          <p className="page__lede">
+            Drag a plugin into "My system" (or press Add) to connect it. Keys are encrypted on this server and never shown again.
+          </p>
+        </div>
       </div>
-      {error && <p role="alert" style={{ color: "var(--danger)" }}>{error}</p>}
-      {!plugins && !error && <p>Loading plugins…</p>}
+      {error && <p role="alert" className="field__error">{error}</p>}
+      {!plugins && !error && <p className="page__lede">Loading plugins…</p>}
       {plugins && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+        <div className="zones">
           <div aria-labelledby="available-title" role="region" {...zoneProps("available")}>
-            <h2 id="available-title" style={{ margin: 0, fontSize: 15 }}>Available ({available.length})</h2>
-            {available.length === 0 && <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>Everything is connected.</p>}
+            <h2 className="zone__title" id="available-title">Available ({available.length})</h2>
+            {available.length === 0 && <p className="zone__hint">Everything is connected.</p>}
             {available.map((plugin) => (
-              <article key={plugin.id} aria-label={plugin.name} {...dragProps(plugin)} style={cardStyle}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase" }}>{plugin.category}</span>
-                <strong>{plugin.name}</strong>
-                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{plugin.description}</span>
-                <button type="button" onClick={() => setDrawer(plugin)} style={{ ...button(true), justifySelf: "start" }}>Add</button>
+              <article key={plugin.id} aria-label={plugin.name} {...dragProps(plugin)} className="plugin">
+                <span className="plugin__category">{plugin.category}</span>
+                <strong className="plugin__name">{plugin.name}</strong>
+                <span className="plugin__desc">{plugin.description}</span>
+                <div className="plugin__actions">
+                  <button type="button" className="btn btn--primary btn--sm" onClick={() => setDrawer(plugin)}>Add</button>
+                </div>
               </article>
             ))}
           </div>
           <div aria-labelledby="system-title" role="region" {...zoneProps("system")}>
-            <h2 id="system-title" style={{ margin: 0, fontSize: 15 }}>My system ({connected.length})</h2>
-            {connected.length === 0 && <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>Nothing connected yet. Drag a plugin here.</p>}
+            <h2 className="zone__title" id="system-title">My system ({connected.length})</h2>
+            {connected.length === 0 && <p className="zone__hint">Nothing connected yet. Drag a plugin here.</p>}
             {connected.map((plugin) => {
               const h = health[plugin.id];
               const failed = h && !h.ok;
               return (
-                <article key={plugin.id} aria-label={plugin.name} {...dragProps(plugin)} style={{ ...cardStyle, borderColor: failed ? "var(--danger)" : "var(--border)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-                    <strong>{plugin.name}</strong>
-                    <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: failed ? "var(--danger-soft)" : "var(--accent-soft)", color: failed ? "var(--danger)" : "var(--accent)" }}>
+                <article key={plugin.id} aria-label={plugin.name} {...dragProps(plugin)} className={`plugin ${failed ? "plugin--failed" : ""}`}>
+                  <div className="plugin__head">
+                    <strong className="plugin__name">{plugin.name}</strong>
+                    <span className={`plugin__badge ${failed ? "plugin__badge--off" : "plugin__badge--on"}`}>
                       {failed ? "Test failed" : "Connected"}
                     </span>
                   </div>
-                  {h && <span role={failed ? "alert" : "status"} style={{ fontSize: 13, color: failed ? "var(--danger)" : "var(--text-secondary)" }}>{h.text}</span>}
-                  {plugin.status && <span style={{ fontSize: 13, color: plugin.status.warning ? "var(--danger)" : "var(--text-secondary)" }}>{plugin.status.text}</span>}
+                  {h && <span role={failed ? "alert" : "status"} className={`plugin__status ${failed ? "plugin__status--failed" : ""}`}>{h.text}</span>}
+                  {plugin.status && <span className={`plugin__status ${plugin.status.warning ? "plugin__status--failed" : ""}`}>{plugin.status.text}</span>}
                   {plugin.id === "n8n" && <DeliveryLog />}
                   {plugin.id === "twilio" && <CallLog />}
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button type="button" onClick={() => setDrawer(plugin)} style={button()}>Settings</button>
-                    <button type="button" onClick={() => test(plugin)} style={button()}>Test</button>
-                    <button type="button" onClick={() => remove(plugin)} style={button()}>Remove</button>
+                  <div className="plugin__actions">
+                    <button type="button" className="btn btn--sm" onClick={() => setDrawer(plugin)}>Settings</button>
+                    <button type="button" className="btn btn--sm" onClick={() => test(plugin)}>Test</button>
+                    <button type="button" className="btn btn--sm" onClick={() => remove(plugin)}>Remove</button>
                   </div>
                 </article>
               );

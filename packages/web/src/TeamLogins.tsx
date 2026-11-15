@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 
 type StaffLogin = { id: string; name: string; createdAt: string };
-const input: React.CSSProperties = { padding: "8px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)", fontSize: 14 };
 
 // Owner only: who can log in to this dashboard. Staff see bookings and the inbox; they cannot change settings or plugins.
 export function TeamLogins() {
@@ -29,32 +28,35 @@ export function TeamLogins() {
   };
 
   return (
-    <section aria-labelledby="logins-title" style={{ display: "grid", gap: 12, padding: 18, marginBottom: 16, borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", maxWidth: 760 }}>
+    <section aria-labelledby="logins-title" className="record">
       <div>
-        <h2 id="logins-title" style={{ margin: 0, fontSize: 18 }}>Dashboard logins</h2>
-        <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>Staff can see bookings and the inbox. Only you can change settings, plugins and logins.</p>
+        <h2 className="record__name" id="logins-title">Dashboard logins</h2>
+        <p className="page__lede">Staff can see bookings and the inbox. Only you can change settings, plugins and logins.</p>
       </div>
-      <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6, fontSize: 14 }}>
-        {data?.owner && <li><strong>{data.owner}</strong> · owner</li>}
+      <ul className="record__list plain-list">
+        {data?.owner && <li className="record__row"><dt>Owner</dt><dd>{data.owner}</dd></li>}
         {data?.staff.map((login) => (
-          <li key={login.id}>
-            {login.name} · staff{" "}
-            <button type="button" onClick={() => remove(login)} style={{ ...input, padding: "2px 8px", cursor: "pointer" }} aria-label={`Remove ${login.name}`}>Remove</button>
+          <li key={login.id} className="record__row">
+            <dt>Staff</dt>
+            <dd>
+              {login.name}
+              <button type="button" onClick={() => remove(login)} className="btn btn--sm" aria-label={`Remove ${login.name}`}>Remove</button>
+            </dd>
           </li>
         ))}
       </ul>
-      <form onSubmit={add} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}>
-        <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 600 }}>
-          Name
-          <input aria-label="Staff name" style={input} value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
+      <form onSubmit={add} className="login-form">
+        <label className="field">
+          <span className="field__label">Name</span>
+          <input className="input" aria-label="Staff name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
         </label>
-        <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 600 }}>
-          Starting PIN (6–8 numbers)
-          <input aria-label="Starting PIN" style={input} type="password" inputMode="numeric" pattern="\d{6,8}" value={pin} onChange={(e) => setPin(e.target.value)} required autoComplete="new-password" />
+        <label className="field">
+          <span className="field__label">Starting PIN (6 to 8 numbers)</span>
+          <input className="input" aria-label="Starting PIN" type="password" inputMode="numeric" pattern="\d{6,8}" value={pin} onChange={(e) => setPin(e.target.value)} required autoComplete="new-password" />
         </label>
-        <button type="submit" style={{ ...input, background: "var(--accent)", borderColor: "var(--accent)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Add login</button>
+        <button type="submit" className="btn btn--primary">Add login</button>
       </form>
-      {message && <p role={message.error ? "alert" : "status"} style={{ margin: 0, fontSize: 13, color: message.error ? "var(--danger)" : "var(--text-secondary)" }}>{message.text}</p>}
+      {message && <p role={message.error ? "alert" : "status"} className={message.error ? "field__error" : "field__hint"}>{message.text}</p>}
     </section>
   );
 }

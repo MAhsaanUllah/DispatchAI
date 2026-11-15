@@ -57,6 +57,7 @@ packages/web/worker-configuration.d.ts
 .agents/
 .codex/
 .gemini/
+.hallmark/
 AGENTS.md
 *.md
 !/README.md

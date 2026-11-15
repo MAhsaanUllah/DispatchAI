@@ -43,24 +43,59 @@ export function PublicDashboard() {
   const completed = cloudJobs.filter((job) => job.status === "COMPLETED").length;
   const demoWorkOrder = cloudJobs.find((job) => job.id === demoWorkOrderId);
 
-  if (access !== "granted") return <div className="public-dashboard"><header className="public-dashboard-nav"><a href="/" className="public-dashboard-brand">Dispatch<span>AI</span></a></header><main className="public-dashboard-main"><div className="public-dashboard-intro"><div><span className="landing-card-eyebrow">PRIVATE RECRUITER DEMO</span><h1>{access === "loading" ? "Loading dashboard…" : access === "denied" ? "Private access required." : "Dashboard temporarily unavailable."}</h1><p>{access === "denied" ? "Open your one-use invite link and sign in with Google to see live synthetic bookings." : access === "error" ? "Cloud data could not be loaded. Please retry later." : "Checking your demo access."}</p></div><a className="landing-primary-cta" href={demoEmail}><Mail size={16} aria-hidden="true" /> Request access <ArrowRight size={16} aria-hidden="true" /></a></div></main></div>;
+  if (access !== "granted") return <div className="public"><header className="public__nav"><a href="/" className="public__brand">Dispatch<span className="public__brand-accent">AI</span></a></header><main className="public__main"><div className="public__hero"><div>
+    <h1 className="public__title">{access === "loading" ? "Loading dashboard…" : access === "denied" ? "Private access required." : "Dashboard temporarily unavailable."}</h1>
+    <p className="public__lede">{access === "denied" ? "Open your one-use invite link and sign in with Google to see live synthetic bookings." : access === "error" ? "Cloud data could not be loaded. Please retry later." : "Checking your demo access."}</p>
+  </div><a className="btn btn--primary" href={demoEmail}><Mail size={16} aria-hidden="true" /> Request access</a></div></main></div>;
 
-  return <div className="public-dashboard">
-    <header className="public-dashboard-nav">
-      <a href="/" className="public-dashboard-brand"><img src="/favicon.svg" width="34" height="34" alt="" /> Dispatch<span>AI</span></a>
-      <a href="/" className="public-dashboard-back"><ArrowLeft size={15} aria-hidden="true" /> Back to home</a>
+  return <div className="public">
+    <header className="public__nav">
+      <a href="/" className="public__brand"><span className="app-nav__mark"><img src="/favicon.svg" width="18" height="18" alt="" /></span>Dispatch<span className="public__brand-accent">AI</span></a>
+      <a className="btn btn--sm" href="/"><ArrowLeft size={15} aria-hidden="true" /> Back to home</a>
     </header>
-    <main className="public-dashboard-main">
-      <div className="public-dashboard-intro"><div><span className="landing-card-eyebrow">OPERATIONS DASHBOARD · LIVE SYNTHETIC DATA</span><h1>Dispatch at a glance.</h1><p>A read-only view of cloud demo bookings. All records are synthetic; staff actions remain private.</p></div><a className="landing-primary-cta" href="/">Try live voice demo <ArrowRight size={16} aria-hidden="true" /></a></div>
-      {demoWorkOrder && <section className="public-dashboard-demo-result" aria-label="Your demo work order"><span className="landing-card-eyebrow">YOUR DEMO WORK ORDER</span><h2>{demoWorkOrder.id.replace("wo_", "WO-").toUpperCase()} · {demoWorkOrder.status}</h2><p>{demoWorkOrder.serviceType} · {demoWorkOrder.issueSummary}</p><p>{properties.get(demoWorkOrder.propertyId ?? "")?.addressLine1 ?? "Synthetic Austin property"} · {technicians.get(demoWorkOrder.technicianId ?? "")?.name ?? "Technician pending"}</p><p>{demoWorkOrder.scheduledStart ? new Date(demoWorkOrder.scheduledStart).toLocaleString() : "Schedule pending"}</p></section>}
-      <div className="public-dashboard-stats"><div><span>WORK ORDERS</span><strong>{cloudJobs.length}</strong></div><div><span>ACTIVE / BOOKED</span><strong>{active}</strong></div><div><span>COMPLETED</span><strong>{completed}</strong></div><div><span>TECHNICIANS</span><strong>{sample.technicians.length}</strong></div></div>
-      <section className="public-dashboard-panel" aria-label="Sample work orders">
-        <div className="public-dashboard-panel-head"><div><h2>Work orders</h2><p>Cloud demo queue, refreshed every 10 seconds</p></div><span className="public-dashboard-readonly">READ-ONLY</span></div>
-        <div className="public-dashboard-filters"><label className="public-dashboard-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Search work orders</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search issue, technician, zone..." /></label><label><span className="sr-only">Service</span><select value={service} onChange={(event) => setService(event.target.value)}><option value="ALL">All services</option>{[...new Set(cloudJobs.map((job) => job.serviceType))].map((id) => <option key={id} value={id}>{id}</option>)}</select></label><label><span className="sr-only">Status</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option><option value="BOOKED">Booked</option><option value="DISPATCHED">Dispatched</option><option value="IN_PROGRESS">In progress</option><option value="COMPLETED">Completed</option></select></label></div>
-        <div className="public-dashboard-table-wrap"><table><thead><tr><th>JOB</th><th>STATUS</th><th>SERVICE</th><th>ZONE</th><th>ISSUE</th><th>TECHNICIAN</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.id} className={job.id === demoWorkOrderId ? "public-dashboard-highlight" : ""}><td className="public-dashboard-job">{job.id.replace("wo_", "WO-").toUpperCase()}{job.id === demoWorkOrderId && <small> YOUR DEMO WORK ORDER</small>}</td><td><span className={`public-dashboard-status status-${job.status.toLowerCase()}`}>{job.status.replace("_", " ")}</span></td><td>{job.serviceType}</td><td>{properties.get(job.propertyId ?? "")?.serviceZone.replace("Austin-", "") ?? "—"}</td><td>{job.issueSummary}</td><td>{technicians.get(job.technicianId ?? "")?.name ?? "Unassigned"}</td></tr>)}</tbody></table>{jobs.length === 0 && <p className="public-dashboard-empty">No cloud work orders match those filters.</p>}</div>
-        <div className="public-dashboard-panel-foot">Showing {jobs.length} of {cloudJobs.length} synthetic cloud work orders</div>
+    <main className="public__main">
+      <div className="public__hero">
+        <div>
+          <h1 className="public__title">Dispatch at a glance.</h1>
+          <p className="public__lede">A read-only view of cloud demo bookings. All records are synthetic; staff actions remain private.</p>
+        </div>
+        <a className="btn btn--primary" href="/">Try live voice demo</a>
+      </div>
+      {demoWorkOrder && <section className="public__demo-result" aria-label="Your demo work order">
+        <h2>Your demo work order</h2>
+        <p className="public__demo-id">{demoWorkOrder.id.replace("wo_", "WO-")}: {demoWorkOrder.status}</p>
+        <p>{demoWorkOrder.serviceType}: {demoWorkOrder.issueSummary}</p>
+        <p>{properties.get(demoWorkOrder.propertyId ?? "")?.addressLine1 ?? "Synthetic Austin property"}, {technicians.get(demoWorkOrder.technicianId ?? "")?.name ?? "Technician pending"}</p>
+        <p>{demoWorkOrder.scheduledStart ? new Date(demoWorkOrder.scheduledStart).toLocaleString() : "Schedule pending"}</p>
+      </section>}
+      <div className="public__figures">
+        <div className="public__figure"><span className="public__figure-value">{cloudJobs.length}</span><span className="public__figure-label">Work orders</span></div>
+        <div className="public__figure"><span className="public__figure-value">{active}</span><span className="public__figure-label">Active and booked</span></div>
+        <div className="public__figure"><span className="public__figure-value">{completed}</span><span className="public__figure-label">Completed</span></div>
+        <div className="public__figure"><span className="public__figure-value">{sample.technicians.length}</span><span className="public__figure-label">Technicians</span></div>
+      </div>
+      <section className="public__panel" aria-label="Sample work orders">
+        <div className="public__panel-head"><div><h2 className="public__panel-title">Work orders</h2><p className="public__panel-copy">Cloud demo queue, refreshed every 10 seconds</p></div><span className="public__readonly">Read only</span></div>
+        <div className="public__filters">
+          <label className="public__search"><Search size={16} aria-hidden="true" /><span className="sr-only">Search work orders</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search issue, technician, zone..." /></label>
+          <label><span className="sr-only">Service</span><select className="select" value={service} onChange={(event) => setService(event.target.value)}><option value="ALL">All services</option>{[...new Set(cloudJobs.map((job) => job.serviceType))].map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+          <label><span className="sr-only">Status</span><select className="select" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option><option value="BOOKED">Booked</option><option value="DISPATCHED">Dispatched</option><option value="IN_PROGRESS">In progress</option><option value="COMPLETED">Completed</option></select></label>
+        </div>
+        <div className="public__table-wrap"><table>
+          <thead><tr><th scope="col">Job</th><th scope="col">Status</th><th scope="col">Service</th><th scope="col">Zone</th><th scope="col">Issue</th><th scope="col">Technician</th></tr></thead>
+          <tbody>{jobs.map((job) => <tr key={job.id} className={job.id === demoWorkOrderId ? "is-highlight" : undefined}>
+            <td className="public__job-id">{job.id.replace("wo_", "WO-")}{job.id === demoWorkOrderId && <small> Your demo work order</small>}</td>
+            <td><span className={`public__readonly ${job.status === "COMPLETED" ? "" : "public__readonly--live"}`}>{job.status.replace("_", " ")}</span></td>
+            <td>{job.serviceType}</td>
+            <td>{properties.get(job.propertyId ?? "")?.serviceZone.replace("Austin-", "") ?? "Not in a zone"}</td>
+            <td>{job.issueSummary}</td>
+            <td>{technicians.get(job.technicianId ?? "")?.name ?? "Unassigned"}</td>
+          </tr>)}</tbody>
+        </table>
+        {jobs.length === 0 && <p className="public__panel-foot">No cloud work orders match those filters.</p>}</div>
+        <div className="public__panel-foot">Showing {jobs.length} of {cloudJobs.length} synthetic cloud work orders</div>
       </section>
-      <p className="public-dashboard-note">These synthetic bookings are read from the Cloudflare agent database.</p>
+      <p className="public__note">These synthetic bookings are read from the Cloudflare agent database.</p>
     </main>
   </div>;
 }

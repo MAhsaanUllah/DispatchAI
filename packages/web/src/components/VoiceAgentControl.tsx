@@ -109,56 +109,41 @@ function VoiceCall({ onClose, sessionId, onEventEmitted, visitor, autoStart }: V
 
   const active = conversation.status === "connected";
   const connecting = conversation.status === "connecting";
-  const orbState = connecting ? "connecting" : active ? (conversation.isSpeaking ? "talking" : "listening") : "idle";
   const orbLabel = connecting ? "Connecting your call…" : active ? (conversation.isSpeaking ? "DispatchAI is speaking" : "Listening to you") : "Start a conversation";
 
   return (
-    <div className="voice-backdrop" role="dialog" aria-modal="true" aria-label="DispatchAI voice assistant">
-      <div className="voice-panel">
-        <div className="voice-header">
-          <div className="voice-brand">
-            <span className="voice-brand-mark"><img src="/favicon.svg" alt="" width="28" height="28" /></span>
-            <span>DispatchAI <span className="voice-brand-divider">/</span> Voice assistant</span>
-          </div>
-          <button className="voice-close" onClick={close} aria-label="Close voice call"><X size={18} /></button>
+    <div className="modal" role="dialog" aria-modal="true" aria-label="DispatchAI voice assistant">
+      <div className="modal__panel">
+        <div className="modal__head">
+          <span className="public__card-label">DispatchAI voice assistant</span>
+          <button className="modal__close" onClick={close} aria-label="Close voice call"><X size={16} aria-hidden="true" /></button>
         </div>
-        <div className="voice-hero">
-          <div className="voice-avatar"><img src="/dispatch-agent-avatar.png" alt="DispatchAI dispatcher avatar" /></div>
-          <div className="voice-hero-copy">
-            <div className="voice-hero-title">Your dispatch assistant</div>
-            <p>HVAC &amp; plumbing · Austin operations</p>
-            <span className={`voice-status ${active ? "is-live" : ""}`}>
-              <span className="voice-status-dot" />
-              {active ? (conversation.isSpeaking ? "Agent speaking" : "Listening to you") : connecting ? "Connecting…" : "Ready for a call"}
-            </span>
-          </div>
+        <div className="public__card-head">
+          <span className="public__card-label">HVAC and plumbing, Austin operations</span>
+          <span className={`public__readonly ${active ? "public__readonly--live" : ""}`}>
+            {active ? (conversation.isSpeaking ? "Agent speaking" : "Listening to you") : connecting ? "Connecting…" : "Ready for a call"}
+          </span>
         </div>
-        <div className="voice-transcript-head">
-          <span>Conversation</span>
-          <span>{active ? "LIVE TRANSCRIPT" : "NO ACTIVE CALL"}</span>
+        <div className="modal__transcript" aria-live="polite">
+          {messages.length === 0 ? (
+            <p className="field__hint">Ask about an HVAC or plumbing issue. Live messages and tool actions appear here.</p>
+          ) : (
+            messages.map((item, index) => (
+              <div key={index} className={`message ${item.role === "user" ? "message--out" : ""}`}>
+                <div className="message__who">{item.role === "user" ? "You" : "DispatchAI"}</div>
+                <div className="message__body">{item.text}</div>
+              </div>
+            ))
+          )}
         </div>
-        <div className="voice-transcript" aria-live="polite">
-          <div className={`voice-orb-stage ${messages.length ? "has-messages" : ""}`}>
-            <div className={`voice-orb voice-orb-${orbState}`} aria-hidden="true" />
-            <strong>{orbLabel}</strong>
-            {messages.length === 0 && <span>Ask about an HVAC or plumbing issue. Live messages and tool actions appear here.</span>}
-          </div>
-          {messages.map((item, index) => (
-            <div key={index} className={`voice-message ${item.role === "user" ? "from-user" : "from-agent"}`}>
-              <span>{item.role === "user" ? "You" : "DispatchAI"}</span>
-              <p>{item.text}</p>
-            </div>
-          ))}
+        {error && <p className="field__error" role="alert">{error}</p>}
+        <div className="modal__foot">
+          <span className="field__hint">{orbLabel}</span>
+          {active
+            ? <button className="btn btn--danger" onClick={close}><PhoneOff size={15} aria-hidden="true" /> End call</button>
+            : <button className="btn btn--primary" onClick={start} disabled={connecting}><Mic size={15} aria-hidden="true" /> {connecting ? "Connecting" : "Start voice call"}</button>}
         </div>
-        {error && <p className="voice-error" role="alert">{error}</p>}
-        <div className="voice-footer">
-          <div className="voice-footer-meta">
-            <span>Powered by ElevenLabs · connected to dispatch tools</span>
-            {conversationId && <span className="voice-conversation-id">{conversationId}</span>}
-          </div>
-          {active ? <button className="voice-button voice-end" onClick={close}><PhoneOff size={16} /> End call</button> : <button className="voice-button voice-start" onClick={start} disabled={connecting}><Mic size={16} /> {connecting ? "Connecting" : "Start voice call"}</button>}
-        </div>
-        <p className="voice-footnote">Calls use ElevenLabs minutes. Each Google account gets 2 demo calls. Booking changes require your explicit confirmation.</p>
+        <p className="field__hint">Calls use ElevenLabs minutes. Each Google account gets 2 demo calls. Booking changes require your explicit confirmation.</p>
       </div>
     </div>
   );
