@@ -9,6 +9,7 @@ import { SQLiteDispatchStore } from "../../domain/src/sqlite-store.js";
 import { deliverBookingEmails } from "../../domain/src/email.js";
 import { dueReminders, reminderKey, ReminderLog } from "./reminders.js";
 import { SessionStore } from "./session-store.js";
+import { CallLog, type CallRecord } from "./call-log.js";
 import { AuthStore, generateSetupCode, safeEqual } from "./auth-store.js";
 import { buildBookingEvent } from "./outbound-events.js";
 import { Outbox } from "./outbox.js";
@@ -25,7 +26,11 @@ import { handleMcp } from "./mcp.js";
 import { dialTwiml, fetchTwilioAccount, gatherTwiml, hangupTwiml, isOpenNow, maskPhone, verifyTwilioSignature } from "./twilio.js";
 
 // shortcut: recent phone calls kept in memory (last 20) for the Twilio card; persist if owners need a call history.
-const recentCalls = new Map<string, { id: string; from: string; startedAt: string; turns: number; silences: number; outcome: string }>();
+const callLog = new CallLog(process.env.DATABASE_URL);
+// Calls are mutated while a phone call runs; this cache holds the live ones and is written to SQLite every 5 s (shortcut: a crash loses at most 5 s of one call).
+const recentCalls = new Map<string, CallRecord>();
+const flushCalls = () => recentCalls.forEach((call) => callLog.save(call));
+setInterval(flushCalls, 5000).unref();
 
 // Saved onboarding settings must be active before the business data (and its seed) is created below.
 const settings = new SettingsStore(process.env.DATABASE_URL);
@@ -310,6 +315,7 @@ async function routeRequest(req: Request): Promise<Response> {
     const call = recentCalls.get(sessionId) ?? { id: sessionId, from: maskPhone(form.From ?? ""), startedAt: new Date().toISOString(), turns: 0, silences: 0, outcome: "In progress" };
     recentCalls.set(sessionId, call);
     while (recentCalls.size > 20) recentCalls.delete(recentCalls.keys().next().value!);
+    callLog.save(call);
 
     // Handoff: forward to staff while open, otherwise a call-back task in the inbox.
     const handoff = (say: string) => {
@@ -341,7 +347,8 @@ async function routeRequest(req: Request): Promise<Response> {
     return xml(gatherTwiml(reply, action));
   }
   if (pathname === "/api/plugins/twilio/calls" && method === "GET" && user?.role === "owner") {
-    return json({ ok: true, data: { calls: [...recentCalls.values()].reverse() } }, 200, corsHeaders);
+    flushCalls();
+    return json({ ok: true, data: { calls: callLog.recent(50) } }, 200, corsHeaders);
   }
 
   // Staff run the day (bookings, inbox, chat); only the owner changes settings, plugins, logins or resets data.
@@ -375,7 +382,7 @@ async function routeRequest(req: Request): Promise<Response> {
     }
     return json({ ok: true, data: {
       ai: { enabled: !!ai?.enabled, provider: ai?.config.provider ?? null, model: ai?.config.model ?? null, today, month, price, cost: price ? { today: estimateCostUsd(today, price), month: estimateCostUsd(month, price) } : null },
-      twilio: { enabled: !!twilio?.enabled, callsToday: [...recentCalls.values()].filter((call) => call.startedAt >= dayStart).length, account, error: accountError }
+      twilio: { enabled: !!twilio?.enabled, callsToday: (flushCalls(), callLog.countSince(dayStart)), account, error: accountError }
     } }, 200, corsHeaders);
   }
 
@@ -443,7 +450,7 @@ async function routeRequest(req: Request): Promise<Response> {
     const dayStart = zonedTimeToUtc(localDate(new Date(), zone), "00:00", zone).toISOString();
     const phoneOn = !!(await pluginStore.get("twilio"))?.enabled;
     return json({ ok: true, data: {
-      calls: { lineOn: phoneOn, today: phoneOn ? [...recentCalls.values()].filter((call) => call.startedAt >= dayStart).length : 0 },
+      calls: { lineOn: phoneOn, today: phoneOn ? (flushCalls(), callLog.countSince(dayStart)) : 0 },
       uptimeSeconds: Math.round(process.uptime()),
       database: { kind: dbPath ? "file" : "memory", sizeBytes: dbPath && existsSync(dbPath) ? statSync(dbPath).size : 0 },
       inbox: { open: open.length, overdue: open.filter((task) => now - Date.parse(task.createdAt) > SLA_MINUTES[task.kind] * 60_000).length },
