@@ -47,6 +47,27 @@ describe("Work-order routing correctness", () => {
     agent.subscribe((event) => emittedEvents.push(event));
   });
 
+  describe("Spoken and typed work-order id forms", () => {
+    it.each(["Show work order wo 1001", "Show W O 1001", "show w.o. 1001", "show wo-1001", "show WO#1001", "show wo_1001"])(
+      "routes %s to get_work_order wo_1001",
+      async (message) => {
+        await agent.processMessage(message);
+        expect(toolCalls("get_work_order").map((e) => (e.payload as any).workOrderId)).toEqual(["wo_1001"]);
+      }
+    );
+
+    it("prepares cancellation for a spaced id", async () => {
+      await agent.processMessage("Please cancel W O 1002");
+      expect(agent.getState().pendingAction?.type).toBe("CANCEL_WORK_ORDER");
+      expect((agent.getState().pendingAction?.payload as any).workOrderId).toBe("wo_1002");
+    });
+
+    it("does not treat words containing 'wo' as an id", async () => {
+      await agent.processMessage("I have two 1001 problems");
+      expect(toolCalls("get_work_order")).toHaveLength(0);
+    });
+  });
+
   describe("Defect 1: explicit work-order ids take precedence over phone detection", () => {
     it("routes a wo_ id with a long numeric sequence to get_work_order, not find_customer", async () => {
       await agent.processMessage("5125550101");
