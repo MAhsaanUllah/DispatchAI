@@ -10,6 +10,8 @@ Built for appointment businesses: field service (HVAC, plumbing), salons, auto r
 
 > **Status: early, pilot-ready, not battle-tested.** The booking engine, security model and install paths are covered by automated tests. Real phone calls, real email and real AI providers have **not** been exercised with live accounts yet. See [Not verified yet](#not-verified-yet).
 
+<p align="center"><img src="assets/demo.gif" alt="60 second tour of the DispatchAI dashboard" width="760" /></p>
+
 ## What it does
 
 - **Books on the phone or in chat.** A rule-based agent collects the job, the customer and a slot, using the questions of your business type. An optional AI brain understands callers who phrase things in their own words.
