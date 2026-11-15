@@ -70,4 +70,24 @@ describe("business onboarding API", () => {
     expect((await put({ name: "Noor Salon & Spa" })).status).toBe(200);
     expect((await call("/api/jobs")).body.data.jobs).toHaveLength(1);
   });
+
+  const putStaff = (staff: unknown) => call("/api/staff", { method: "PUT", body: JSON.stringify({ staff }) });
+
+  it("validates staff and will not remove someone with an upcoming booking", async () => {
+    expect((await putStaff([{ name: "", skills: ["HAIRCUT"] }])).status).toBe(400);
+    expect((await putStaff([{ name: "Sana", skills: ["PLUMBING"] }])).status).toBe(400);
+    const removeAll = await putStaff([]);
+    expect(removeAll.status).toBe(409);
+    expect(removeAll.body.error.code).toBe("STAFF_HAS_BOOKINGS");
+  });
+
+  it("adds staff and services; the directory and new slots follow", async () => {
+    const current = (await call("/api/directory")).body.data.technicians.map((t: { id: string; name: string; skills: string[] }) => ({ id: t.id, name: t.name, skills: t.skills }));
+    expect((await put({ services: [{ name: "Haircut" }, { name: "Color" }, { name: "Bridal makeup" }] })).status).toBe(200);
+    const res = await putStaff([...current, { name: "Hina", skills: ["BRIDAL_MAKEUP"] }]);
+    expect(res.status).toBe(200);
+    const directory = (await call("/api/directory")).body.data;
+    expect(directory.services.map((s: { id: string }) => s.id)).toEqual(["HAIRCUT", "COLOR", "BRIDAL_MAKEUP"]);
+    expect(directory.technicians.map((t: { name: string }) => t.name)).toContain("Hina");
+  });
 });

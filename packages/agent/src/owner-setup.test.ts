@@ -1,8 +1,11 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { AuthStore, generateSetupCode } from "./auth-store.js";
+
+// PBKDF2 with 600k iterations is slow on purpose; under a loaded machine the default 5 s can run out.
+vi.setConfig({ testTimeout: 30_000 });
 
 const dir = mkdtempSync(join(tmpdir(), "dispatchai-auth-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

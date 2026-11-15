@@ -25,7 +25,8 @@ import {
   LocalNotification
 } from "@dispatchai/shared";
 import { DispatchStore } from "./store.js";
-import { isKnownService, serviceZoneFor } from "./templates.js";
+import { getBusinessConfig, isKnownService, serviceZoneFor } from "./templates.js";
+import { localDate } from "./schedule.js";
 
 export class DispatchService {
   private store: DispatchStore;
@@ -156,11 +157,13 @@ export class DispatchService {
     );
 
     const eligibleTechMap = new Map(eligibleTechs.map((t) => [t.id, t]));
+    const timeZone = getBusinessConfig().timeZone;
     const availableSlots: AvailableSlot[] = [];
 
     for (const slot of this.store.slots.values()) {
       if (slot.status !== "AVAILABLE") continue;
-      if (!slot.startAt.startsWith(date)) continue;
+      // "date" is the caller's local day in the business time zone, not the UTC day.
+      if (localDate(slot.startAt, timeZone) !== date) continue;
 
       const tech = eligibleTechMap.get(slot.technicianId);
       if (!tech) continue;

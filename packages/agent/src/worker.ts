@@ -1,5 +1,5 @@
 import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
-import { BusinessConfigSchema } from "@dispatchai/shared";
+import { BusinessConfigSchema, type BusinessService } from "@dispatchai/shared";
 import { toolFailure, toolSuccess, verifyWebhookSignature } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
@@ -89,6 +89,16 @@ function cookieValue(req: Request, name: string): string | undefined {
 function ownerCookie(req: Request, value: string, maxAge: number): string {
   const https = new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
   return `${OWNER_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${https ? "; Secure" : ""}`;
+}
+
+// Owner-edited service names -> config services. Ids come from the name; existing services keep their keywords.
+function toServices(list: unknown[], current: BusinessService[]): BusinessService[] {
+  return list.map((raw) => {
+    const name = typeof (raw as { name?: unknown }).name === "string" ? (raw as { name: string }).name.trim() : "";
+    const id = name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    const existing = current.find((service) => service.id === id);
+    return existing ? { ...existing, name } : { id, name, description: name, priceNote: "Staff must confirm any fee or estimate.", keywords: [name.toLowerCase()] };
+  });
 }
 
 function json(body: unknown, status: number, headers: Record<string, string>): Response {
@@ -187,6 +197,28 @@ async function routeRequest(req: Request): Promise<Response> {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
   }
 
+  // Staff list from onboarding. Each member does the listed services in every business zone/location.
+  if (pathname === "/api/staff" && method === "PUT") {
+    const body = await req.json().catch(() => ({})) as { staff?: unknown };
+    const config = getBusinessConfig();
+    const known = new Set(config.services.map((service) => service.id));
+    const list = Array.isArray(body.staff) ? body.staff : null;
+    const staff = list?.map((raw) => {
+      const member = raw as { id?: unknown; name?: unknown; skills?: unknown };
+      const name = typeof member.name === "string" ? member.name.trim() : "";
+      const skills = Array.isArray(member.skills) ? member.skills.filter((skill): skill is string => typeof skill === "string" && known.has(skill)) : [];
+      return { id: typeof member.id === "string" ? member.id : undefined, name, skills };
+    });
+    if (!staff || staff.some((member) => !member.name || member.name.length > 80 || member.skills.length === 0)) {
+      return json(toolFailure("INVALID_INPUT", "Each staff member needs a name and at least one service", false, `staff_${Date.now()}`), 400, corsHeaders);
+    }
+    const blocked = domainService.getStore().setStaff(staff, config.serviceZones);
+    if (blocked.length > 0) {
+      return json(toolFailure("STAFF_HAS_BOOKINGS", `Cannot remove staff with upcoming bookings: ${blocked.join(", ")}`, false, `staff_${Date.now()}`), 409, corsHeaders);
+    }
+    return json(toolSuccess({ staff: [...domainService.getStore().technicians.values()] }, `staff_${Date.now()}`), 200, corsHeaders);
+  }
+
   if (businessRoute && method === "GET") {
     const saved = settings.load();
     return json({ ok: true, data: {
@@ -197,7 +229,7 @@ async function routeRequest(req: Request): Promise<Response> {
     } }, 200, corsHeaders);
   }
   if (businessRoute && method === "PUT") {
-    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown };
+    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown; services?: unknown; hours?: unknown; slotMinutes?: unknown };
     const current = getBusinessConfig();
     const templateId = typeof body.templateId === "string" ? body.templateId : current.templateId;
     const switching = templateId !== current.templateId;
@@ -213,7 +245,10 @@ async function routeRequest(req: Request): Promise<Response> {
       name: text(body.name) ?? base.name,
       market: text(body.market) ?? base.market,
       timeZone: text(body.timeZone) ?? base.timeZone,
-      serviceZones: zones ?? base.serviceZones
+      serviceZones: zones ?? base.serviceZones,
+      services: Array.isArray(body.services) ? toServices(body.services, base.services) : base.services,
+      hours: body.hours ?? base.hours,
+      slotMinutes: body.slotMinutes ?? base.slotMinutes
     });
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -226,6 +261,8 @@ async function routeRequest(req: Request): Promise<Response> {
       domainService.getStore().reset();
       agents.clear();
     }
+    // Hours, slot length or zones may have changed: regenerate future free slots.
+    domainService.getStore().rebuildFutureSlots();
     return json(toolSuccess({ config: parsed.data }, `biz_${Date.now()}`), 200, corsHeaders);
   }
 
