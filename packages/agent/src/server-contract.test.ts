@@ -37,6 +37,8 @@ describe("dashboard static files", () => {
     expect(await page?.text()).toContain("dashboard");
     const asset = await serveStatic(get("/assets/app.js"), root);
     expect(asset?.headers.get("Content-Type")).toContain("javascript");
+    expect(page?.headers.get("Content-Security-Policy")).toContain("script-src 'self'");
+    expect(page?.headers.get("X-Content-Type-Options")).toBe("nosniff");
   });
 
   it("leaves API routes to the API handler", async () => {

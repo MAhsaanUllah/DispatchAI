@@ -6,6 +6,10 @@ type Owner = { name: string; pinHash: string; salt: string; iterations: number; 
 
 // OWASP 2023 guidance for PBKDF2-HMAC-SHA256.
 const ITERATIONS = 600_000;
+const MAX_FAILURES = 5;
+const LOCK_MS = 15 * 60 * 1000;
+const SESSION_MS = 24 * 60 * 60 * 1000;
+const sha256 = async (value: string) => toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
 const toHex = (bytes: Uint8Array) => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 async function hashPin(pin: string, salt: string, iterations: number): Promise<string> {
@@ -34,13 +38,20 @@ export function generateSetupCode(): string {
 export class AuthStore {
   private db?: DatabaseSync;
   private owner?: Owner;
+  private memSessions = new Map<string, number>();
+  // shortcut: lockout counters live in memory (single process); a restart needs server access anyway.
+  private failures = 0;
+  private lockedUntil = 0;
 
   constructor(databasePath?: string) {
     if (!databasePath) return;
     const path = resolve(databasePath.replace(/^file:/, ""));
     mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
-    this.db.exec("CREATE TABLE IF NOT EXISTS owners (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT NOT NULL, pin_hash TEXT NOT NULL, salt TEXT NOT NULL, iterations INTEGER NOT NULL, created_at TEXT NOT NULL)");
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS owners (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT NOT NULL, pin_hash TEXT NOT NULL, salt TEXT NOT NULL, iterations INTEGER NOT NULL, created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS owner_sessions (token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
+    `);
   }
 
   private load(): Owner | undefined {
@@ -74,6 +85,50 @@ export class AuthStore {
     const owner = this.load();
     if (!owner) return false;
     return safeEqual(await hashPin(pin, owner.salt, owner.iterations), owner.pinHash);
+  }
+
+  ownerName(): string | undefined {
+    return this.load()?.name;
+  }
+
+  // PIN login with lockout: 5 wrong PINs lock login for 15 minutes. Returns a session token or why it failed.
+  async login(pin: string, now = Date.now()): Promise<{ token: string } | { error: "LOCKED" | "WRONG_PIN"; retryAfterMs?: number }> {
+    if (now < this.lockedUntil) return { error: "LOCKED", retryAfterMs: this.lockedUntil - now };
+    if (!(await this.verifyPin(pin))) {
+      this.failures += 1;
+      if (this.failures >= MAX_FAILURES) {
+        this.failures = 0;
+        this.lockedUntil = now + LOCK_MS;
+        return { error: "LOCKED", retryAfterMs: LOCK_MS };
+      }
+      return { error: "WRONG_PIN" };
+    }
+    this.failures = 0;
+    const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
+    const tokenHash = await sha256(token);
+    const expiresAt = now + SESSION_MS;
+    if (this.db) {
+      this.db.prepare("DELETE FROM owner_sessions WHERE expires_at <= ?").run(now);
+      this.db.prepare("INSERT INTO owner_sessions (token_hash, expires_at) VALUES (?, ?)").run(tokenHash, expiresAt);
+    } else this.memSessions.set(tokenHash, expiresAt);
+    return { token };
+  }
+
+  // Only the hash of the session token is stored, so a copied database cannot be used to log in.
+  async isValidSession(token: string | undefined, now = Date.now()): Promise<boolean> {
+    if (!token || !/^[0-9a-f]{64}$/.test(token)) return false;
+    const tokenHash = await sha256(token);
+    const expiresAt = this.db
+      ? (this.db.prepare("SELECT expires_at FROM owner_sessions WHERE token_hash = ?").get(tokenHash) as { expires_at: number } | undefined)?.expires_at
+      : this.memSessions.get(tokenHash);
+    return expiresAt !== undefined && expiresAt > now;
+  }
+
+  async logout(token: string | undefined): Promise<void> {
+    if (!token) return;
+    const tokenHash = await sha256(token);
+    if (this.db) this.db.prepare("DELETE FROM owner_sessions WHERE token_hash = ?").run(tokenHash);
+    else this.memSessions.delete(tokenHash);
   }
 
   close(): void {

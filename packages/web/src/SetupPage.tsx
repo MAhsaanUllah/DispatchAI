@@ -62,7 +62,7 @@ export function SetupPage({ onDone }: Props) {
 
         {done ? (
           <p role="status" style={{ margin: 0, padding: 12, borderRadius: 8, background: "var(--accent-soft)", color: "var(--accent)", fontWeight: 600 }}>
-            Owner account created. Opening the dashboard…
+            Owner account created. Now log in with your PIN…
           </p>
         ) : (
           <>

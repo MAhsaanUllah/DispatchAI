@@ -118,7 +118,7 @@ export const App: React.FC = () => {
   return (
     <div style={{ height: "100vh", maxHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--background)", overflow: "hidden" }}>
       {/* Shell Header */}
-      <Navbar onReset={handleResetData} austinTime={austinTime} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
+      <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={austinTime} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
 
       <main style={{ padding: "14px 24px 16px", maxWidth: "1680px", margin: "0 auto", width: "100%", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: activeView === "dispatch" ? "hidden" : "auto" }}>
         {activeView === "system" ? <SystemPanel /> : activeView !== "dispatch" ? <DirectoryPanel view={activeView} directory={directory} loading={directoryLoading} /> : <>

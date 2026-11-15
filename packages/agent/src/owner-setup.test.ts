@@ -62,4 +62,41 @@ describe("setup API", () => {
     expect(again.status).toBe(403);
     expect(((await again.json()) as { error: { code: string } }).error.code).toBe("SETUP_LOCKED");
   });
+
+  // Runs after setup above: an owner now exists, so the API is closed without a session.
+  const call = (path: string, init: RequestInit = {}) => handleRequest(new Request(`http://localhost${path}`, init));
+  const login = (pin: string, headers: Record<string, string> = {}) =>
+    call("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify({ pin }) });
+  const cookieOf = (res: Response) => (res.headers.get("Set-Cookie") ?? "").split(";")[0];
+
+  it("closes the API without a session and opens it after PIN login, until logout", async () => {
+    expect((await call("/api/jobs")).status).toBe(401);
+    expect((await call("/api/chat", { method: "POST", body: "{}" })).status).toBe(401);
+
+    const ok = await login("482915");
+    expect(ok.status).toBe(200);
+    const setCookie = ok.headers.get("Set-Cookie") ?? "";
+    expect(setCookie).toMatch(/HttpOnly/);
+    expect(setCookie).toMatch(/SameSite=Strict/);
+    expect(setCookie).not.toMatch(/Secure/);
+    const cookie = cookieOf(ok);
+
+    expect((await call("/api/jobs", { headers: { Cookie: cookie } })).status).toBe(200);
+    const me = (await (await call("/api/auth/me", { headers: { Cookie: cookie } })).json()) as { data: { authenticated: boolean; owner: string } };
+    expect(me.data).toEqual({ authenticated: true, owner: "Ayesha" });
+
+    expect((await call("/api/auth/logout", { method: "POST", headers: { Cookie: cookie } })).status).toBe(200);
+    expect((await call("/api/jobs", { headers: { Cookie: cookie } })).status).toBe(401);
+  });
+
+  it("marks the cookie Secure behind HTTPS", async () => {
+    const res = await login("482915", { "x-forwarded-proto": "https" });
+    expect(res.headers.get("Set-Cookie")).toMatch(/; Secure/);
+  });
+
+  it("locks login after 5 wrong PINs, even for the right PIN", async () => {
+    for (let i = 0; i < 4; i++) expect((await login("000000")).status).toBe(401);
+    expect((await login("000000")).status).toBe(429);
+    expect((await login("482915")).status).toBe(429);
+  });
 });

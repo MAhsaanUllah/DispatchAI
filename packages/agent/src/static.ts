@@ -16,10 +16,28 @@ const TYPES: Record<string, string> = {
 // Built dashboard (npm run build --workspace=@dispatchai/web). WEB_DIST overrides it, e.g. in the Docker image.
 const defaultRoot = fileURLToPath(new URL("../../web/dist", import.meta.url));
 
+// Inline styles are used across the React UI; scripts only from this origin. Fonts come from Google Fonts (index.html).
+const SECURITY_HEADERS = {
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data:",
+    // shortcut: ElevenLabs allowed for the existing voice demo; remove when the browser Test call (chunk 11) replaces it.
+    "connect-src 'self' https://*.elevenlabs.io wss://*.elevenlabs.io",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'"
+  ].join("; "),
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "same-origin"
+};
+
 async function file(path: string): Promise<Response | null> {
   try {
     const type = TYPES[extname(path)] ?? "application/octet-stream";
-    return new Response(await readFile(path), { headers: { "Content-Type": type } });
+    return new Response(await readFile(path), { headers: { "Content-Type": type, ...SECURITY_HEADERS } });
   } catch {
     return null;
   }
