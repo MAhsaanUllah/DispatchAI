@@ -31,3 +31,11 @@ const server = http.createServer(async (req, res) => {
 server.listen(port, host, () => {
   console.log(`[agent-server] listening on ${host}:${port}`);
 });
+
+// Desktop app: stop when the app that started this server is gone (signal 0 only checks that the process exists).
+const parentPid = Number(process.env.PARENT_PID);
+if (parentPid) {
+  setInterval(() => {
+    try { process.kill(parentPid, 0); } catch { process.exit(0); }
+  }, 2000).unref();
+}

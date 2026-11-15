@@ -4,7 +4,8 @@ type Props = { onDone: () => void };
 
 // First-run screen: the owner proves access to the server log (setup code) and picks a PIN.
 export function SetupPage({ onDone }: Props) {
-  const [code, setCode] = useState("");
+  // The desktop app opens /app#setup=<code> so the owner does not have to copy the code.
+  const [code, setCode] = useState(() => /setup=([\w-]+)/.exec(window.location.hash)?.[1] ?? "");
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [pinAgain, setPinAgain] = useState("");

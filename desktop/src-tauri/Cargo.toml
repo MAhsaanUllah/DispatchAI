@@ -1,0 +1,13 @@
+[package]
+name = "dispatchai-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "DispatchAI desktop shell: runs the local server and shows the dashboard"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+getrandom = "0.3"
+tauri-plugin-single-instance = "2"
