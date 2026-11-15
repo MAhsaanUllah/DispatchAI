@@ -85,7 +85,7 @@ export class DispatchService {
     if (!parsed.success) {
       return toolFailure(
         "INVALID_INPUT",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -135,7 +135,7 @@ export class DispatchService {
     if (!parsed.success) {
       return toolFailure(
         "INVALID_INPUT",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -201,7 +201,7 @@ export class DispatchService {
     if (!parsed.success) {
       return toolFailure(
         "INVALID_INPUT",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -314,7 +314,7 @@ export class DispatchService {
     if (!parsed.success) {
       return toolFailure(
         "INVALID_INPUT",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -335,7 +335,7 @@ export class DispatchService {
     if (!parsed.success) {
       return toolFailure(
         "INVALID_INPUT",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -446,7 +446,7 @@ export class DispatchService {
     if (!parsed.success) {
       return toolFailure(
         "INVALID_INPUT",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );

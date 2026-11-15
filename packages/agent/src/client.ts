@@ -174,7 +174,7 @@ export class N8nClient {
     if (!parsed.success) {
       return toolFailure(
         "VALIDATION_ERROR",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -197,7 +197,7 @@ export class N8nClient {
     if (!parsed.success) {
       return toolFailure(
         "VALIDATION_ERROR",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -220,7 +220,7 @@ export class N8nClient {
     if (!parsed.success) {
       return toolFailure(
         "VALIDATION_ERROR",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -243,7 +243,7 @@ export class N8nClient {
     if (!parsed.success) {
       return toolFailure(
         "VALIDATION_ERROR",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -266,7 +266,7 @@ export class N8nClient {
     if (!parsed.success) {
       return toolFailure(
         "VALIDATION_ERROR",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );
@@ -288,7 +288,7 @@ export class N8nClient {
     if (!parsed.success) {
       return toolFailure(
         "VALIDATION_ERROR",
-        parsed.error.errors.map((e) => e.message).join(", "),
+        parsed.error.issues.map((e) => e.message).join(", "),
         false,
         correlationId
       );

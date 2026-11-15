@@ -20,7 +20,7 @@ export const AgentEventSchema = z.object({
   timestamp: z.string(),
   correlationId: z.string(),
   toolName: z.string().optional(),
-  payload: z.record(z.any()).optional(),
+  payload: z.record(z.string(), z.any()).optional(),
   message: z.string().optional()
 });
 export type AgentEvent = z.infer<typeof AgentEventSchema>;
