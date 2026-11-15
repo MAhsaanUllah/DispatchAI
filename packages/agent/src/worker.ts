@@ -18,6 +18,9 @@ import { PluginStore } from "./plugin-store.js";
 import { llmConfig, pluginById, plugins } from "./plugins.js";
 import { extract, setUsageSink, toCanonical } from "./llm.js";
 import { estimateCostUsd, UsageLog } from "./usage-store.js";
+import { ApiKeyStore, type ApiKeyScope } from "./api-keys.js";
+import { handleApiV1 } from "./api-v1.js";
+import { handleMcp } from "./mcp.js";
 import { dialTwiml, fetchTwilioAccount, gatherTwiml, hangupTwiml, isOpenNow, maskPhone, verifyTwilioSignature } from "./twilio.js";
 
 // shortcut: recent phone calls kept in memory (last 20) for the Twilio card; persist if owners need a call history.
@@ -27,6 +30,7 @@ const recentCalls = new Map<string, { id: string; from: string; startedAt: strin
 const settings = new SettingsStore(process.env.DATABASE_URL);
 const pluginStore = new PluginStore(process.env.DATABASE_URL);
 const usageLog = new UsageLog(process.env.DATABASE_URL);
+const apiKeys = new ApiKeyStore(process.env.DATABASE_URL);
 setUsageSink((row) => usageLog.add({ at: new Date().toISOString(), ...row }));
 // n8n plugin settings from the dashboard win; .env values stay as a fallback for scripted installs.
 async function eventTarget(): Promise<{ url: string; secret: string } | undefined> {
@@ -186,6 +190,15 @@ export async function handleRequest(req: Request): Promise<Response> {
   return response;
 }
 
+// Dashboard rows: the work order plus names the owner sees (also the developer API's booking list).
+function jobRows() {
+  const store = domainService.getStore();
+  return Array.from(store.workOrders.values()).map((job) => {
+    const property = job.propertyId ? store.properties.get(job.propertyId) : undefined;
+    return { ...job, zone: serviceZoneFor(property), technicianName: store.technicians.get(job.technicianId ?? "")?.name, propertyAddress: property?.addressLine1 };
+  });
+}
+
 async function routeRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const pathname = url.pathname;
@@ -258,7 +271,7 @@ async function routeRequest(req: Request): Promise<Response> {
 
   // Once an owner exists, every other API call needs an owner session. The Twilio phone line
   // keeps its own signature check instead.
-  const selfAuthenticated = pathname === "/api/twilio/voice";
+  const selfAuthenticated = pathname === "/api/twilio/voice" || pathname.startsWith("/api/v1/") || pathname === "/api/mcp";
   if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !user) {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
   }
@@ -266,6 +279,11 @@ async function routeRequest(req: Request): Promise<Response> {
   // anything before the owner finishes setup. Only the setup and login routes above are open. (Tests run open.)
   if (pathname.startsWith("/api/") && !selfAuthenticated && !auth.hasOwner() && (process.env.NODE_ENV !== "test" || process.env.DISPATCH_LOCK_BEFORE_SETUP === "1")) {
     return json(toolFailure("SETUP_REQUIRED", "Finish first-run setup first", false, `auth_${Date.now()}`), 403, corsHeaders);
+  }
+  // Developer API: a Bearer key replaces the dashboard login (see api-v1.ts).
+  if (pathname.startsWith("/api/v1/") || pathname === "/api/mcp") {
+    const deps = { keys: apiKeys, client: n8nClient, bookings: jobRows, inbox, allow: (key: string) => rateLimiter.check(key), cors: corsHeaders };
+    return pathname === "/api/mcp" ? handleMcp(req, deps) : handleApiV1(req, deps);
   }
   // Twilio phone line: every caller turn arrives here. Twilio's signature replaces the dashboard login.
   if (pathname === "/api/twilio/voice" && method === "POST") {
@@ -317,7 +335,7 @@ async function routeRequest(req: Request): Promise<Response> {
   }
 
   // Staff run the day (bookings, inbox, chat); only the owner changes settings, plugins, logins or resets data.
-  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset" || pathname === "/api/backup" || pathname === "/api/usage"
+  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset" || pathname === "/api/backup" || pathname === "/api/usage" || pathname.startsWith("/api/api-keys")
     || (method !== "GET" && (pathname === "/api/business" || pathname === "/api/staff"));
   if (ownerOnly && user?.role === "staff") {
     return json(toolFailure("FORBIDDEN", "Only the owner can change this", false, `auth_${Date.now()}`), 403, corsHeaders);
@@ -413,6 +431,22 @@ async function routeRequest(req: Request): Promise<Response> {
       events: { pending: deliveries.filter((d) => d.status === "pending").length, dead: deliveries.filter((d) => d.status === "dead").length },
       bookings: { total: bookings.length, lastCreatedAt: bookings.map((b) => b.createdAt).sort().at(-1) ?? null }
     } }, 200, corsHeaders);
+  }
+  // Developer API keys (owner only). The key is returned once, when it is created; the list shows the last 4 characters.
+  if (pathname === "/api/api-keys" && method === "GET") return json({ ok: true, data: { keys: apiKeys.list() } }, 200, corsHeaders);
+  if (pathname === "/api/api-keys" && method === "POST") {
+    const body = (await req.json().catch(() => ({}))) as { name?: unknown; scope?: unknown };
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name || name.length > 60 || (body.scope !== "read" && body.scope !== "write")) {
+      return json(toolFailure("INVALID_INPUT", "Give the key a name (up to 60 characters) and choose read or write access", false, `key_${Date.now()}`), 400, corsHeaders);
+    }
+    const { key, row } = apiKeys.create(name, body.scope as ApiKeyScope);
+    return new Response(JSON.stringify({ ok: true, data: { key, ...row } }), { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  }
+  const revokeKey = /^\/api\/api-keys\/([\w-]+)$/.exec(pathname);
+  if (revokeKey && method === "DELETE") {
+    if (!apiKeys.revoke(revokeKey[1])) return json(toolFailure("NOT_FOUND", "No active key with that id", false, `key_${Date.now()}`), 404, corsHeaders);
+    return json(toolSuccess({ revoked: revokeKey[1] }, `key_${Date.now()}`), 200, corsHeaders);
   }
   // Owner downloads one file with the whole business. It contains the plugin key file, so it is never cached.
   if (pathname === "/api/backup" && method === "GET") {
@@ -635,11 +669,7 @@ async function routeRequest(req: Request): Promise<Response> {
 
   // 5. Jobs list for dashboard
   if (method === "GET" && pathname === "/api/jobs") {
-    const store = domainService.getStore();
-    const jobs = Array.from(store.workOrders.values()).map((job) => {
-      const property = job.propertyId ? store.properties.get(job.propertyId) : undefined;
-      return { ...job, zone: serviceZoneFor(property), technicianName: store.technicians.get(job.technicianId ?? "")?.name, propertyAddress: property?.addressLine1 };
-    });
+    const jobs = jobRows();
     return new Response(JSON.stringify({ ok: true, data: { jobs } }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
