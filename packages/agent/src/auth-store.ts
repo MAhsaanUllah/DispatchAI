@@ -36,7 +36,8 @@ export async function safeEqual(a: string, b: string): Promise<boolean> {
 export function generateSetupCode(): string {
   const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   const bytes = crypto.getRandomValues(new Uint8Array(8));
-  const chars = [...bytes].map((byte) => alphabet[byte % alphabet.length]).join("");
+  // 32 symbols and 256 byte values divide evenly, so masking to 5 bits is unbiased.
+  const chars = [...bytes].map((byte) => alphabet[byte & 31]).join("");
   return `${chars.slice(0, 4)}-${chars.slice(4)}`;
 }
 
