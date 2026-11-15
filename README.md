@@ -19,6 +19,17 @@ Built for appointment businesses: field service (HVAC, plumbing), salons, auto r
 - **Plugins you switch on from the dashboard:** phone line, AI brain, email, reminders, and signed events to your own [n8n](https://n8n.io) workflows.
 - **Owner and staff logins** with a PIN. Staff run the day; only the owner changes settings.
 
+## Screenshots
+
+The demo company below is fictional sample data (`SEED_DEMO_DATA=true`). A real install starts empty and walks you through onboarding.
+
+| | |
+| --- | --- |
+| ![Dispatch board](assets/screenshots/dispatch-board.png)<br>**Dispatch board.** Today's jobs, what the AI did, a chat to test the agent. | ![Features](assets/screenshots/features.png)<br>**Features.** Phone line, AI brain, email, reminders, public address and n8n, each switched on with a key. |
+| ![Inbox](assets/screenshots/inbox.png)<br>**Inbox.** Handoffs and failed deliveries for a person to handle. | ![Team](assets/screenshots/team.png)<br>**Team.** Staff, their hours and their logins. |
+| ![Services](assets/screenshots/services.png)<br>**Services.** What you book and for how long. | ![Company](assets/screenshots/company.png)<br>**Company.** Name, time zone, areas and opening hours. |
+| ![System](assets/screenshots/system.png)<br>**System.** Health, the nine booking steps, where it runs and backup. | |
+
 ## Install
 
 Pick one. All three give you the same dashboard.
