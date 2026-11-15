@@ -1,3 +1,4 @@
+import React from "react";
 import { Workflow, Cloud, Bot, Database, PhoneCall, ShieldCheck } from "lucide-react";
 
 type NodeStatus = "live" | "flowing";
@@ -56,16 +57,34 @@ function Node({ node, pulse }: { node: SystemNode; pulse: boolean }) {
   );
 }
 
+// Read-only connection health. Connecting and disconnecting happens on the Plugins page only.
+function ConnectionHealth() {
+  const [plugins, setPlugins] = React.useState<{ id: string; name: string; enabled: boolean }[] | null>(null);
+  React.useEffect(() => {
+    fetch("/api/plugins").then((r) => (r.ok ? r.json() : null)).then((body) => setPlugins(body?.data?.plugins ?? null)).catch(() => setPlugins(null));
+  }, []);
+  if (!plugins) return null;
+  return (
+    <ul aria-label="Connections" style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: 0, margin: "0 0 16px", listStyle: "none" }}>
+      {plugins.map((plugin) => (
+        <li key={plugin.id} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 13, border: "1px solid var(--border)", color: plugin.enabled ? "var(--accent)" : "var(--text-tertiary)" }}>
+          {plugin.name}: {plugin.enabled ? "connected" : "not connected"}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function SystemPanel() {
   return (
     <section className="directory-page system-page" aria-label="System architecture">
       <div className="directory-head">
         <div>
-          <span className="directory-eyebrow">AUSTIN OPERATIONS / LIVE ARCHITECTURE</span>
+          <span className="directory-eyebrow">SYSTEM</span>
           <h1>How the dispatch loop is wired</h1>
         </div>
-        <span className="directory-pill"><span className="sys-pill-dot" aria-hidden="true" /> All hops live · Local demo</span>
       </div>
+      <ConnectionHealth />
       <p className="directory-intro">
         Voice bookings ride this exact path: the ElevenLabs agent reasons and speaks, the Cloudflare Worker (Agents SDK) holds
         tool logic and state, n8n executes the operational actions, and the domain API owns the work-order data.
