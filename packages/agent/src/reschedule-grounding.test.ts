@@ -17,11 +17,7 @@ describe("P0-2: Reschedule constraint grounding", () => {
 
   beforeEach(() => {
     domainService = new DispatchService();
-    n8nClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      directService: domainService
-    });
+    n8nClient = new N8nClient({ directService: domainService });
     agent = new DispatchAgent("p0_2_session", n8nClient);
     emittedEvents = [];
     agent.subscribe((event) => emittedEvents.push(event));
@@ -118,23 +114,6 @@ describe("P0-2: Reschedule constraint grounding", () => {
     expect(availabilityQueries().length).toBe(0);
     expect(reply).not.toContain("Austin-South");
     expect(reply).not.toContain("Austin-Central");
-  });
-
-  it("reports a backend outage during reschedule instead of a false not-found", async () => {
-    const offlineClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      request: async (): Promise<Response> => {
-        throw new Error("ECONNREFUSED connect ECONNREFUSED 127.0.0.1:5678");
-      }
-    });
-    const store = domainService.getStore();
-    const offlineAgent = new DispatchAgent("p0_2_offline", offlineClient, { customer: store.customers.get("cust_101")!, selectedProperty: store.properties.get("prop_201")! });
-
-    const reply = await offlineAgent.processMessage("Please reschedule wo_1001");
-
-    expect(reply).not.toContain("could not find");
-    expect(reply.toLowerCase()).toContain("unavailable");
   });
 
   it("still reports a true work-order not-found during reschedule", async () => {

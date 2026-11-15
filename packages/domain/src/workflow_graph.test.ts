@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const workflow = JSON.parse(
-  readFileSync(new URL("../../../n8n/workflows/_merged_all_operations.json", import.meta.url), "utf8")
+  readFileSync(new URL("../../../docs/reference/_merged_all_operations.json", import.meta.url), "utf8")
 );
 
 describe("merged n8n canvas", () => {

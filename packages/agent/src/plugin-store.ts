@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type { webcrypto } from "node:crypto";
 
 export type PluginRecord = { enabled: boolean; config: Record<string, string>; secrets: Record<string, string> };
 
@@ -21,7 +22,7 @@ export function loadMasterKey(databasePath?: string): string {
   return readFileSync(file, "utf8").trim();
 }
 
-async function aesKey(masterKey: string): Promise<CryptoKey> {
+async function aesKey(masterKey: string): Promise<webcrypto.CryptoKey> {
   const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(masterKey));
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
@@ -30,7 +31,7 @@ async function aesKey(masterKey: string): Promise<CryptoKey> {
 export class PluginStore {
   private db?: DatabaseSync;
   private mem = new Map<string, { enabled: boolean; config: string; secrets: string }>();
-  private key: Promise<CryptoKey>;
+  private key: Promise<webcrypto.CryptoKey>;
 
   constructor(databasePath?: string, masterKey = loadMasterKey(databasePath)) {
     this.key = aesKey(masterKey);

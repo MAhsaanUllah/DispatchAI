@@ -13,33 +13,8 @@ describe("Phase 7: Failure Engineering Test Suite", () => {
     emittedEvents = [];
   });
 
-  it("Scenario 1: Bounded retries trigger retry events for retryable read operations", async () => {
-    let retryCount = 0;
-    const n8nClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      directService: domainService,
-      onRetry: (attempt, maxRetries, err, correlationId) => {
-        retryCount++;
-      }
-    });
-
-    const agent = new DispatchAgent("failure_session_707", n8nClient);
-    agent.subscribe((evt) => emittedEvents.push(evt));
-
-    // Execute safe read query (findCustomer)
-    const result = await agent.findCustomer("5125550101");
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.error.message);
-    expect(result.data.customer?.firstName).toBe("Alicia");
-  });
-
   it("Scenario 2: Duplicate mutation with identical idempotencyKey prevents duplicate work orders", async () => {
-    const n8nClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      directService: domainService
-    });
+    const n8nClient = new N8nClient({ directService: domainService });
 
     const avail = await n8nClient.checkAvailability({ serviceType: "HVAC", serviceZone: "Austin-South", date: "2026-09-19" }, "corr_avail_dup");
     expect(avail.ok).toBe(true);
@@ -109,11 +84,7 @@ describe("Phase 7: Failure Engineering Test Suite", () => {
   });
 
   it("Scenario 3: Attempting to book a taken/stale slot fails cleanly with SLOT_UNAVAILABLE", async () => {
-    const n8nClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      directService: domainService
-    });
+    const n8nClient = new N8nClient({ directService: domainService });
 
     // slot_301 is seeded as already BOOKED in domain store
     const res = await n8nClient.createWorkOrder(
@@ -137,11 +108,7 @@ describe("Phase 7: Failure Engineering Test Suite", () => {
   });
 
   it("Scenario 4: Validation error for invalid parameters returns non-retryable error", async () => {
-    const n8nClient = new N8nClient({
-      baseUrl: "http://localhost:5678",
-      secret: "test_secret",
-      directService: domainService
-    });
+    const n8nClient = new N8nClient({ directService: domainService });
 
     // Invalid phone number (less than 10 digits)
     const res = await n8nClient.findCustomer({ phone: "123" }, "corr_val_1");

@@ -95,7 +95,7 @@ export type CallOutcome = z.infer<typeof CallOutcomeSchema>;
 
 export const CallSchema = z.object({
   id: z.string(),
-  elevenLabsConversationId: z.string(),
+  conversationId: z.string(),
   customerId: z.string().optional(),
   workOrderId: z.string().optional(),
   startedAt: z.string(),

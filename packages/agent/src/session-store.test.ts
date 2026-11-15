@@ -13,7 +13,7 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 describe("SessionStore", () => {
   it("keeps a pending booking confirmation across a restart", async () => {
     const path = join(dir, "restart.sqlite");
-    const client = new N8nClient({ baseUrl: "http://localhost:5678", secret: "test", directService: new DispatchService() });
+    const client = new N8nClient({ directService: new DispatchService() });
 
     const before = new SessionStore(path);
     const agent = new DispatchAgent("caller_1", client, before.loadState("caller_1"));

@@ -13,7 +13,7 @@ describe("instore booking (salon template)", () => {
 
   it("books a haircut at the salon by chat without any customer address", async () => {
     const service = new DispatchService();
-    const agent = new DispatchAgent("salon_chat", new N8nClient({ baseUrl: "http://localhost:5678", secret: "test", directService: service }));
+    const agent = new DispatchAgent("salon_chat", new N8nClient({ directService: service }));
 
     await agent.processMessage("5555550901");
     await agent.processMessage("Jordan Lee");

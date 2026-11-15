@@ -124,7 +124,7 @@ export function generateSeedData(config: BusinessConfig = getBusinessConfig(), o
     { id: "prop_210", customerId: "cust_110", addressLine1: "9500 Burnet Rd", city: "Austin", state: "TX", zipCode: "78758", serviceZone: "Austin-North" },
     { id: "prop_211", customerId: "cust_111", addressLine1: "701 W Riverside Dr", city: "Austin", state: "TX", zipCode: "78704", serviceZone: "Austin-South" },
     { id: "prop_212", customerId: "cust_112", addressLine1: "1100 E 11th St", city: "Austin", state: "TX", zipCode: "78702", serviceZone: "Austin-East" },
-    { id: "prop_213", customerId: "cust_113", addressLine1: "3100 Guadalupe St", city: "Austin", state: "TX", zipCode: "78705", serviceZone: "Austin-Central" },
+    { id: "prop_213", customerId: "cust_113", addressLine1: "3200 Guadalupe St", city: "Austin", state: "TX", zipCode: "78705", serviceZone: "Austin-Central" },
     { id: "prop_214", customerId: "cust_114", addressLine1: "12400 N Interstate 35", city: "Austin", state: "TX", zipCode: "78753", serviceZone: "Austin-North" },
     { id: "prop_215", customerId: "cust_115", addressLine1: "5207 Brodie Ln", city: "Austin", state: "TX", zipCode: "78745", serviceZone: "Austin-South" },
     { id: "prop_216", customerId: "cust_116", addressLine1: "2113 Manor Rd", city: "Austin", state: "TX", zipCode: "78722", serviceZone: "Austin-East" },

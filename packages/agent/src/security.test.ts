@@ -1,34 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { maskSecret, sanitizeInputString, verifyWebhookSignature } from "@dispatchai/shared";
-import { handleRequest } from "./worker.js";
 
 describe("Phase 8: Security Hardening Test Suite", () => {
-  it("rejects a protected voice tool request when the secret header is missing", async () => {
-    const req = new Request("http://localhost/api/voice/tools/find_customer", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: "5125550101" })
-    });
-    const res = await handleRequest(req);
-    expect(res.status).toBe(401);
-  });
-
-  it("Scenario 1: Unauthenticated request with invalid x-dispatch-secret is rejected with 401", async () => {
-    const req = new Request("http://localhost/api/voice/tools/find_customer", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-dispatch-secret": "INVALID_SECRET_ATTEMPT"
-      },
-      body: JSON.stringify({ phone: "5125550101" })
-    });
-
-    const res = await handleRequest(req);
-    expect(res.status).toBe(401);
-    const body: any = await res.json();
-    expect(body.error.code).toBe("UNAUTHORIZED");
-  });
-
   it("Scenario 2: Mask secret helper sanitizes sensitive credentials for logging", () => {
     expect(maskSecret("dev_secret_dispatch_2026")).toBe("dev***026");
     expect(maskSecret("12345")).toBe("***");
