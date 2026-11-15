@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import http from "node:http";
 import { handleRequest } from "../worker.js";
+import { serveStatic } from "../static.js";
 
 const port = Number(process.env.AGENT_PORT || 8787);
 const host = process.env.HOST || "0.0.0.0";
@@ -19,7 +20,7 @@ const server = http.createServer(async (req, res) => {
     headers,
     body: body.length > 0 ? body : undefined
   });
-  const response = await handleRequest(request);
+  const response = (await serveStatic(request)) ?? (await handleRequest(request));
   res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
   res.end(Buffer.from(await response.arrayBuffer()));
 });
