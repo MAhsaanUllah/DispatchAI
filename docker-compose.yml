@@ -37,8 +37,10 @@ services:
         { n8n import:workflow --input=/opt/dispatchai/dispatchai-events-starter.json && touch /home/node/.n8n/.dispatchai-imported; };
         exec tini -- /docker-entrypoint.sh
     environment:
-      # Lets the starter workflow verify DispatchAI's event signatures.
+      # Lets the starter workflow verify DispatchAI's event signatures: it needs the crypto module and to read
+      # DISPATCHAI_EVENTS_SECRET (n8n 2.x blocks $env in Code nodes unless this is false).
       NODE_FUNCTION_ALLOW_BUILTIN: crypto
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       DISPATCHAI_EVENTS_SECRET: ${N8N_EVENTS_SECRET:-}
       GENERIC_TIMEZONE: ${TZ:-UTC}
     volumes:
