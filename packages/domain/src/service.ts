@@ -37,6 +37,15 @@ export class DispatchService {
     this.store = store ?? new DispatchStore();
   }
 
+  // Queues the reminder notice for a booked appointment (sent by the reminders runner).
+  public queueReminder(workOrderId: string): boolean {
+    const workOrder = this.store.workOrders.get(workOrderId);
+    if (!workOrder || workOrder.status !== "BOOKED") return false;
+    this.queueNotifications(workOrder, "REMINDER", new Date().toISOString());
+    this.store.persist();
+    return true;
+  }
+
   // New caller from a conversation: a customer, plus their service address for onsite businesses.
   public createCaller(
     input: { name: string; phone: string; addressLine1?: string; serviceZone?: string },

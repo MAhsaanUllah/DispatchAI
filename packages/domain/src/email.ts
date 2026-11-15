@@ -2,13 +2,14 @@ import type { DispatchStore } from "./store.js";
 
 // Email is opt-in. Demo addresses are never sent to a provider.
 // Credentials come from the Email plugin when connected; .env stays as the fallback for scripted installs.
-export async function deliverBookingEmails(store: DispatchStore, workOrderId: string, creds?: { apiKey?: string; from?: string }): Promise<void> {
+// only: send just this kind (reminders must not flush older unsent confirmations).
+export async function deliverBookingEmails(store: DispatchStore, workOrderId: string, creds?: { apiKey?: string; from?: string }, only?: string): Promise<void> {
   const apiKey = creds?.apiKey ?? process.env.RESEND_API_KEY;
   const from = creds?.from ?? process.env.EMAIL_FROM;
   if (!apiKey || !from) return;
 
   for (const notice of store.notifications) {
-    if (notice.workOrderId !== workOrderId || notice.channel !== "EMAIL" || notice.status !== "PENDING_LOCAL") continue;
+    if (notice.workOrderId !== workOrderId || notice.channel !== "EMAIL" || notice.status !== "PENDING_LOCAL" || (only && notice.eventType !== only)) continue;
     const to = notice.recipientAddress;
     if (!to || to.toLowerCase().endsWith("@example.com")) continue;
     try {

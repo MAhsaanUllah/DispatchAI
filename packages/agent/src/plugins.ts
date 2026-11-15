@@ -150,6 +150,26 @@ export const plugins: Plugin[] = [
   }
 ];
 
+plugins.push({
+  id: "reminders",
+  name: "Appointment reminders",
+  category: "Messages",
+  description: "Emails each customer a reminder before their appointment. Uses the Email plugin, so connect that first.",
+  fields: [
+    { key: "hoursBefore", label: "Send the reminder", secret: false, options: [
+      { value: "2", label: "2 hours before" }, { value: "12", label: "12 hours before" },
+      { value: "24", label: "24 hours before" }, { value: "48", label: "48 hours before" }
+    ] }
+  ],
+  limits: "Email only for now (SMS comes later). One reminder per appointment time; a rescheduled booking gets a new one. Reminders that fell due while the server was off are sent once when it starts again, if the appointment is still ahead. Customers without an email address are skipped.",
+  validate: (values) => ["2", "12", "24", "48"].includes(values.hoursBefore ?? "") ? null : "Choose when to send the reminder",
+  test: async ({ config }) => ({ ok: true, message: `Reminders will go out ${config.hoursBefore} hours before each appointment through the Email plugin.` }),
+  preview: () => {
+    const notice = bookingNotice({ id: "wo_1001", serviceType: "", scheduledStart: new Date(Date.now() + 86_400_000).toISOString() }, "REMINDER");
+    return [{ title: notice.subject, text: notice.message }];
+  }
+});
+
 // Twilio phone line, kept out of the array literal above for readability.
 plugins.push({
   id: "twilio",
