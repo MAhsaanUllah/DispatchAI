@@ -5,11 +5,11 @@ import { N8nClient } from "./client.js";
 import { ELEVENLABS_AGENT_CONFIG, ELEVENLABS_TOOLS, ELEVENLABS_SYSTEM_PROMPT } from "./elevenlabs.config.js";
 import { SQLiteDispatchStore } from "../../domain/src/sqlite-store.js";
 import { deliverBookingEmails } from "../../domain/src/email.js";
+import { SessionStore } from "./session-store.js";
 
-// Multi-session agent registry
+// Multi-session agent registry: in-memory cache in front of the durable SessionStore.
 const agents: Map<string, DispatchAgent> = new Map();
-// ponytail: In-memory one-hour voice capabilities suit local demos; use durable session auth for multi-instance deployment.
-const voiceTokens = new Map<string, { sessionId: string; expiresAt: number }>();
+const sessions = new SessionStore(process.env.DATABASE_URL);
 // One process owns the business data (single writer). DATABASE_URL = SQLite file path; unset = in-memory.
 const domainService = new DispatchService(process.env.DATABASE_URL ? new SQLiteDispatchStore(process.env.DATABASE_URL) : undefined);
 const isTestRuntime = process.env.NODE_ENV === "test";
@@ -25,7 +25,7 @@ const n8nClient = new N8nClient({
 export function getOrCreateAgent(sessionId: string): DispatchAgent {
   let agent = agents.get(sessionId);
   if (!agent) {
-    agent = new DispatchAgent(sessionId, n8nClient);
+    agent = new DispatchAgent(sessionId, n8nClient, sessions.loadState(sessionId));
     agents.set(sessionId, agent);
   }
   return agent;
@@ -56,7 +56,22 @@ class RateLimiter {
 
 const rateLimiter = new RateLimiter();
 
+function sessionIdOf(req: Request): string {
+  return req.headers.get("x-session-id") || new URL(req.url).searchParams.get("sessionId") || "default_session";
+}
+
+// Every non-GET request may change the conversation, so its session is saved afterwards (survives restarts).
 export async function handleRequest(req: Request): Promise<Response> {
+  const response = await routeRequest(req);
+  if (req.method !== "GET") {
+    const sessionId = sessionIdOf(req);
+    const agent = agents.get(sessionId);
+    if (agent) sessions.saveState(sessionId, agent.getState());
+  }
+  return response;
+}
+
+async function routeRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const pathname = url.pathname;
   const method = req.method;
@@ -72,9 +87,9 @@ export async function handleRequest(req: Request): Promise<Response> {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const sessionId = req.headers.get("x-session-id") || url.searchParams.get("sessionId") || "default_session";
+  const sessionId = sessionIdOf(req);
   const requestSecret = req.headers.get("x-dispatch-secret");
-  const voiceToken = voiceTokens.get(req.headers.get("x-voice-session-token") || "");
+  const voiceToken = sessions.getToken(req.headers.get("x-voice-session-token") || "");
 
   // 1. Rate Limit Enforcement
   const clientKey = req.headers.get("cf-connecting-ip") || "local";
@@ -239,7 +254,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         const signed = await response.json() as { signed_url?: string };
         if (!signed.signed_url) throw new Error("ElevenLabs did not return a signed URL");
         const voiceToolToken = crypto.randomUUID();
-        voiceTokens.set(voiceToolToken, { sessionId, expiresAt: Date.now() + 60 * 60 * 1000 });
+        sessions.saveToken(voiceToolToken, { sessionId, expiresAt: Date.now() + 60 * 60 * 1000 });
         const convId = body.conversationId || null;
         if (convId) agent.setElevenLabsConversationId(convId);
         if (visitorEmail) agent.setVisitorDetails(visitorName || "Website visitor", visitorEmail);
