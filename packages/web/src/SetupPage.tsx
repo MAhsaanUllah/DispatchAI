@@ -48,7 +48,7 @@ export function SetupPage({ onDone }: Props) {
   };
 
   return (
-    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 16, background: "var(--bg, var(--surface))" }}>
+    <main style={{ height: "100%", overflowY: "auto", boxSizing: "border-box", display: "grid", placeItems: "center", padding: 16, background: "var(--bg, var(--surface))" }}>
       <form onSubmit={submit} aria-labelledby="setup-title" style={{
         width: "100%", maxWidth: 420, display: "grid", gap: 16, padding: 28, borderRadius: 12,
         border: "1px solid var(--border)", background: "var(--surface)", boxShadow: "0 8px 30px rgba(0,0,0,0.06)"

@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 
-type Field = { key: string; label: string; secret: boolean; placeholder?: string; help?: string; value: string; saved?: boolean };
-type Plugin = { id: string; name: string; category: string; description: string; limits: string; enabled: boolean; fields: Field[]; preview?: { title: string; text: string }[] };
+type Field = { key: string; label: string; secret: boolean; placeholder?: string; help?: string; value: string; saved?: boolean; options?: { value: string; label: string }[] };
+type Plugin = {
+  id: string; name: string; category: string; description: string; limits: string; enabled: boolean; fields: Field[];
+  preview?: { title: string; text: string }[]; status?: { text: string; warning: boolean };
+};
 type Status = { kind: "ok" | "error" | "info"; text: string } | null;
 
 const input: React.CSSProperties = { padding: "9px 11px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)", fontSize: 14 };
@@ -95,14 +98,26 @@ function PluginCard({ plugin, onChanged }: { plugin: Plugin; onChanged: () => vo
       {plugin.fields.map((field) => (
         <label key={field.key} style={{ display: "grid", gap: 5, fontSize: 13, fontWeight: 600 }}>
           {field.label}
-          <input
-            aria-label={field.label} style={input} type={field.secret ? "password" : "text"} autoComplete="off"
-            placeholder={field.secret && field.saved ? "Saved — leave empty to keep" : field.placeholder}
-            value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-          />
+          {field.options ? (
+            <select aria-label={field.label} style={input} value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}>
+              <option value="">Choose…</option>
+              {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          ) : (
+            <input
+              aria-label={field.label} style={input} type={field.secret ? "password" : "text"} autoComplete="off"
+              placeholder={field.secret && field.saved ? "Saved — leave empty to keep" : field.placeholder}
+              value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+            />
+          )}
           {field.help && <span style={{ fontWeight: 400, fontSize: 12, color: "var(--text-tertiary)" }}>{field.help}</span>}
         </label>
       ))}
+      {plugin.status && (
+        <p role={plugin.status.warning ? "alert" : "status"} style={{ margin: 0, fontSize: 13, padding: plugin.status.warning ? 8 : 0, borderRadius: 8, background: plugin.status.warning ? "var(--danger-soft)" : "none", color: plugin.status.warning ? "var(--danger)" : "var(--text-secondary)" }}>
+          {plugin.status.text}
+        </p>
+      )}
       {plugin.preview && (
         <details style={{ fontSize: 13 }}>
           <summary style={{ cursor: "pointer", fontWeight: 600 }}>Preview what customers receive</summary>

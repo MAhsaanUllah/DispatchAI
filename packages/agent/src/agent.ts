@@ -459,13 +459,16 @@ export class DispatchAgent {
   }
 
   // Conversational text interaction pipeline
-  public async processMessage(text: string): Promise<string> {
+  // Optional AI fallback: turns a message the rules did not understand into a plain sentence they do (see llm.ts).
+  public understand?: (text: string) => Promise<string | null>;
+
+  public async processMessage(text: string, rewritten = false): Promise<string> {
     const correlationId = this.generateCorrelationId();
     // Normalise spoken/typed id forms ("W O 1001", "w.o. 1001", "wo-1001", "WO#1001") to "wo_1001".
     const cleanText = text.trim().replace(/\bw\.?\s*o\.?[\s#_-]*(\d{4,6})\b/gi, "wo_$1");
 
-    // Record user message in history
-    this.state.history.push({
+    // Record user message in history (a rewrite keeps the caller's own words in history)
+    if (!rewritten) this.state.history.push({
       id: `msg_${Date.now()}_u`,
       role: "user",
       content: cleanText,
@@ -753,6 +756,12 @@ export class DispatchAgent {
       const notFoundReply = `I could not find work order #${woId}. Please verify the order number.`;
       this.state.history.push({ id: `msg_${Date.now()}_a`, role: "agent", content: notFoundReply, timestamp: new Date().toISOString() });
       return notFoundReply;
+    }
+
+    // Not understood by the rules: one AI attempt, then the same rules run on the plain sentence (code still owns every action).
+    if (!rewritten && this.understand) {
+      const canonical = await this.understand(cleanText).catch(() => null);
+      if (canonical) return this.processMessage(canonical, true);
     }
 
     // Default conversational reply
