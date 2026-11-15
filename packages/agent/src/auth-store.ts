@@ -101,6 +101,15 @@ export class AuthStore {
     return Number(result.changes) === 1;
   }
 
+  // Offline recovery (reset-pin CLI): new PIN for the owner, every open session ends. Returns false when there is no owner.
+  async resetOwnerPin(pin: string): Promise<boolean> {
+    if (!this.db || !this.hasOwner()) return false;
+    const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+    this.db.prepare("UPDATE owners SET pin_hash = ?, salt = ?, iterations = ? WHERE id = 1").run(await hashPin(pin, salt, ITERATIONS), salt, ITERATIONS);
+    this.db.prepare("DELETE FROM owner_sessions WHERE user_id = 'owner'").run();
+    return true;
+  }
+
   async verifyPin(pin: string): Promise<boolean> {
     const owner = this.load();
     if (!owner) return false;
@@ -125,6 +134,32 @@ export class AuthStore {
       this.db.prepare("INSERT INTO staff_users (id, name, pin_hash, salt, iterations, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(user.id, user.name, user.pinHash, user.salt, user.iterations, user.createdAt);
     } else this.memStaff.set(user.id, user);
     return { id: user.id };
+  }
+
+  // Owner sets a new PIN for a staff login; that person is logged out. Memory mode keeps the hash in the map.
+  async setStaffPin(id: string, pin: string): Promise<boolean> {
+    const staff = this.staff().find((s) => s.id === id);
+    if (!staff) return false;
+    const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+    const pinHash = await hashPin(pin, salt, ITERATIONS);
+    if (this.db) {
+      this.db.prepare("UPDATE staff_users SET pin_hash = ?, salt = ?, iterations = ? WHERE id = ?").run(pinHash, salt, ITERATIONS, id);
+      this.db.prepare("DELETE FROM owner_sessions WHERE user_id = ?").run(id);
+    } else {
+      Object.assign(staff, { pinHash, salt, iterations: ITERATIONS });
+      for (const [hash, session] of this.memSessions) if (session.userId === id) this.memSessions.delete(hash);
+    }
+    return true;
+  }
+
+  // Owner changes their own PIN; needs the current one. Open sessions stay (the owner is using one).
+  async changeOwnerPin(current: string, pin: string): Promise<boolean> {
+    if (!(await this.verifyPin(current))) return false;
+    const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+    const pinHash = await hashPin(pin, salt, ITERATIONS);
+    if (this.db) this.db.prepare("UPDATE owners SET pin_hash = ?, salt = ?, iterations = ? WHERE id = 1").run(pinHash, salt, ITERATIONS);
+    else if (this.owner) Object.assign(this.owner, { pinHash, salt, iterations: ITERATIONS });
+    return true;
   }
 
   // Removing a login also ends every open session of that person.

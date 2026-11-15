@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { SetupPage } from "./SetupPage.js";
 import { LoginPage } from "./LoginPage.js";
 import { BusinessWizard } from "./BusinessWizard.js";
+import "./fonts.css";
 import "./index.css";
 import "./ux.css";
 

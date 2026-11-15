@@ -13,6 +13,7 @@ import { BusinessWizard } from "./BusinessWizard.js";
 import { PluginsPage } from "./PluginsPage.js";
 import { InboxPage } from "./InboxPage.js";
 import { TeamLogins } from "./TeamLogins.js";
+import { SettingsPage } from "./SettingsPage.js";
 import { LocalNotification, WorkOrder } from "@dispatchai/shared";
 
 export const App: React.FC = () => {
@@ -27,7 +28,7 @@ export const App: React.FC = () => {
     fetch("/api/auth/me").then((r) => r.json()).then((body) => setIsOwner(body?.data?.role !== "staff")).catch(() => undefined);
   }, []);
   // Onboarding can ask to land on Features once, when there is something left to connect.
-  const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox">(() => {
+  const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox" | "settings">(() => {
     try {
       const wanted = sessionStorage.getItem("dispatch.view");
       sessionStorage.removeItem("dispatch.view");
@@ -149,6 +150,7 @@ export const App: React.FC = () => {
 
       <main className="app-main">
         {editing ? <BusinessWizard startAt={editing} onDone={() => window.location.reload()} onCancel={() => setEditing(null)} />
+          : activeView === "settings" ? (isOwner ? <SettingsPage onOpenTeam={() => setActiveView("team")} /> : null)
           : activeView === "inbox" ? <InboxPage />
             : activeView === "plugins" ? <PluginsPage />
               : activeView === "system" ? <SystemPanel onOpenPlugins={() => setActiveView("plugins")} onOpenInbox={() => setActiveView("inbox")} isOwner={isOwner} />

@@ -129,6 +129,16 @@ A write goes through the same service, emails and n8n events as a phone booking.
 
 **MCP** (for Claude or another assistant that speaks MCP over HTTP): point it at `https://YOUR-HOST/api/mcp` with the key as a Bearer token. A read key gets four look-up tools (`list_bookings`, `get_booking`, `find_customer`, `free_times`). A write key also gets `propose_booking`, `propose_reschedule`, `propose_cancel` and `confirm`: a change is only a proposal until `confirm` is called with the returned id (single use, 5 minutes, only by the key that proposed it). The tool descriptions tell the assistant to ask you first; the server enforces the two steps, not your "yes". Customer names and addresses go to your assistant's provider, so use a read key unless you need more.
 
+## Bring your own voice agent (Vapi, ElevenLabs)
+
+Instead of the Twilio phone line you can let a voice platform answer calls and use DispatchAI only for the diary: free times, booking, the dashboard and emails. The platform owns the phone number and the voice; DispatchAI is the tool it calls.
+
+1. Make DispatchAI reachable over HTTPS (a VPS, or Features, Public address) and create a **write** key (see above).
+2. In the platform, add an **MCP server** with the URL `https://YOUR-HOST/api/mcp` and the header `Authorization: Bearer dsp_...`. Vapi: an MCP tool with `server.url` and `server.headers`. ElevenLabs: the MCP server box, Server URL plus the secret token (`Bearer dsp_...`). Or add the `/api/v1` calls above as HTTP tools.
+3. In the agent prompt say: look up free times first, read the booking back, and call `confirm` only after the caller says yes. A change is only a proposal until `confirm`.
+
+Phone numbers: Vapi gives one free US number (inbound only) and otherwise imports Twilio, Telnyx, DIDWW or a SIP trunk number. ElevenLabs sells no numbers; it imports Twilio, Exotel or a SIP trunk. Cost is per minute on top of the carrier: Vapi lists $0.05 hosting plus model and voice costs (about $0.08 to $0.13 a minute in its estimator, $5 free credit); ElevenLabs lists 15 free minutes, then $0.08 a minute, LLM billed separately. Check both pricing pages before you rely on these numbers. Not tested here with a real account.
+
 ## Back up your data
 
 The owner can download one backup file from the dashboard (System page) or `GET /api/backup`. It contains a consistent database snapshot and the `master.key` that decrypts your plugin keys, so **keep it private**. A `MASTER_KEY` set in the environment is never put in the file; store it in your secret manager.
@@ -157,6 +167,21 @@ docker compose up -d app
 ```
 
 Log in with your usual name and PIN. Then switch the PC install off: two installs must never share one customer base (each keeps its own database).
+
+## Forgot your PIN
+
+PINs are stored only as hashes, so nobody can read one back. Whoever runs the server sets a new one (6-8 digits), then restarts the app so any lockout clears.
+
+```bash
+docker compose exec app node ./node_modules/vite-node/dist/cli.mjs packages/agent/src/bin/reset-pin.ts /data/dispatchai.sqlite 482915
+docker compose restart app
+```
+
+Desktop app: run the same `reset-pin.ts` against its database file with the app closed. The login name is the owner's name, or empty for the owner; a staff member who forgot theirs is removed and re-added in Team.
+
+## Privacy
+
+The project collects nothing: no accounts, tracking or analytics. Data stays on the computer or server running DispatchAI. It leaves only when you turn a feature on: a cloud AI provider (caller's words; none with Ollama), Resend (email), Twilio (calls), your own n8n (booking events), Cloudflare (public address), an MCP assistant's provider (what it reads), and the browser vendor's speech service for the Test call microphone. The login screen lists the same. Fonts are bundled, so the page asks no third party for anything.
 
 ## Security
 

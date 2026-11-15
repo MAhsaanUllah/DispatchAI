@@ -112,3 +112,20 @@ describe("setup API", () => {
     expect((await login("482915", { "x-client-ip": "198.51.100.7" })).status).toBe(200);
   });
 });
+
+describe("reset owner PIN", () => {
+  it("sets a new PIN and ends open sessions", async () => {
+    const path = join(dir, "reset.sqlite");
+    const auth = new AuthStore(path);
+    await auth.createOwner("Ayesha", "482915");
+    const session = await auth.login("482915");
+    const cli = new AuthStore(path); // the CLI is a second process on the same file
+    expect(await cli.resetOwnerPin("135790")).toBe(true);
+    expect(await auth.session("token" in session ? session.token : "")).toBeUndefined();
+    expect(await auth.verifyPin("482915")).toBe(false);
+    expect(await auth.verifyPin("135790")).toBe(true);
+    const empty = new AuthStore(join(dir, "empty.sqlite"));
+    expect(await empty.resetOwnerPin("135790")).toBe(false);
+    [auth, cli, empty].forEach((a) => a.close());
+  });
+});
