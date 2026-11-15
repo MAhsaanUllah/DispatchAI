@@ -1,4 +1,5 @@
 import { existsSync, statSync } from "node:fs";
+import { createBackup } from "./backup.js";
 import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
 import { BusinessConfigSchema, type BusinessService } from "@dispatchai/shared";
 import { toolFailure, toolSuccess } from "@dispatchai/shared";
@@ -307,7 +308,7 @@ async function routeRequest(req: Request): Promise<Response> {
   }
 
   // Staff run the day (bookings, inbox, chat); only the owner changes settings, plugins, logins or resets data.
-  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset"
+  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset" || pathname === "/api/backup"
     || (method !== "GET" && (pathname === "/api/business" || pathname === "/api/staff"));
   if (ownerOnly && user?.role === "staff") {
     return json(toolFailure("FORBIDDEN", "Only the owner can change this", false, `auth_${Date.now()}`), 403, corsHeaders);
@@ -371,6 +372,15 @@ async function routeRequest(req: Request): Promise<Response> {
       events: { pending: deliveries.filter((d) => d.status === "pending").length, dead: deliveries.filter((d) => d.status === "dead").length },
       bookings: { total: bookings.length, lastCreatedAt: bookings.map((b) => b.createdAt).sort().at(-1) ?? null }
     } }, 200, corsHeaders);
+  }
+  // Owner downloads one file with the whole business. It contains the plugin key file, so it is never cached.
+  if (pathname === "/api/backup" && method === "GET") {
+    const backup = createBackup(process.env.DATABASE_URL);
+    if (!backup) return json(toolFailure("NO_DATABASE_FILE", "This server keeps its data in memory only, so there is nothing to back up", false, `backup_${Date.now()}`), 409, corsHeaders);
+    return new Response(JSON.stringify(backup), { status: 200, headers: {
+      ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store",
+      "Content-Disposition": `attachment; filename="dispatchai-backup-${backup.createdAt.slice(0, 10)}.json"`
+    } });
   }
   const closeMatch = /^\/api\/inbox\/([\w-]+)\/close$/.exec(pathname);
   if (closeMatch && method === "POST") {
