@@ -295,8 +295,7 @@ export const JobsTable: React.FC<JobsTableProps> = ({ jobs, selectedJobId, onSel
             }}
           >
             <option value="ALL">All Services</option>
-            <option value="HVAC">HVAC</option>
-            <option value="PLUMBING">Plumbing</option>
+            {[...new Set(jobs.map((job) => job.serviceType))].map((id) => <option key={id} value={id}>{id}</option>)}
           </select>
 
           {/* Zone Filter (Section 21) */}
