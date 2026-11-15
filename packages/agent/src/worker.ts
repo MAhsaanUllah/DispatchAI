@@ -15,6 +15,10 @@ import { SettingsStore } from "./settings-store.js";
 import { PluginStore } from "./plugin-store.js";
 import { llmConfig, pluginById, plugins } from "./plugins.js";
 import { extract, toCanonical } from "./llm.js";
+import { dialTwiml, gatherTwiml, hangupTwiml, isOpenNow, maskPhone, verifyTwilioSignature } from "./twilio.js";
+
+// shortcut: recent phone calls kept in memory (last 20) for the Twilio card; persist if owners need a call history.
+const recentCalls = new Map<string, { id: string; from: string; startedAt: string; turns: number; silences: number; outcome: string }>();
 
 // Saved onboarding settings must be active before the business data (and its seed) is created below.
 const settings = new SettingsStore(process.env.DATABASE_URL);
@@ -233,10 +237,59 @@ async function routeRequest(req: Request): Promise<Response> {
   }
 
   // Once an owner exists, every other API call needs an owner session. Voice tool and webhook routes keep their own secret/signature checks.
-  const selfAuthenticated = pathname.startsWith("/api/voice/tools/") || pathname === "/api/voice/webhook";
+  const selfAuthenticated = pathname.startsWith("/api/voice/tools/") || pathname === "/api/voice/webhook" || pathname === "/api/twilio/voice";
   if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !user) {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
   }
+  // Twilio phone line: every caller turn arrives here. Twilio's signature replaces the dashboard login.
+  if (pathname === "/api/twilio/voice" && method === "POST") {
+    const twilio = await pluginStore.get("twilio");
+    const form = Object.fromEntries(new URLSearchParams(await req.text())) as Record<string, string>;
+    if (!twilio?.enabled) return new Response("Phone line not connected", { status: 403 });
+    const publicUrl = twilio.config.publicUrl.replace(/\/$/, "");
+    if (!verifyTwilioSignature(twilio.secrets.authToken, `${publicUrl}${pathname}${url.search}`, form, req.headers.get("x-twilio-signature"))) {
+      return new Response("Invalid Twilio signature", { status: 403 });
+    }
+    const xml = (body: string) => new Response(body, { status: 200, headers: { "Content-Type": "text/xml" } });
+    const action = `${publicUrl}/api/twilio/voice`;
+    const sessionId = `call_${form.CallSid ?? "unknown"}`;
+    const call = recentCalls.get(sessionId) ?? { id: sessionId, from: maskPhone(form.From ?? ""), startedAt: new Date().toISOString(), turns: 0, silences: 0, outcome: "In progress" };
+    recentCalls.set(sessionId, call);
+    while (recentCalls.size > 20) recentCalls.delete(recentCalls.keys().next().value!);
+
+    // Handoff: forward to staff while open, otherwise a call-back task in the inbox.
+    const handoff = (say: string) => {
+      const config = getBusinessConfig();
+      if (twilio.config.staffPhone && isOpenNow(config)) {
+        call.outcome = "Forwarded to staff";
+        return xml(dialTwiml(`${say} Connecting you to our team now.`, twilio.config.staffPhone));
+      }
+      inbox.add("human", sessionId, `Call back: ${form.From ?? "unknown number"}`, "The caller needs a person (handoff from the phone line).");
+      call.outcome = "Call-back requested";
+      return xml(hangupTwiml(`${say} Our team will call you back as soon as we open. Goodbye.`));
+    };
+
+    if (!("SpeechResult" in form) && call.turns === 0 && call.silences === 0) {
+      return xml(gatherTwiml(`Thanks for calling ${getBusinessConfig().name}. How can I help you today?`, action));
+    }
+    const speech = (form.SpeechResult ?? "").trim();
+    if (!speech) {
+      call.silences += 1;
+      return call.silences === 1 ? xml(gatherTwiml("Sorry, I did not hear anything. How can I help?", action)) : handoff("I still cannot hear you.");
+    }
+    call.turns += 1;
+    const agent = getOrCreateAgent(sessionId);
+    const before = agent.getState().events.length;
+    const reply = await agent.processMessage(speech);
+    sessions.saveState(sessionId, agent.getState());
+    if (/confirmed your appointment|booked/i.test(reply) && agent.getState().activeWorkOrder) call.outcome = `Booked ${agent.getState().activeWorkOrder!.id.replace(/^wo_/, "WO-")}`;
+    if (agent.getState().events.slice(before).some((event) => event.type === "HANDOFF_REQUESTED")) return handoff(reply);
+    return xml(gatherTwiml(reply, action));
+  }
+  if (pathname === "/api/plugins/twilio/calls" && method === "GET" && user?.role === "owner") {
+    return json({ ok: true, data: { calls: [...recentCalls.values()].reverse() } }, 200, corsHeaders);
+  }
+
   // Staff run the day (bookings, inbox, chat); only the owner changes settings, plugins, logins or resets data.
   const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset"
     || (method !== "GET" && (pathname === "/api/business" || pathname === "/api/staff"));

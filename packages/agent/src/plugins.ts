@@ -150,7 +150,41 @@ export const plugins: Plugin[] = [
   }
 ];
 
-export const llmConfig = (config: Record<string, string>, secrets: Record<string, string>): LlmConfig =>
+// Twilio phone line, kept out of the array literal above for readability.
+plugins.push({
+  id: "twilio",
+  name: "Twilio phone line",
+  category: "Phone",
+  description: "Answers calls to your Twilio number with the same agent as the Test call. Callers who need a person are forwarded to staff while you are open, otherwise they get a call-back task in the Inbox.",
+  fields: [
+    { key: "accountSid", label: "Account SID", secret: false, placeholder: "AC…", help: "Twilio Console → Account info." },
+    { key: "authToken", label: "Auth token", secret: true, help: "Used to check every call really comes from Twilio." },
+    { key: "phoneNumber", label: "Your Twilio number", secret: false, placeholder: "+15551234567" },
+    { key: "staffPhone", label: "Forward to staff (optional)", secret: false, placeholder: "+923001234567", help: "During opening hours, callers asking for a person are connected here." },
+    { key: "publicUrl", label: "Public address of this dashboard", secret: false, placeholder: "https://bookings.yourdomain.com", help: "In Twilio, set the number's Voice webhook to <public address>/api/twilio/voice (HTTP POST)." }
+  ],
+  limits: "Twilio must reach this server over the internet: on a VPS use your HTTPS domain; on a home PC use a tunnel, and calls fail while the PC is off. Twilio charges per minute on your own account.",
+  validate: (values) => !/^AC[0-9a-f]{32}$/i.test(values.accountSid ?? "") ? "Account SID starts with AC and has 34 characters"
+    : (values.authToken ?? "").length < 32 ? "Enter the 32-character auth token"
+    : !/^\+\d{8,15}$/.test(values.phoneNumber ?? "") ? "Twilio number must look like +15551234567"
+    : values.staffPhone && !/^\+\d{8,15}$/.test(values.staffPhone) ? "Staff phone must look like +923001234567"
+    : !/^https:\/\//.test(values.publicUrl ?? "") ? "Public address must start with https:// (Twilio cannot call localhost)" : null,
+  test: async ({ config, secrets }) => {
+    try {
+      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(config.accountSid)}.json`, {
+        headers: { Authorization: `Basic ${Buffer.from(`${config.accountSid}:${secrets.authToken}`).toString("base64")}` },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (response.status === 401 || response.status === 404) return { ok: false, message: "Twilio rejected the Account SID or auth token." };
+      if (!response.ok) return { ok: false, message: `Twilio answered ${response.status}.` };
+      return { ok: true, message: `Twilio account OK. Now set the Voice webhook of ${config.phoneNumber} to ${config.publicUrl.replace(/\/$/, "")}/api/twilio/voice.` };
+    } catch {
+      return { ok: false, message: "Could not reach Twilio. Check the internet connection." };
+    }
+  }
+});
+
+export const llmConfig =(config: Record<string, string>, secrets: Record<string, string>): LlmConfig =>
   ({ provider: config.provider as LlmConfig["provider"], model: config.model, accountId: config.accountId, baseUrl: config.baseUrl, apiKey: secrets.apiKey });
 
 export const pluginById = (id: string) => plugins.find((plugin) => plugin.id === id);

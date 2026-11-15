@@ -50,6 +50,32 @@ function DeliveryLog() {
   );
 }
 
+type Call = { id: string; from: string; startedAt: string; turns: number; silences: number; outcome: string };
+
+// Last 20 phone calls since the server started (caller number masked).
+function CallLog() {
+  const [calls, setCalls] = useState<Call[] | null>(null);
+  useEffect(() => {
+    fetch("/api/plugins/twilio/calls").then((r) => r.json()).then((body) => setCalls(body.data.calls)).catch(() => setCalls([]));
+  }, []);
+  if (!calls) return null;
+  return (
+    <details style={{ fontSize: 13 }}>
+      <summary style={{ cursor: "pointer", fontWeight: 600 }}>Recent calls ({calls.length})</summary>
+      {calls.length === 0 ? <p style={{ color: "var(--text-tertiary)" }}>No calls yet since the server started.</p> : (
+        <table style={{ width: "100%", marginTop: 8, borderCollapse: "collapse" }}>
+          <thead><tr style={{ textAlign: "left", color: "var(--text-tertiary)" }}><th>When</th><th>From</th><th>Turns</th><th>Outcome</th></tr></thead>
+          <tbody>{calls.map((call) => (
+            <tr key={call.id} style={{ borderTop: "1px solid var(--border)" }}>
+              <td>{new Date(call.startedAt).toLocaleString()}</td><td>{call.from}</td><td>{call.turns}</td><td>{call.outcome}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+    </details>
+  );
+}
+
 function PluginCard({ plugin, onChanged }: { plugin: Plugin; onChanged: () => void }) {
   const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(plugin.fields.map((f) => [f.key, f.value])));
   const [status, setStatus] = useState<Status>(null);
@@ -130,6 +156,7 @@ function PluginCard({ plugin, onChanged }: { plugin: Plugin; onChanged: () => vo
         </details>
       )}
       {plugin.id === "n8n" && plugin.enabled && <DeliveryLog />}
+      {plugin.id === "twilio" && plugin.enabled && <CallLog />}
       <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>Limits: {plugin.limits}</p>
       {status && <p role={status.kind === "error" ? "alert" : "status"} style={{ margin: 0, fontSize: 13, color }}>{status.text}</p>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
