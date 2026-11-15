@@ -9,7 +9,8 @@ import { handleRequest } from "./worker.js";
 const dir = mkdtempSync(join(tmpdir(), "dispatchai-settings-"));
 afterAll(() => {
   setBusinessConfig(undefined);
-  rmSync(dir, { recursive: true, force: true });
+  // Windows keeps open SQLite files locked; a leftover temp folder is harmless.
+  try { rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
 });
 
 describe("SettingsStore", () => {

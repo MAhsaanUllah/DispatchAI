@@ -40,7 +40,8 @@ describe("plugins API", () => {
   });
   afterAll(() => {
     server.close();
-    rmSync(dir, { recursive: true, force: true });
+    // Windows keeps open SQLite files locked; a leftover temp folder is harmless.
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
   });
 
   const call = async (path: string, init: RequestInit = {}) => {

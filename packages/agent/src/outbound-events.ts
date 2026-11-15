@@ -35,24 +35,27 @@ export function buildBookingEvent(type: BookingEventType, workOrder: WorkOrder, 
   };
 }
 
-// shortcut: one attempt, no outbox/retry/dead-letter; PR 12 adds those. Never throws, so a booking never fails because n8n is down.
-export async function sendBookingEvent(url: string, secret: string, event: BookingEvent, timeoutMs = 5000): Promise<boolean> {
-  const body = JSON.stringify(event);
+// Posts one signed event body. Never throws, so a booking never fails because n8n is down; retries live in outbox.ts.
+export async function postSignedEvent(url: string, secret: string, type: string, body: string, timeoutMs = 5000): Promise<{ ok: boolean; error?: string }> {
   const timestamp = String(Math.floor(Date.now() / 1000));
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-dispatchai-event": event.type,
+        "x-dispatchai-event": type,
         "x-dispatchai-timestamp": timestamp,
         "x-dispatchai-signature": await signEvent(body, timestamp, secret)
       },
       body,
       signal: AbortSignal.timeout(timeoutMs)
     });
-    return response.ok;
-  } catch {
-    return false;
+    return response.ok ? { ok: true } : { ok: false, error: `HTTP ${response.status}` };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error && error.name === "TimeoutError" ? "Timed out" : "Could not connect" };
   }
+}
+
+export async function sendBookingEvent(url: string, secret: string, event: BookingEvent, timeoutMs = 5000): Promise<boolean> {
+  return (await postSignedEvent(url, secret, event.type, JSON.stringify(event), timeoutMs)).ok;
 }
