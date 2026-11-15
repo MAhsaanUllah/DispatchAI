@@ -90,7 +90,7 @@ export class DispatchStore {
   }
 
   // Replace the staff list. Staff with a future booking cannot be removed. Returns the blocking staff ids.
-  public setStaff(staff: { id?: string; name: string; skills: string[] }[], serviceZones: string[], now = new Date().toISOString()): string[] {
+  public setStaff(staff: { id?: string; name: string; skills: string[]; hours?: Technician["hours"] }[], serviceZones: string[], now = new Date().toISOString()): string[] {
     const keep = new Set(staff.map((member) => member.id).filter(Boolean));
     const blocked = [...this.technicians.keys()].filter((id) => !keep.has(id) && [...this.slots.values()].some((slot) => slot.technicianId === id && slot.status !== "AVAILABLE" && slot.startAt > now));
     if (blocked.length > 0) return blocked;
@@ -98,7 +98,7 @@ export class DispatchStore {
     const updated = new Map<string, Technician>();
     for (const member of staff) {
       const id = member.id && this.technicians.has(member.id) ? member.id : `tech_${String(next++).padStart(2, "0")}`;
-      updated.set(id, { id, name: member.name, skills: member.skills, serviceZones, status: "ACTIVE" });
+      updated.set(id, { id, name: member.name, skills: member.skills, serviceZones, status: "ACTIVE", ...(member.hours ? { hours: member.hours } : {}) });
     }
     this.technicians = updated;
     this.rebuildFutureSlots(now);

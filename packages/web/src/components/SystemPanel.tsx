@@ -1,64 +1,12 @@
 import React from "react";
-import { PhoneCall, Bot, Database, Plug, ShieldCheck, Cpu, Cable } from "lucide-react";
+import { BackupPanel } from "./BackupPanel.js";
+import { BookingMeter } from "../BookingMeter.js";
+import { BOOKING_STEPS, featureById, RUNS_ON, type RunsOn } from "../features.js";
 
 type SystemPlugin = {
   id: string; name: string; enabled: boolean;
   status?: { text: string; warning: boolean };
 };
-
-const STEPS = [
-  {
-    icon: PhoneCall,
-    title: "Caller",
-    meta: "Browser mic, or your Twilio number",
-    copy: "A caller reaches the agent from the browser Test call. Connect the Twilio plugin and the same agent answers your own number."
-  },
-  {
-    icon: Bot,
-    title: "DispatchAI server",
-    meta: "One server, running on this machine",
-    copy: "The rule-based agent collects the job, the customer and the slot. An optional AI brain handles the awkward parts of the call."
-  },
-  {
-    icon: ShieldCheck,
-    title: "Confirmation gate",
-    meta: "Nothing is written without a yes",
-    copy: "Every booking, reschedule and cancellation is proposed first and written only after you confirm it. The agent never books on its own."
-  },
-  {
-    icon: Database,
-    title: "SQLite on this machine",
-    meta: "One database file, no cloud",
-    copy: "Work orders, technicians, slots and customers live in a single file beside the server. Back it up by copying that file."
-  },
-  {
-    icon: Cable,
-    title: "Plugins",
-    meta: "What a confirmed booking touches",
-    copy: "Each plugin is optional and switched on from the Plugins page. A plugin that is off is simply skipped."
-  }
-] as const;
-
-// Live plugin state, as chips that open the Plugins page.
-function PluginChips({ onOpenPlugins }: { onOpenPlugins: () => void }) {
-  const [plugins, setPlugins] = React.useState<SystemPlugin[] | null>(null);
-  React.useEffect(() => {
-    fetch("/api/plugins").then((r) => (r.ok ? r.json() : null)).then((body) => setPlugins(body?.data?.plugins ?? null)).catch(() => setPlugins(null));
-  }, []);
-  if (!plugins) return <p className="flow__note">Reading plugin status…</p>;
-  return (
-    <div className="chip-row">
-      {plugins.map((plugin) => (
-        <button key={plugin.id} type="button" className={`chip ${plugin.enabled ? "chip--on" : "chip--off"}`} onClick={onOpenPlugins} title={plugin.status?.text ?? (plugin.enabled ? "Connected" : "Not connected")}>
-          <span className={`swatch swatch--${plugin.enabled ? "live" : "closed"}`} aria-hidden="true" />
-          <span className="chip__name">{plugin.name}</span>
-          <span className="chip__state">{plugin.enabled ? "live" : "off"}</span>
-        </button>
-      ))}
-      <button type="button" className="chip chip--link" onClick={onOpenPlugins}>Manage plugins</button>
-    </div>
-  );
-}
 
 type Health = {
   uptimeSeconds: number;
@@ -68,87 +16,137 @@ type Health = {
   bookings: { total: number; lastCreatedAt: string | null };
 };
 
+export type Problem = { text: string; go?: "features" | "inbox" };
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+// What needs the owner's attention right now, in plain words, each with where to fix it.
+export function systemProblems(health: Health | null, plugins: SystemPlugin[] | null): Problem[] {
+  const problems: Problem[] = [];
+  if (health) {
+    if (health.database.kind === "memory") problems.push({ text: "Data is kept in memory only, so it is lost when the server stops." });
+    if (health.inbox.overdue > 0) problems.push({ text: `${plural(health.inbox.overdue, "task")} in the Inbox ${health.inbox.overdue === 1 ? "is" : "are"} overdue.`, go: "inbox" });
+    if (health.events.dead > 0) problems.push({ text: `${plural(health.events.dead, "booking event")} did not reach your custom workflow.`, go: "features" });
+  }
+  for (const plugin of plugins ?? []) {
+    if (plugin.enabled && plugin.status?.warning) problems.push({ text: `${plugin.name}: ${plugin.status.text}`, go: "features" });
+  }
+  return problems;
+}
+
 const duration = (seconds: number) => seconds < 3600 ? `${Math.max(1, Math.round(seconds / 60))} min` : `${Math.floor(seconds / 3600)} h ${Math.round((seconds % 3600) / 60)} min`;
 const size = (bytes: number) => bytes < 1_048_576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1_048_576).toFixed(1)} MB`;
 
-// Live numbers from the server, so the owner can tell at a glance that the system is working.
-function HealthStrip() {
+type StepState = "auto" | "live" | "off" | "failing";
+const STEP_LABEL: Record<StepState, string> = { auto: "Automatic", live: "Live", off: "Off", failing: "Failing" };
+
+export function SystemPanel({ onOpenPlugins, onOpenInbox, isOwner = false }: { onOpenPlugins: () => void; onOpenInbox?: () => void; isOwner?: boolean }) {
   const [health, setHealth] = React.useState<Health | null | "error">(null);
+  const [plugins, setPlugins] = React.useState<SystemPlugin[] | null>(null);
+  const [runsOn, setRunsOn] = React.useState<RunsOn>("desktop");
+
   React.useEffect(() => {
-    const load = () => fetch("/api/system").then((r) => (r.ok ? r.json() : Promise.reject())).then((body) => setHealth(body.data)).catch(() => setHealth("error"));
+    const load = () => {
+      fetch("/api/system").then((r) => (r.ok ? r.json() : Promise.reject())).then((body) => setHealth(body.data)).catch(() => setHealth("error"));
+      if (isOwner) fetch("/api/plugins").then((r) => (r.ok ? r.json() : null)).then((body) => setPlugins(body?.data?.plugins ?? null)).catch(() => setPlugins(null));
+    };
     load();
+    fetch("/api/business").then((r) => r.json()).then((body) => setRunsOn(body.data.config.runsOn ?? "desktop")).catch(() => undefined);
     const timer = setInterval(load, 15_000);
     return () => clearInterval(timer);
   }, []);
-  if (health === null) return null;
-  if (health === "error") return <p className="flow__note">Could not read the server status. Is the server still running?</p>;
-  const tiles = [
-    { label: "Server", value: `Up ${duration(health.uptimeSeconds)}`, warn: false },
-    { label: "Database", value: health.database.kind === "memory" ? "In memory (not saved)" : size(health.database.sizeBytes), warn: health.database.kind === "memory" },
-    { label: "Inbox", value: `${health.inbox.open} open${health.inbox.overdue ? ` · ${health.inbox.overdue} overdue` : ""}`, warn: health.inbox.overdue > 0 },
-    { label: "n8n events", value: `${health.events.pending} waiting · ${health.events.dead} failed`, warn: health.events.dead > 0 },
-    { label: "Bookings", value: `${health.bookings.total}${health.bookings.lastCreatedAt ? ` · last ${new Date(health.bookings.lastCreatedAt).toLocaleDateString()}` : ""}`, warn: false }
-  ];
-  return (
-    <dl className="health" aria-label="System health">
-      {tiles.map((tile) => (
-        <div key={tile.label} className={`health__tile${tile.warn ? " health__tile--warn" : ""}`}>
-          <dt>{tile.label}</dt>
-          <dd>{tile.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 
-export function SystemPanel({ onOpenPlugins }: { onOpenPlugins: () => void }) {
+  const data = health === "error" ? null : health;
+  const problems = systemProblems(data, plugins);
+  const stateOf = (by: string | null): StepState | null => {
+    if (!by) return "auto";
+    if (!isOwner || !plugins) return null;
+    const plugin = plugins?.find((p) => p.id === by);
+    return !plugin?.enabled ? "off" : plugin.status?.warning ? "failing" : "live";
+  };
+  const liveIds = plugins?.filter((p) => p.enabled && !p.status?.warning).map((p) => p.id) ?? [];
+  const where = RUNS_ON.find((option) => option.id === runsOn) ?? RUNS_ON[0];
+  const go = (target?: "features" | "inbox") => (target === "inbox" ? onOpenInbox?.() : onOpenPlugins());
+
+  const tiles = data ? [
+    { label: "Server", value: `Up ${duration(data.uptimeSeconds)}`, warn: false },
+    { label: "Database", value: data.database.kind === "memory" ? "In memory, not saved" : size(data.database.sizeBytes), warn: data.database.kind === "memory" },
+    { label: "Inbox", value: `${data.inbox.open} open${data.inbox.overdue ? `, ${data.inbox.overdue} overdue` : ""}`, warn: data.inbox.overdue > 0 },
+    { label: "Custom workflow", value: `${data.events.pending} waiting, ${data.events.dead} failed`, warn: data.events.dead > 0 },
+    { label: "Bookings", value: data.bookings.lastCreatedAt ? `${data.bookings.total}, last ${new Date(data.bookings.lastCreatedAt).toLocaleDateString()}` : `${data.bookings.total}`, warn: false }
+  ] : [];
+
   return (
-    <section className="page" aria-label="System architecture">
+    <section className="page" aria-labelledby="system-title">
       <div className="page__head">
         <div className="page__head-text">
-          <h1 className="page__title">How DispatchAI works</h1>
-          <p className="page__lede">One server on this machine takes the call, confirms the booking and writes it to the database. Plugins carry it out from there.</p>
+          <h1 className="page__title" id="system-title">System</h1>
+          <p className="page__lede">Is everything working? What runs, what is connected and where your data lives.</p>
         </div>
       </div>
 
-      <HealthStrip />
+      {health === "error" && <p role="alert" className="status status--warn">Could not read the server status. Is the server still running?</p>}
+      {data && (
+        <div role="status" className={`status ${problems.length === 0 ? "status--ok" : "status--warn"}`}>
+          <h2 className="status__title">{problems.length === 0 ? "Everything is working." : `${plural(problems.length, "thing")} need${problems.length === 1 ? "s" : ""} attention.`}</h2>
+          {problems.length > 0 && (
+            <ul className="status__list">
+              {problems.map((problem) => (
+                <li key={problem.text}>
+                  <span>{problem.text}</span>
+                  {problem.go && <button type="button" className="btn btn--sm" onClick={() => go(problem.go)}>{problem.go === "inbox" ? "Open Inbox" : "Open Features"}</button>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
-      <ol className="flow">
-        {STEPS.map((step) => {
-          const Icon = step.icon;
-          return (
-            <li className="flow__step" key={step.title}>
-              <span className="flow__icon" aria-hidden="true"><Icon size={15} /></span>
-              <div className="flow__body">
-                <div className="flow__head">
-                  <h2 className="flow__title">{step.title}</h2>
-                  <span className="flow__meta">{step.meta}</span>
-                </div>
-                <p className="flow__copy">{step.copy}</p>
-                {step.title === "DispatchAI server" && (
-                  <span className="flow__note"><Cpu size={12} aria-hidden="true" />The AI brain is a plugin, not the agent. Without it the rule-based agent still books.</span>
-                )}
-                {step.title === "Plugins" && <PluginChips onOpenPlugins={onOpenPlugins} />}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+      {data && (
+        <dl className="health" aria-label="System health">
+          {tiles.map((tile) => (
+            <div key={tile.label} className={`health__tile${tile.warn ? " health__tile--warn" : ""}`}>
+              <dt>{tile.label}</dt>
+              <dd>{tile.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
-      <div className="facts">
-        <div className="fact">
-          <ShieldCheck size={15} aria-hidden="true" />
-          <span>Nothing reaches a customer without a confirmation step in between.</span>
+      <section className="journey" aria-labelledby="journey-title">
+        <div className="journey__head">
+          <h2 className="journey__title" id="journey-title">What happens to a booking</h2>
+          <p className="journey__lede">Nine steps, from the call to your own tools. Nothing is saved without the caller's clear yes.</p>
         </div>
-        <div className="fact">
-          <Plug size={15} aria-hidden="true" />
-          <span>Plugins are the only part that leaves this machine, and only the ones you connect.</span>
-        </div>
-        <div className="fact">
-          <Database size={15} aria-hidden="true" />
-          <span>One SQLite file holds the whole business: jobs, technicians, slots, customers.</span>
-        </div>
-      </div>
+        {isOwner && plugins && <BookingMeter live={liveIds} compact />}
+        {!isOwner && <p className="field__hint">Only the owner can see which features are switched on.</p>}
+        <ol className="journey__list">
+          {BOOKING_STEPS.map((step, index) => {
+            const state = stateOf(step.by);
+            const feature = step.by ? featureById(step.by) : undefined;
+            return (
+              <li key={step.label} className="journey__row">
+                <span className="journey__n" aria-hidden="true">{index + 1}</span>
+                <span className="journey__body">
+                  <span className="journey__name">{step.label}</span>
+                  <span className="journey__by">{feature ? feature.name : "Built in, always on"}</span>
+                </span>
+                {state && <span className={`state state--${state}`}>{STEP_LABEL[state]}</span>}
+                {isOwner && (state === "off" || state === "failing") && <button type="button" className="btn btn--sm" onClick={() => go("features")}>{state === "off" ? "Set up" : "Fix"}</button>}
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+
+      <section className="where" aria-labelledby="where-title">
+        <h2 className="where__title" id="where-title">Where it runs: {where.title}</h2>
+        <p className="where__summary">{where.summary}</p>
+        <ul className="where__points">{where.points.map((point) => <li key={point}>{point}</li>)}</ul>
+        <p className="field__hint">Your data is one database file on this machine{data && data.database.kind === "file" ? ` (${size(data.database.sizeBytes)})` : ""}. It never leaves unless you switch on a feature that sends it, and only the parts that feature needs.</p>
+      </section>
+
+      {isOwner && <BackupPanel />}
     </section>
   );
 }

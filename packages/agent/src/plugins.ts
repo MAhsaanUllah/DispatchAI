@@ -36,9 +36,9 @@ const isHttpUrl = (value: string) => {
 export const plugins: Plugin[] = [
   {
     id: "n8n",
-    name: "n8n automations",
-    category: "Automation",
-    description: "Sends a signed event to your n8n workflow when a booking is created, rescheduled or cancelled. IDs only, no names or addresses.",
+    name: "Custom workflow (n8n)",
+    category: "Custom workflow",
+    description: "Paste your n8n webhook link and DispatchAI sends a signed event when a booking is created, rescheduled or cancelled (IDs only, no names or addresses). Host n8n on your cloud server or use n8n Cloud.",
     fields: [
       { key: "url", label: "Webhook URL", secret: false, placeholder: "http://n8n:5678/webhook/dispatchai-events", help: "Import n8n/workflows/dispatchai-events-starter.json in n8n and copy its webhook URL." },
       { key: "secret", label: "Signing secret", secret: true, help: "Any long random text. Set the same value as DISPATCHAI_EVENTS_SECRET in n8n." }
@@ -117,7 +117,9 @@ export const plugins: Plugin[] = [
       { key: "model", label: "Model", secret: false, placeholder: "@cf/meta/llama-3.1-8b-instruct", help: "Workers AI: @cf/meta/llama-3.1-8b-instruct · Groq: llama-3.1-8b-instant · Gemini: gemini-2.0-flash · Ollama: llama3.1" },
       { key: "accountId", label: "Cloudflare account ID", secret: false, help: "Workers AI only. Cloudflare dashboard → Workers AI → Use REST API." },
       { key: "apiKey", label: "API key / token", secret: true, help: "Not needed for Ollama." },
-      { key: "baseUrl", label: "Ollama URL", secret: false, placeholder: "http://localhost:11434", help: "Ollama only." }
+      { key: "baseUrl", label: "Ollama URL", secret: false, placeholder: "http://localhost:11434", help: "Ollama only." },
+      { key: "priceIn", label: "Your price per million input tokens (USD)", secret: false, placeholder: "0.15", help: "Optional. From your provider's pricing page, only used to estimate the cost on the Features page. Leave both prices empty for a free tier or Ollama." },
+      { key: "priceOut", label: "Your price per million output tokens (USD)", secret: false, placeholder: "0.60" }
     ],
     limits: "If the AI is down, slow or its free allowance is used up, the built-in rules keep answering (they understand simpler sentences). Check your provider's pricing page for current free limits.",
     validate: (values) => {
@@ -127,6 +129,9 @@ export const plugins: Plugin[] = [
       if (provider === "workers-ai" && !/^[0-9a-f]{32}$/i.test(values.accountId ?? "")) return "Enter your 32-character Cloudflare account ID";
       if (provider !== "ollama" && (values.apiKey ?? "").length < 10) return "Enter the API key";
       if (provider === "ollama" && values.baseUrl && !isHttpUrl(values.baseUrl)) return "Ollama URL must start with http:// or https://";
+      const prices = [values.priceIn, values.priceOut].map((value) => (value ?? "").trim());
+      if (prices.some((value) => value && !(Number(value) >= 0))) return "Prices must be numbers such as 0.15";
+      if (prices.some(Boolean) && !prices.every(Boolean)) return "Enter both prices, or leave both empty";
       return null;
     },
     test: async ({ config, secrets }) => {

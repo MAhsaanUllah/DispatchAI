@@ -3,14 +3,14 @@ import React, { useEffect, useState } from "react";
 type Hours = Record<Day, { open: string; close: string } | null>;
 type Day = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 type Service = { id: string; name: string };
-type Staff = { id?: string; name: string; skills: string[] };
-type Props = { onDone: () => void; onBack: () => void };
+type Staff = { id?: string; name: string; skills: string[]; hours?: Hours };
+type Props = { onDone: () => void; onBack: () => void; finishLabel?: string };
 
 const DAYS: [Day, string][] = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
 const idOf = (name: string) => name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
 // Onboarding step 3: what you offer, when you are open, and who works. Saving generates bookable slots.
-export function ScheduleSetup({ onDone, onBack }: Props) {
+export function ScheduleSetup({ onDone, onBack, finishLabel = "Finish setup" }: Props) {
   const [services, setServices] = useState<Service[]>([]);
   const [hours, setHours] = useState<Hours | null>(null);
   const [slotMinutes, setSlotMinutes] = useState(60);
@@ -23,7 +23,7 @@ export function ScheduleSetup({ onDone, onBack }: Props) {
       setServices(business.data.config.services.map((s: Service) => ({ id: s.id, name: s.name })));
       setHours(business.data.config.hours);
       setSlotMinutes(business.data.config.slotMinutes);
-      setStaff(directory.data.technicians.map((t: Staff & { id: string }) => ({ id: t.id, name: t.name, skills: t.skills })));
+      setStaff(directory.data.technicians.map((t: Staff & { id: string }) => ({ id: t.id, name: t.name, skills: t.skills, hours: t.hours })));
     }).catch(() => setError("Cannot load your schedule settings."));
   }, []);
 
@@ -52,6 +52,8 @@ export function ScheduleSetup({ onDone, onBack }: Props) {
       setSaving(false);
     }
   };
+
+  const setOwnHours = (index: number, own: Hours | undefined) => setStaff(staff.map((member, i) => (i === index ? { ...member, hours: own } : member)));
 
   const toggleSkill = (index: number, skill: string) => setStaff(staff.map((member, i) => i !== index ? member
     : { ...member, skills: member.skills.includes(skill) ? member.skills.filter((s) => s !== skill) : [...member.skills, skill] }));
@@ -107,6 +109,34 @@ export function ScheduleSetup({ onDone, onBack }: Props) {
               <input className="input" aria-label={`Staff ${index + 1} name`} value={member.name} onChange={(e) => setStaff(staff.map((m, i) => i === index ? { ...m, name: e.target.value } : m))} />
               <button type="button" className="btn btn--sm" aria-label={`Remove ${member.name || "staff member"}`} onClick={() => setStaff(staff.filter((_, i) => i !== index))}>Remove</button>
             </div>
+            <label className="check">
+              <input type="checkbox" checked={!member.hours} onChange={(e) => setOwnHours(index, e.target.checked ? undefined : structuredClone(hours))} />
+              Works the business hours
+            </label>
+            {member.hours && (
+              <div className="staff-hours" role="group" aria-label={`${member.name || "Staff member"} working hours`}>
+                {DAYS.map(([day, label]) => {
+                  const own = member.hours![day];
+                  return (
+                    <div key={day} className="hours-row">
+                      <span>{label}</span>
+                      <label className="check">
+                        <input type="checkbox" aria-label={`${member.name || "Staff"} works ${label}`} checked={own !== null} onChange={(e) => setOwnHours(index, { ...member.hours!, [day]: e.target.checked ? (hours[day] ?? { open: "09:00", close: "17:00" }) : null })} />
+                        Works
+                      </label>
+                      {own ? (
+                        <span className="time-pair">
+                          <input className="input" aria-label={`${member.name || "Staff"} starts ${label}`} type="time" value={own.open} onChange={(e) => setOwnHours(index, { ...member.hours!, [day]: { ...own, open: e.target.value } })} />
+                          <span className="field__hint">to</span>
+                          <input className="input" aria-label={`${member.name || "Staff"} finishes ${label}`} type="time" value={own.close} onChange={(e) => setOwnHours(index, { ...member.hours!, [day]: { ...own, close: e.target.value } })} />
+                        </span>
+                      ) : <span className="field__hint">Day off</span>}
+                    </div>
+                  );
+                })}
+                <p className="field__hint">Customers can only book them inside the business opening hours.</p>
+              </div>
+            )}
             <div className="skill-list">
               {services.filter((service) => service.name.trim()).map((service) => {
                 const skill = idOf(service.name);
@@ -127,7 +157,7 @@ export function ScheduleSetup({ onDone, onBack }: Props) {
       <div className="wizard__actions">
         <button type="button" className="btn" onClick={onBack}>Back</button>
         <button type="button" className="btn btn--primary" onClick={save} disabled={saving}>
-          {saving ? "Saving…" : "Finish setup"}
+          {saving ? "Saving…" : finishLabel}
         </button>
       </div>
     </div>

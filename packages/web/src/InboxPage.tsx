@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Inbox as InboxIcon, Check } from "lucide-react";
+import { Inbox as InboxIcon, Check, Phone } from "lucide-react";
 
 type Task = {
   id: string; kind: "emergency" | "human" | "tool_failure" | "delivery_failed"; title: string; detail: string; ref: string;
@@ -22,6 +22,13 @@ const KIND_PREFIX: Record<Task["kind"], RegExp> = {
   delivery_failed: /^n8n did not receive\s*/
 };
 const subjectOf = (task: Task): string => task.title.replace(KIND_PREFIX[task.kind], "").trim() || task.title;
+
+// Staff work from a phone: when the task holds a caller's number, one tap dials it (tel: link).
+export const phoneOf = (task: Pick<Task, "kind" | "title" | "detail">): string | undefined => {
+  if (task.kind !== "human" && task.kind !== "emergency") return undefined;
+  const found = /\+?\d[\d\s().-]{6,}\d/.exec(`${task.title} ${task.detail}`)?.[0];
+  return found ? found.replace(/[^\d+]/g, "") : undefined;
+};
 
 // Human-in-the-loop inbox: what the agent handed to a person. Open tasks first; overdue ones are marked.
 export function InboxPage() {
@@ -89,7 +96,12 @@ export function InboxPage() {
                 <span className="task__actions">
                   {task.closedAt
                     ? <span className="task__closed">Closed by {task.closedBy}, {age(task.closedAt)}</span>
-                    : <button type="button" className="btn btn--sm" onClick={() => close(task.id)}><Check size={12} aria-hidden="true" />Done</button>}
+                    : (
+                      <>
+                        {phoneOf(task) && <a className="btn btn--primary btn--sm" href={`tel:${phoneOf(task)}`}><Phone size={12} aria-hidden="true" />Call back</a>}
+                        <button type="button" className="btn btn--sm" onClick={() => close(task.id)}><Check size={12} aria-hidden="true" />Done</button>
+                      </>
+                    )}
                 </span>
               </li>
             ))}

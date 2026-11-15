@@ -40,3 +40,29 @@ export function isOpenNow(config: BusinessConfig, now = new Date()): boolean {
 }
 
 export const maskPhone = (phone: string) => phone.replace(/\d(?=\d{4})/g, "•");
+
+export type TwilioAccount = { balance: string; currency: string; month: { calls: number; minutes: number; spend: string; unit: string } };
+
+// Twilio's REST API, with the owner's own SID and token (the same ones that check incoming calls).
+// Read-only: balance and this month's usage records. Throws an Error whose message starts with the HTTP status.
+export async function fetchTwilioAccount(accountSid: string, authToken: string, request: typeof fetch = fetch): Promise<TwilioAccount> {
+  const base = `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}`;
+  const headers = { Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}` };
+  const get = async (path: string) => {
+    const response = await request(`${base}${path}`, { headers, signal: AbortSignal.timeout(6000) });
+    if (!response.ok) throw new Error(`${response.status}`);
+    return (await response.json()) as Record<string, unknown>;
+  };
+  const [balance, calls, spend] = await Promise.all([get("/Balance.json"), get("/Usage/Records/ThisMonth.json?Category=calls"), get("/Usage/Records/ThisMonth.json?Category=totalprice")]);
+  const first = (body: Record<string, unknown>) => ((body.usage_records as Record<string, string>[] | undefined) ?? [])[0];
+  return {
+    balance: String(balance.balance ?? ""),
+    currency: String(balance.currency ?? ""),
+    month: {
+      calls: Number(first(calls)?.count ?? 0),
+      minutes: Number(first(calls)?.usage ?? 0),
+      spend: String(first(spend)?.price ?? ""),
+      unit: String(first(spend)?.price_unit ?? "").toUpperCase()
+    }
+  };
+}

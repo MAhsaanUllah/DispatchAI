@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Navbar } from "./components/Navbar.js";
 import { StatsBar } from "./components/StatsBar.js";
+import { TodaySummary } from "./components/TodaySummary.js";
 import { JobsTable } from "./components/JobsTable.js";
 import { WorkOrderDrawer } from "./components/WorkOrderDrawer.js";
 import { AgentChat } from "./components/AgentChat.js";
@@ -19,12 +20,21 @@ export const App: React.FC = () => {
   const [jobsLoading, setJobsLoading] = useState(true);
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [directoryLoading, setDirectoryLoading] = useState(true);
-  const [editingBusiness, setEditingBusiness] = useState(false);
+  // Which part of the business is being edited, if any. Company opens the details, Services and Team open hours and staff.
+  const [editing, setEditing] = useState<null | "details" | "schedule">(null);
   const [isOwner, setIsOwner] = useState(true);
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((body) => setIsOwner(body?.data?.role !== "staff")).catch(() => undefined);
   }, []);
-  const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox">("dispatch");
+  // Onboarding can ask to land on Features once, when there is something left to connect.
+  const [activeView, setActiveView] = useState<"dispatch" | "team" | "services" | "company" | "system" | "plugins" | "inbox">(() => {
+    try {
+      const wanted = sessionStorage.getItem("dispatch.view");
+      sessionStorage.removeItem("dispatch.view");
+      if (wanted === "plugins") return "plugins";
+    } catch { /* storage can be blocked */ }
+    return "dispatch";
+  });
   const [notifications, setNotifications] = useState<LocalNotification[]>([]);
   const [selectedJob, setSelectedJob] = useState<WorkOrder | null>(null);
   const [agentState, setAgentState] = useState(api.getAgent().getState());
@@ -138,25 +148,28 @@ export const App: React.FC = () => {
       <Navbar onLogout={() => void fetch("/api/auth/logout", { method: "POST" }).finally(() => window.location.reload())} onReset={handleResetData} austinTime={localTime} companyName={directory?.company.name} isOwner={isOwner} demo={directory?.demo} onOpenVoiceModal={() => setIsVoiceModalOpen(true)} activeView={activeView} onViewChange={setActiveView} />
 
       <main className="app-main">
-        {activeView === "company" && editingBusiness ? <BusinessWizard onDone={() => window.location.reload()} onCancel={() => setEditingBusiness(false)} />
+        {editing ? <BusinessWizard startAt={editing} onDone={() => window.location.reload()} onCancel={() => setEditing(null)} />
           : activeView === "inbox" ? <InboxPage />
             : activeView === "plugins" ? <PluginsPage />
-              : activeView === "system" ? <SystemPanel onOpenPlugins={() => setActiveView("plugins")} />
+              : activeView === "system" ? <SystemPanel onOpenPlugins={() => setActiveView("plugins")} onOpenInbox={() => setActiveView("inbox")} isOwner={isOwner} />
                 : !isBoard ? (
                   <div className="app-body">
                     <DirectoryPanel
                       view={activeView}
                       directory={directory}
                       loading={directoryLoading}
-                      onEdit={activeView === "company" && isOwner ? () => setEditingBusiness(true) : undefined}
+                      onEdit={isOwner ? () => setEditing(activeView === "company" ? "details" : "schedule") : undefined}
+                      onEditHours={activeView === "company" && isOwner ? () => setEditing("schedule") : undefined}
                     />
                     {activeView === "team" && isOwner && <TeamLogins />}
                   </div>
                 ) : (
                   <div className="app-body app-body--flush">
+                    <h1 className="visually-hidden">Dispatch</h1>
                     <div className="split">
                       <div className="split__main board">
                         <StatsBar jobs={jobs} companyName={directory?.company.name} />
+                        <TodaySummary jobs={jobs} />
                         <JobsTable
                           jobs={jobs}
                           selectedJobId={selectedJob?.id || null}

@@ -1,10 +1,11 @@
+import type { WeekHours } from "./hoursText.js";
 import type { AgentState } from "@dispatchai/agent";
 import type { AgentEvent, LocalNotification, WorkOrder } from "@dispatchai/shared";
 
 export type Directory = {
-  company: { name: string; market: string; timeZone: string; serviceZones: string[]; note: string };
+  company: { name: string; market: string; timeZone: string; serviceZones: string[]; note: string; hours: WeekHours; slotMinutes: number; greeting: string; agentName: string; tone: "friendly" | "formal" | "brief" };
   services: { id: string; name: string; description: string; priceNote: string }[];
-  technicians: { id: string; name: string; skills: string[]; serviceZones: string[]; status: string; upcomingSlots: { id: string; startAt: string; endAt: string; status: string }[] }[];
+  technicians: { id: string; name: string; skills: string[]; serviceZones: string[]; status: string; hours?: WeekHours; upcomingSlots: { id: string; startAt: string; endAt: string; status: string }[] }[];
   // True while the install still runs on the fictional demo dataset.
   demo: boolean;
 };

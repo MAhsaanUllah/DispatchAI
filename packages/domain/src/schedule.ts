@@ -42,14 +42,18 @@ export function generateScheduleSlots(config: BusinessConfig, technicians: Techn
   for (let offset = 0; offset < days; offset++) {
     const day = new Date(Date.UTC(y, m - 1, d + offset));
     const date = day.toISOString().slice(0, 10);
-    const hours = config.hours[WEEKDAYS[day.getUTCDay()]];
-    if (!hours) continue;
-    for (let start = toMinutes(hours.open); start + config.slotMinutes <= toMinutes(hours.close); start += config.slotMinutes) {
+    const weekday = WEEKDAYS[day.getUTCDay()];
+    const business = config.hours[weekday];
+    if (!business) continue;
+    for (let start = toMinutes(business.open); start + config.slotMinutes <= toMinutes(business.close); start += config.slotMinutes) {
       const startTime = toTime(start);
       const startAt = zonedTimeToUtc(date, startTime, config.timeZone).toISOString();
       const endAt = zonedTimeToUtc(date, toTime(start + config.slotMinutes), config.timeZone).toISOString();
       for (const tech of technicians) {
         if (tech.status !== "ACTIVE") continue;
+        // A person's own hours only narrow the business hours; with none set they work the business hours.
+        const own = tech.hours ? tech.hours[weekday] : business;
+        if (!own || start < toMinutes(own.open) || start + config.slotMinutes > toMinutes(own.close)) continue;
         slots.push({ id: `slot_${date.replaceAll("-", "")}_${tech.id}_${startTime.replace(":", "")}`, technicianId: tech.id, startAt, endAt, status: "AVAILABLE" });
       }
     }

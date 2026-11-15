@@ -67,3 +67,27 @@ describe("real business (no demo data)", () => {
     expect(store.technicians.size).toBe(1);
   });
 });
+
+describe("a person's own working hours", () => {
+  const week = { sun: null, mon: { open: "09:00", close: "17:00" }, tue: { open: "09:00", close: "17:00" }, wed: null, thu: null, fri: null, sat: null };
+  const base = config({ timeZone: "Asia/Karachi", hours: week, slotMinutes: 60 });
+  const startsOf = (slots: ReturnType<typeof generateScheduleSlots>, id: string) => slots.filter((s) => s.technicianId === id).map((s) => s.startAt);
+  const from = new Date("2026-11-09T03:00:00Z"); // a Monday in Karachi
+
+  it("narrows the business hours, and gives everyone else the business hours", () => {
+    const part: Technician[] = [
+      { id: "tech_01", name: "Sana", skills: ["HAIRCUT"], serviceZones: ["Gulberg"], status: "ACTIVE", hours: { ...week, tue: null, mon: { open: "12:00", close: "15:00" } } },
+      { id: "tech_02", name: "Ali", skills: ["HAIRCUT"], serviceZones: ["Gulberg"], status: "ACTIVE" }
+    ];
+    const slots = generateScheduleSlots(base, part, from, 7);
+    // Monday 12:00, 13:00, 14:00 in Karachi (UTC+5), and nothing on Tuesday.
+    expect(startsOf(slots, "tech_01")).toEqual(["2026-11-09T07:00:00.000Z", "2026-11-09T08:00:00.000Z", "2026-11-09T09:00:00.000Z"]);
+    expect(startsOf(slots, "tech_02")).toHaveLength(16);
+  });
+
+  it("never offers a time outside the business hours, even if the person's hours reach further", () => {
+    const wide: Technician[] = [{ id: "tech_01", name: "Sana", skills: ["HAIRCUT"], serviceZones: ["Gulberg"], status: "ACTIVE", hours: { ...week, mon: { open: "06:00", close: "22:00" }, tue: { open: "06:00", close: "22:00" }, wed: { open: "09:00", close: "17:00" } } }];
+    const slots = generateScheduleSlots(base, wide, from, 7);
+    expect(startsOf(slots, "tech_01")).toHaveLength(16); // Mon + Tue 09:00 to 17:00 only; Wednesday is closed for the business
+  });
+});

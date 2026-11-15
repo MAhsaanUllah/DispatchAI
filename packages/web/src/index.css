@@ -1573,7 +1573,7 @@
 .choice--on .choice__meta { color: var(--color-paper-2); }
 
 .choice__name { font-size: var(--text-md); font-weight: 800; }
-.choice__meta { font-size: var(--text-xs); color: var(--color-mink); }
+.choice__meta { font-size: var(--text-xs); color: var(--color-muted); }
 
 .wizard__actions {
   display: flex;

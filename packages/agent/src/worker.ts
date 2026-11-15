@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { createBackup } from "./backup.js";
-import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, serviceZoneFor, setBusinessConfig } from "@dispatchai/domain";
-import { BusinessConfigSchema, type BusinessService } from "@dispatchai/shared";
+import { businessTemplates, DispatchService, getBusinessConfig, getDirectory, localDate, serviceZoneFor, setBusinessConfig, zonedTimeToUtc } from "@dispatchai/domain";
+import { BusinessConfigSchema, WeekHoursSchema, type BusinessService } from "@dispatchai/shared";
 import { toolFailure, toolSuccess } from "@dispatchai/shared";
 import { DispatchAgent } from "./agent.js";
 import { N8nClient } from "./client.js";
@@ -16,8 +16,9 @@ import { Inbox, SLA_MINUTES } from "./inbox.js";
 import { SettingsStore } from "./settings-store.js";
 import { PluginStore } from "./plugin-store.js";
 import { llmConfig, pluginById, plugins } from "./plugins.js";
-import { extract, toCanonical } from "./llm.js";
-import { dialTwiml, gatherTwiml, hangupTwiml, isOpenNow, maskPhone, verifyTwilioSignature } from "./twilio.js";
+import { extract, setUsageSink, toCanonical } from "./llm.js";
+import { estimateCostUsd, UsageLog } from "./usage-store.js";
+import { dialTwiml, fetchTwilioAccount, gatherTwiml, hangupTwiml, isOpenNow, maskPhone, verifyTwilioSignature } from "./twilio.js";
 
 // shortcut: recent phone calls kept in memory (last 20) for the Twilio card; persist if owners need a call history.
 const recentCalls = new Map<string, { id: string; from: string; startedAt: string; turns: number; silences: number; outcome: string }>();
@@ -25,6 +26,8 @@ const recentCalls = new Map<string, { id: string; from: string; startedAt: strin
 // Saved onboarding settings must be active before the business data (and its seed) is created below.
 const settings = new SettingsStore(process.env.DATABASE_URL);
 const pluginStore = new PluginStore(process.env.DATABASE_URL);
+const usageLog = new UsageLog(process.env.DATABASE_URL);
+setUsageSink((row) => usageLog.add({ at: new Date().toISOString(), ...row }));
 // n8n plugin settings from the dashboard win; .env values stay as a fallback for scripted installs.
 async function eventTarget(): Promise<{ url: string; secret: string } | undefined> {
   const n8n = await pluginStore.get("n8n");
@@ -202,7 +205,8 @@ async function routeRequest(req: Request): Promise<Response> {
   const sessionId = sessionIdOf(req);
 
   const agent = getOrCreateAgent(sessionId);
-  const clientKey = req.headers.get("cf-connecting-ip") || "local";
+  // x-client-ip is set by agent-server.ts from the connection itself, never taken from the caller.
+  const clientKey = req.headers.get("x-client-ip") || "local";
   if (!rateLimiter.check(clientKey)) {
     return new Response(
       JSON.stringify(toolFailure("RATE_LIMIT_EXCEEDED", "Too many requests. Please wait before retrying.", false, `rate_${Date.now()}`)),
@@ -258,6 +262,11 @@ async function routeRequest(req: Request): Promise<Response> {
   if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !user) {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
   }
+  // On a fresh install nobody has logged in yet, but a server on the internet must not let strangers read or change
+  // anything before the owner finishes setup. Only the setup and login routes above are open. (Tests run open.)
+  if (pathname.startsWith("/api/") && !selfAuthenticated && !auth.hasOwner() && (process.env.NODE_ENV !== "test" || process.env.DISPATCH_LOCK_BEFORE_SETUP === "1")) {
+    return json(toolFailure("SETUP_REQUIRED", "Finish first-run setup first", false, `auth_${Date.now()}`), 403, corsHeaders);
+  }
   // Twilio phone line: every caller turn arrives here. Twilio's signature replaces the dashboard login.
   if (pathname === "/api/twilio/voice" && method === "POST") {
     const twilio = await pluginStore.get("twilio");
@@ -308,10 +317,38 @@ async function routeRequest(req: Request): Promise<Response> {
   }
 
   // Staff run the day (bookings, inbox, chat); only the owner changes settings, plugins, logins or resets data.
-  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset" || pathname === "/api/backup"
+  const ownerOnly = pathname.startsWith("/api/plugins") || pathname.startsWith("/api/users") || pathname === "/api/reset" || pathname === "/api/backup" || pathname === "/api/usage"
     || (method !== "GET" && (pathname === "/api/business" || pathname === "/api/staff"));
   if (ownerOnly && user?.role === "staff") {
     return json(toolFailure("FORBIDDEN", "Only the owner can change this", false, `auth_${Date.now()}`), 403, corsHeaders);
+  }
+
+  // What the AI brain and the phone line have used. Tokens are the provider's own counts; dollars are the owner's
+  // own prices times those tokens, so nothing here is a guessed price. Twilio figures come from Twilio's API.
+  if (pathname === "/api/usage" && method === "GET") {
+    const config = getBusinessConfig();
+    const dayStart = zonedTimeToUtc(localDate(new Date(), config.timeZone), "00:00", config.timeZone).toISOString();
+    const monthStart = zonedTimeToUtc(`${localDate(new Date(), config.timeZone).slice(0, 7)}-01`, "00:00", config.timeZone).toISOString();
+    const ai = await pluginStore.get("ai");
+    const prices = [ai?.config.priceIn, ai?.config.priceOut].map((value) => (value ?? "").trim());
+    const price = prices.every((value) => value !== "" && Number.isFinite(Number(value))) ? { input: Number(prices[0]), output: Number(prices[1]) } : null;
+    const today = usageLog.summary(dayStart);
+    const month = usageLog.summary(monthStart);
+    const twilio = await pluginStore.get("twilio");
+    let account: Awaited<ReturnType<typeof fetchTwilioAccount>> | undefined;
+    let accountError: string | undefined;
+    if (twilio?.enabled) {
+      try {
+        account = await fetchTwilioAccount(twilio.config.accountSid ?? "", twilio.secrets.authToken ?? "");
+      } catch (error) {
+        const status = error instanceof Error ? error.message : "";
+        accountError = status === "401" || status === "403" ? "Twilio rejected the Account SID or auth token." : "Could not read your Twilio account right now.";
+      }
+    }
+    return json({ ok: true, data: {
+      ai: { enabled: !!ai?.enabled, provider: ai?.config.provider ?? null, model: ai?.config.model ?? null, today, month, price, cost: price ? { today: estimateCostUsd(today, price), month: estimateCostUsd(month, price) } : null },
+      twilio: { enabled: !!twilio?.enabled, callsToday: [...recentCalls.values()].filter((call) => call.startedAt >= dayStart).length, account, error: accountError }
+    } }, 200, corsHeaders);
   }
 
   // Team logins (owner only): name + starting PIN; removing a login ends that person's sessions.
@@ -365,7 +402,11 @@ async function routeRequest(req: Request): Promise<Response> {
     const open = inbox.list().filter((task) => !task.closedAt);
     const deliveries = outbox.recent(100);
     const bookings = [...domainService.getStore().workOrders.values()];
+    const zone = getBusinessConfig().timeZone;
+    const dayStart = zonedTimeToUtc(localDate(new Date(), zone), "00:00", zone).toISOString();
+    const phoneOn = !!(await pluginStore.get("twilio"))?.enabled;
     return json({ ok: true, data: {
+      calls: { lineOn: phoneOn, today: phoneOn ? [...recentCalls.values()].filter((call) => call.startedAt >= dayStart).length : 0 },
       uptimeSeconds: Math.round(process.uptime()),
       database: { kind: dbPath ? "file" : "memory", sizeBytes: dbPath && existsSync(dbPath) ? statSync(dbPath).size : 0 },
       inbox: { open: open.length, overdue: open.filter((task) => now - Date.parse(task.createdAt) > SLA_MINUTES[task.kind] * 60_000).length },
@@ -431,15 +472,19 @@ async function routeRequest(req: Request): Promise<Response> {
     const known = new Set(config.services.map((service) => service.id));
     const list = Array.isArray(body.staff) ? body.staff : null;
     const staff = list?.map((raw) => {
-      const member = raw as { id?: unknown; name?: unknown; skills?: unknown };
+      const member = raw as { id?: unknown; name?: unknown; skills?: unknown; hours?: unknown };
       const name = typeof member.name === "string" ? member.name.trim() : "";
       const skills = Array.isArray(member.skills) ? member.skills.filter((skill): skill is string => typeof skill === "string" && known.has(skill)) : [];
-      return { id: typeof member.id === "string" ? member.id : undefined, name, skills };
+      const hours = member.hours == null ? undefined : WeekHoursSchema.safeParse(member.hours);
+      return { id: typeof member.id === "string" ? member.id : undefined, name, skills, hours: hours?.success ? hours.data : undefined, badHours: hours ? !hours.success : false };
     });
+    if (staff?.some((member) => member.badHours)) {
+      return json(toolFailure("INVALID_INPUT", "A staff member's hours are not valid (use HH:MM and a closing time after opening)", false, `staff_${Date.now()}`), 400, corsHeaders);
+    }
     if (!staff || staff.some((member) => !member.name || member.name.length > 80 || member.skills.length === 0)) {
       return json(toolFailure("INVALID_INPUT", "Each staff member needs a name and at least one service", false, `staff_${Date.now()}`), 400, corsHeaders);
     }
-    const blocked = domainService.getStore().setStaff(staff, config.serviceZones);
+    const blocked = domainService.getStore().setStaff(staff.map(({ badHours, ...member }) => member), config.serviceZones);
     if (blocked.length > 0) {
       return json(toolFailure("STAFF_HAS_BOOKINGS", `Cannot remove staff with upcoming bookings: ${blocked.join(", ")}`, false, `staff_${Date.now()}`), 409, corsHeaders);
     }
@@ -459,7 +504,7 @@ async function routeRequest(req: Request): Promise<Response> {
     } }, 200, corsHeaders);
   }
   if (businessRoute && method === "PUT") {
-    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown; services?: unknown; hours?: unknown; slotMinutes?: unknown };
+    const body = await req.json().catch(() => ({})) as { templateId?: unknown; name?: unknown; market?: unknown; timeZone?: unknown; serviceZones?: unknown; services?: unknown; hours?: unknown; slotMinutes?: unknown; runsOn?: unknown; greeting?: unknown; agentName?: unknown; tone?: unknown };
     const current = getBusinessConfig();
     const templateId = typeof body.templateId === "string" ? body.templateId : current.templateId;
     const switching = templateId !== current.templateId;
@@ -478,7 +523,11 @@ async function routeRequest(req: Request): Promise<Response> {
       serviceZones: zones ?? base.serviceZones,
       services: Array.isArray(body.services) ? toServices(body.services, base.services) : base.services,
       hours: body.hours ?? base.hours,
-      slotMinutes: body.slotMinutes ?? base.slotMinutes
+      slotMinutes: body.slotMinutes ?? base.slotMinutes,
+      runsOn: body.runsOn ?? current.runsOn,
+      greeting: text(body.greeting) || base.greeting,
+      agentName: text(body.agentName) ?? current.agentName,
+      tone: body.tone ?? current.tone
     });
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -491,8 +540,10 @@ async function routeRequest(req: Request): Promise<Response> {
       domainService.getStore().reset();
       agents.clear();
     }
-    // Hours, slot length or zones may have changed: regenerate future free slots.
-    domainService.getStore().rebuildFutureSlots();
+    // Hours, slot length or zones may have changed. Staff cover every service area, so a new area must reach
+    // the people already on the roster; setStaff also regenerates the future free slots.
+    const store = domainService.getStore();
+    store.setStaff([...store.technicians.values()].map((tech) => ({ id: tech.id, name: tech.name, skills: tech.skills, hours: tech.hours })), parsed.data.serviceZones);
     return json(toolSuccess({ config: parsed.data }, `biz_${Date.now()}`), 200, corsHeaders);
   }
 
