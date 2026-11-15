@@ -5,8 +5,8 @@ interface NavbarProps {
   onReset: () => void;
   austinTime: string;
   onOpenVoiceModal?: () => void;
-  activeView?: "dispatch" | "team" | "services" | "company" | "system";
-  onViewChange?: (view: "dispatch" | "team" | "services" | "company" | "system") => void;
+  activeView?: "dispatch" | "team" | "services" | "company" | "system" | "plugins";
+  onViewChange?: (view: "dispatch" | "team" | "services" | "company" | "system" | "plugins") => void;
   onLogout?: () => void;
   companyName?: string;
 }
@@ -60,7 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset, austinTime, onOpenVoice
       </div>
 
       <nav className="app-nav-links" aria-label="Main navigation">
-        {([ ["dispatch", "Dispatch"], ["team", "Team"], ["services", "Services"], ["company", "Company"], ["system", "System"] ] as const).map(([view, label]) =>
+        {([ ["dispatch", "Dispatch"], ["team", "Team"], ["services", "Services"], ["company", "Company"], ["plugins", "Plugins"], ["system", "System"] ] as const).map(([view, label]) =>
           <button type="button" key={view} className={activeView === view ? "app-nav-link active" : "app-nav-link"} aria-current={activeView === view ? "page" : undefined} onClick={() => onViewChange?.(view)}>{label}</button>
         )}
       </nav>

@@ -10,9 +10,12 @@ import { SessionStore } from "./session-store.js";
 import { AuthStore, generateSetupCode, safeEqual } from "./auth-store.js";
 import { buildBookingEvent, sendBookingEvent } from "./outbound-events.js";
 import { SettingsStore } from "./settings-store.js";
+import { PluginStore } from "./plugin-store.js";
+import { pluginById, plugins } from "./plugins.js";
 
 // Saved onboarding settings must be active before the business data (and its seed) is created below.
 const settings = new SettingsStore(process.env.DATABASE_URL);
+const pluginStore = new PluginStore(process.env.DATABASE_URL);
 setBusinessConfig(settings.load().config);
 
 // Multi-session agent registry: in-memory cache in front of the durable SessionStore.
@@ -38,8 +41,10 @@ const n8nClient = new N8nClient({
   onMutation: async (kind, workOrder) => {
     if (kind === "created") settings.markFirstBooking();
     await deliverBookingEmails(domainService.getStore(), workOrder.id);
-    const url = process.env.N8N_EVENTS_URL;
-    const secret = process.env.N8N_EVENTS_SECRET;
+    // n8n plugin settings from the dashboard win; .env values stay as a fallback for scripted installs.
+    const n8n = await pluginStore.get("n8n");
+    const url = n8n?.enabled ? n8n.config.url : process.env.N8N_EVENTS_URL;
+    const secret = n8n?.enabled ? n8n.secrets.secret : process.env.N8N_EVENTS_SECRET;
     // Not awaited: a slow n8n must not add latency to the caller's turn.
     if (url && secret) void sendBookingEvent(url, secret, buildBookingEvent(`booking.${kind}`, workOrder, getBusinessConfig().timeZone));
   }
@@ -195,6 +200,43 @@ async function routeRequest(req: Request): Promise<Response> {
   const selfAuthenticated = pathname.startsWith("/api/voice/tools/") || pathname === "/api/voice/webhook";
   if (pathname.startsWith("/api/") && !selfAuthenticated && auth.hasOwner() && !(await auth.isValidSession(ownerToken))) {
     return json(toolFailure("UNAUTHORIZED", "Log in with your PIN", false, `auth_${Date.now()}`), 401, corsHeaders);
+  }
+
+  // Plugins page. Secrets are write-only: the API says whether one is saved, never what it is.
+  if (pathname === "/api/plugins" && method === "GET") {
+    const list = await Promise.all(plugins.map(async (plugin) => {
+      const record = await pluginStore.get(plugin.id);
+      return {
+        id: plugin.id, name: plugin.name, category: plugin.category, description: plugin.description, limits: plugin.limits,
+        enabled: record?.enabled ?? false,
+        fields: plugin.fields.map((field) => ({ ...field, value: field.secret ? "" : record?.config[field.key] ?? "", saved: field.secret ? Boolean(record?.secrets[field.key]) : undefined }))
+      };
+    }));
+    return json({ ok: true, data: { plugins: list } }, 200, corsHeaders);
+  }
+  const pluginMatch = /^\/api\/plugins\/([a-z0-9-]+)(\/test)?$/.exec(pathname);
+  if (pluginMatch) {
+    const plugin = pluginById(pluginMatch[1]);
+    if (!plugin) return json(toolFailure("NOT_FOUND", "Unknown plugin", false, `plugin_${Date.now()}`), 404, corsHeaders);
+    const current = (await pluginStore.get(plugin.id)) ?? { enabled: false, config: {}, secrets: {} };
+    if (pluginMatch[2] && method === "POST") {
+      if (plugin.validate({ ...current.config, ...current.secrets })) return json({ ok: true, data: { ok: false, message: "Save the settings first." } }, 200, corsHeaders);
+      return json({ ok: true, data: await plugin.test(current) }, 200, corsHeaders);
+    }
+    if (!pluginMatch[2] && method === "PUT") {
+      const body = await req.json().catch(() => ({})) as { values?: Record<string, unknown>; enabled?: unknown };
+      const next = { enabled: typeof body.enabled === "boolean" ? body.enabled : current.enabled, config: { ...current.config }, secrets: { ...current.secrets } };
+      for (const field of plugin.fields) {
+        const value = body.values?.[field.key];
+        if (typeof value !== "string") continue;
+        // Empty secret = keep the saved one (the page never receives it back).
+        if (field.secret) { if (value.trim()) next.secrets[field.key] = value.trim(); } else next.config[field.key] = value.trim();
+      }
+      const problem = next.enabled ? plugin.validate({ ...next.config, ...next.secrets }) : null;
+      if (problem) return json(toolFailure("INVALID_INPUT", problem, false, `plugin_${Date.now()}`), 400, corsHeaders);
+      await pluginStore.save(plugin.id, next);
+      return json(toolSuccess({ enabled: next.enabled }, `plugin_${Date.now()}`), 200, corsHeaders);
+    }
   }
 
   // Staff list from onboarding. Each member does the listed services in every business zone/location.

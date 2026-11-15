@@ -5,7 +5,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { AuthStore, generateSetupCode } from "./auth-store.js";
 
 // PBKDF2 with 600k iterations is slow on purpose; under a loaded machine the default 5 s can run out.
-vi.setConfig({ testTimeout: 30_000 });
+// The worker import in beforeAll gets the same headroom: a timed-out hook makes vitest skip these tests silently.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 60_000 });
 
 const dir = mkdtempSync(join(tmpdir(), "dispatchai-auth-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
